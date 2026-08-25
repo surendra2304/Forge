@@ -80,6 +80,16 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("GITHUB_REPO", "github_repo"),
         description="Default GitHub repository (e.g. owner/repo)",
     )
+    ai_universe_url: str = Field(
+        default="http://localhost:8000",
+        validation_alias=AliasChoices("AI_UNIVERSE_URL", "ai_universe_url"),
+        description="Base URL for external AI Universe reasoning engine",
+    )
+    ai_universe_api_key: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("AI_UNIVERSE_API_KEY", "ai_universe_api_key"),
+        description="API Key for AI Universe REST API authentication",
+    )
 
     model_config = SettingsConfigDict(
         env_file=".env",

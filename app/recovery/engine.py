@@ -141,11 +141,32 @@ class RecoveryEngine:
 
         # 1. LLM-driven patch synthesis if provider is assigned
         if self.provider:
+            consensus_info = ""
+            try:
+                from app.integrations.ai_universe_client import get_ai_universe_client
+                ai_client = get_ai_universe_client()
+                ai_res = await ai_client.consult_with_verification(
+                    question=f"Diagnose root cause and suggest code repair for {diagnosis.failure_class.value}: {diagnosis.error_message} in file {target_file}",
+                    min_confidence=0.70,
+                    use_debate=True,
+                )
+                if ai_res:
+                    consensus_info = f"\nExternal Multi-Agent Consensus (Run ID: {ai_res.run_id}):\n{ai_res.answer}\n"
+                    if self.store:
+                        await self.store.record_event(
+                            task_id=task_id,
+                            event_type="ai_universe.consulted",
+                            payload={"run_id": ai_res.run_id, "confidence": ai_res.confidence, "stage": "recovery_patch"},
+                        )
+            except Exception:
+                pass
+
             prompt = (
                 f"Fix failure in file '{target_file}':\n"
                 f"Failure Class: {diagnosis.failure_class.value}\n"
                 f"Error Message: {diagnosis.error_message}\n"
                 f"Suggested Strategy: {diagnosis.suggested_strategy}\n"
+                f"{consensus_info}"
                 f"Current File Content:\n```python\n{current_content}\n```\n\n"
                 f"Output the complete fixed file delimited as:\n"
                 f"### File: {target_file}\n```python\n<fixed code>\n```"

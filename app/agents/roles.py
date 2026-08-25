@@ -69,10 +69,32 @@ class ArchitectRole(BaseAgent):
         goal = context.get("goal", "Engineering Project")
         workspace_summary = self.get_workspace_summary(task_id, engine)
 
+        # Consult AI Universe peer debate for complex architectural decisions
+        consensus_info = ""
+        try:
+            from app.integrations.ai_universe_client import get_ai_universe_client
+            ai_client = get_ai_universe_client()
+            ai_res = await ai_client.consult_with_verification(
+                question=f"Architectural tradeoffs, schemas, and module structure for: {goal}. Stage: {node_title}",
+                min_confidence=0.70,
+                use_debate=True,
+            )
+            if ai_res:
+                consensus_info = f"\nExternal Multi-Agent Consensus (Run ID: {ai_res.run_id}):\n{ai_res.answer}\n"
+                if hasattr(engine, "store") and engine.store:
+                    await engine.store.record_event(
+                        task_id=task_id,
+                        event_type="ai_universe.consulted",
+                        payload={"run_id": ai_res.run_id, "confidence": ai_res.confidence, "stage": "architecture"},
+                    )
+        except Exception:
+            pass
+
         prompt = (
             f"Objective: {goal}\n"
             f"Stage: {node_title}\n"
-            f"{workspace_summary}\n\n"
+            f"{workspace_summary}\n"
+            f"{consensus_info}\n"
             f"Please synthesize the complete Architecture Specification for this project. "
             f"Define system modules, interfaces, schema definitions, and file layout.\n"
             f"Format the primary specification document as:\n"
@@ -317,11 +339,33 @@ class DebuggerRole(BaseAgent):
         terminal_logs = context.get("terminal_logs", "No terminal logs.")
         workspace_summary = self.get_workspace_summary(task_id, engine)
 
+        # Consult AI Universe peer debate for complex root-cause diagnosis
+        consensus_info = ""
+        try:
+            from app.integrations.ai_universe_client import get_ai_universe_client
+            ai_client = get_ai_universe_client()
+            ai_res = await ai_client.consult_with_verification(
+                question=f"Diagnose root cause and bug fix for: {error_context}. Diagnostic Scope: {node_title}",
+                min_confidence=0.70,
+                use_debate=True,
+            )
+            if ai_res:
+                consensus_info = f"\nExternal Multi-Agent Consensus (Run ID: {ai_res.run_id}):\n{ai_res.answer}\n"
+                if hasattr(engine, "store") and engine.store:
+                    await engine.store.record_event(
+                        task_id=task_id,
+                        event_type="ai_universe.consulted",
+                        payload={"run_id": ai_res.run_id, "confidence": ai_res.confidence, "stage": "debugging"},
+                    )
+        except Exception:
+            pass
+
         prompt = (
             f"Diagnostic Scope: {node_title}\n"
             f"Error Information:\n{error_context}\n\n"
             f"Recent Terminal Logs:\n{terminal_logs}\n\n"
-            f"{workspace_summary}\n\n"
+            f"{workspace_summary}\n"
+            f"{consensus_info}\n"
             f"Please perform root-cause failure analysis and provide the exact code fixes required. "
             f"Delimit any fixed files with '### File: path/to/file.py'."
         )
