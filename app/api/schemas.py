@@ -100,3 +100,25 @@ class HealthResponse(BaseModel):
     database_connected: bool
     default_provider: ProviderHealthStatus
     capabilities: ProviderCapabilities
+
+
+class TimelineEvent(BaseModel):
+    id: str
+    task_id: str
+    run_id: str
+    stage: str
+    agent_id: str
+    provider_model: str
+    action: str
+    inputs: Dict[str, Any] = Field(default_factory=dict)
+    result: Optional[Dict[str, Any]] = None
+    duration_ms: float = 0.0
+    checkpoint_id: Optional[str] = None
+    timestamp: datetime
+
+
+class TimelineResponse(BaseModel):
+    task_id: str
+    total_events: int
+    stages_covered: List[str]
+    timeline: List[TimelineEvent]

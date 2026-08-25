@@ -21,6 +21,8 @@ from app.api.schemas import (
     TaskCreateRequest,
     TaskDetailResponse,
     TaskResponse,
+    TimelineEvent,
+    TimelineResponse,
 )
 from app.core.config import Settings, get_settings
 from app.core.logging import get_logger
@@ -301,6 +303,53 @@ async def get_run_audit_trail(
             )
             for e in events
         ],
+    )
+
+
+@router.get("/tasks/{task_id}/timeline", response_model=TimelineResponse, summary="Get Structured Chronological Task Timeline")
+async def get_task_timeline(
+    task_id: str,
+    store: StateStore = Depends(get_state_store),
+) -> TimelineResponse:
+    """
+    Return a standardized, chronological telemetry stream of all task actions,
+    stages, model invocations, and checkpoints for external dashboard consumption (FRIDAY / AI Universe).
+    """
+    task = await store.get_task(task_id)
+    if not task:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Task '{task_id}' not found")
+
+    events = await store.get_audit_trail(task_id)
+    timeline_events: List[TimelineEvent] = []
+    stages_covered = set()
+
+    for e in events:
+        payload = e.payload or {}
+        stage = payload.get("stage", "Execution")
+        stages_covered.add(stage)
+
+        timeline_events.append(
+            TimelineEvent(
+                id=e.id,
+                task_id=e.task_id,
+                run_id=payload.get("run_id", e.id),
+                stage=stage,
+                agent_id=payload.get("agent_id", payload.get("agent", "orchestrator")),
+                provider_model=payload.get("provider_model", "direct-model"),
+                action=e.event_type,
+                inputs=payload.get("inputs", {k: v for k, v in payload.items() if k not in ["stage", "run_id", "agent_id", "provider_model", "result", "duration_ms", "checkpoint_id"]}),
+                result=payload.get("result"),
+                duration_ms=payload.get("duration_ms", 0.0),
+                checkpoint_id=payload.get("checkpoint_id"),
+                timestamp=e.timestamp,
+            )
+        )
+
+    return TimelineResponse(
+        task_id=task_id,
+        total_events=len(timeline_events),
+        stages_covered=sorted(list(stages_covered)),
+        timeline=timeline_events,
     )
 
 

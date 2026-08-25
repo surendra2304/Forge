@@ -4,6 +4,7 @@ Verification subsystem for Project FORGE.
 
 from app.verification.checkers import (
     BaseChecker,
+    BrowserChecker,
     BuildChecker,
     LintChecker,
     RuntimeChecker,
@@ -25,6 +26,7 @@ __all__ = [
     "LintChecker",
     "TestChecker",
     "RuntimeChecker",
+    "BrowserChecker",
     "VerificationEngine",
     "verification_engine",
 ]
