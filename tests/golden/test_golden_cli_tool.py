@@ -3,8 +3,9 @@ Golden Benchmark 1: Python CLI Todo Application.
 Validates end-to-end autonomous synthesis, execution, verification, and delivery report generation.
 """
 
-from pathlib import Path
 import json
+from pathlib import Path
+
 import pytest
 
 from app.core.config import Settings
@@ -42,18 +43,20 @@ async def test_golden_benchmark_python_cli_tool(temp_dir: Path):
         "Provide CLI argument parsing via argparse",
     ]
 
-    # 2. Intake and DAG Planning
-    task, graph = await orchestrator.intake_and_plan(
-        goal=goal,
-        requirements=requirements,
-        mode=TaskMode.AUTONOMOUS,
-    )
-    task_id = task.id
-    assert task.state == TaskState.READY
-    assert len(graph.nodes) >= 6
+    task_id = None
+    try:
+        # 2. Intake and DAG Planning
+        task, graph = await orchestrator.intake_and_plan(
+            goal=goal,
+            requirements=requirements,
+            mode=TaskMode.AUTONOMOUS,
+        )
+        task_id = task.id
+        assert task.state == TaskState.READY
+        assert len(graph.nodes) >= 6
 
-    # 3. Scaffold Implementation in Workspace
-    cli_code = """\"\"\"CLI Todo Application.\"\"\"
+        # 3. Scaffold Implementation in Workspace
+        cli_code = """\"\"\"CLI Todo Application.\"\"\"
 import argparse
 import json
 from pathlib import Path
@@ -125,7 +128,7 @@ if __name__ == "__main__":
     sys.exit(main())
 """
 
-    test_code = """\"\"\"Unit tests for CLI Todo application.\"\"\"
+        test_code = """\"\"\"Unit tests for CLI Todo application.\"\"\"
 from main import add_todo, list_todos, complete_todo
 
 def test_todo_lifecycle(tmp_path, monkeypatch):
@@ -148,44 +151,50 @@ def test_todo_lifecycle(tmp_path, monkeypatch):
     assert updated[0]["done"] is True
 """
 
-    wm.write_project_file(task_id, "main.py", cli_code)
-    wm.write_project_file(task_id, "test_main.py", test_code)
-    wm.write_project_file(task_id, "README.md", "# CLI Todo Application\n\nBuilt by FORGE Autonomous Engine.\n")
+        wm.write_project_file(task_id, "main.py", cli_code)
+        wm.write_project_file(task_id, "test_main.py", test_code)
+        wm.write_project_file(task_id, "README.md", "# CLI Todo Application\n\nBuilt by FORGE Autonomous Engine.\n")
 
-    # 4. Execute TaskGraph
-    task = await orchestrator.run_task(task_id, max_iterations=10)
-    assert task.state == TaskState.COMPLETED
-    assert task.progress_percentage == 100
+        # 4. Execute TaskGraph
+        task = await orchestrator.run_task(task_id, max_iterations=10)
+        assert task.state == TaskState.COMPLETED
+        assert task.progress_percentage == 100
 
-    # 5. Verification Battery Gates
-    report = await verifier.verify_task(task_id)
-    if not report.all_passed:
-        print("FAIL REASONS:", report.failure_reasons)
-        for ev in report.evidence:
-            print("EV:", ev.check_name, ev.passed, "ERR:", ev.stderr, "OUT:", ev.stdout)
-    assert report.all_passed is True
-    assert report.failed_checks == 0
-    assert report.total_checks >= 3
+        # 5. Verification Battery Gates
+        report = await verifier.verify_task(task_id)
+        if not report.all_passed:
+            print("FAIL REASONS:", report.failure_reasons)
+            for ev in report.evidence:
+                print("EV:", ev.check_name, ev.passed, "ERR:", ev.stderr, "OUT:", ev.stdout)
+        assert report.all_passed is True
+        assert report.failed_checks == 0
+        assert report.total_checks >= 3
 
-    # 6. Delivery Packaging & Tagging
-    packager = DeliveryPackager(engine=engine, wm=wm)
-    delivery = await packager.package_delivery(
-        task_id=task_id,
-        goal=goal,
-        requirements=requirements,
-        tag_name="v1.0-forge-delivery",
-    )
+        # 6. Delivery Packaging & Tagging
+        packager = DeliveryPackager(engine=engine, wm=wm)
+        delivery = await packager.package_delivery(
+            task_id=task_id,
+            goal=goal,
+            requirements=requirements,
+            tag_name="v1.0-forge-delivery",
+        )
 
-    assert delivery.release_tag == "v1.0-forge-delivery"
-    assert delivery.test_build_status["all_passed"] is True
+        assert delivery.release_tag == "v1.0-forge-delivery"
+        assert delivery.test_build_status["all_passed"] is True
 
-    # 7. Assert artifacts exist
-    artifacts_dir = wm.get_task_workspace_dir(task_id) / "artifacts"
-    assert (artifacts_dir / "completion_report.json").exists()
-    assert (artifacts_dir / "COMPLETION_REPORT.md").exists()
-    assert (artifacts_dir / "verification_report.json").exists()
+        # 7. Assert artifacts exist
+        artifacts_dir = wm.get_task_workspace_dir(task_id) / "artifacts"
+        assert (artifacts_dir / "completion_report.json").exists()
+        assert (artifacts_dir / "COMPLETION_REPORT.md").exists()
+        assert (artifacts_dir / "verification_report.json").exists()
 
-    report_json = json.loads((artifacts_dir / "completion_report.json").read_text(encoding="utf-8"))
-    assert report_json["objective"] == goal
-    assert len(report_json["requirements"]) == 3
-    assert report_json["release_tag"] == "v1.0-forge-delivery"
+        report_json = json.loads((artifacts_dir / "completion_report.json").read_text(encoding="utf-8"))
+        assert report_json["objective"] == goal
+        assert len(report_json["requirements"]) == 3
+        assert report_json["release_tag"] == "v1.0-forge-delivery"
+    finally:
+        if task_id:
+            import shutil
+            ws_dir = wm.get_task_workspace_dir(task_id)
+            if ws_dir.exists():
+                shutil.rmtree(ws_dir, ignore_errors=True)

@@ -49,15 +49,23 @@ class WorkspaceManager:
         base_workspaces = self.settings.base_dir / self.settings.workspaces_dir
         return base_workspaces / folder_name
 
-    def create_workspace(self, task_id: str, custom_base: Optional[Path] = None) -> WorkspacePaths:
+    def create_workspace(
+        self,
+        task_id: str,
+        custom_base: Optional[Path] = None,
+        repo_url: Optional[str] = None,
+        local_path: Optional[str | Path] = None,
+    ) -> WorkspacePaths:
         """
         Create isolated directory hierarchy for task under workspaces/task_<id>/:
-        - project/
+        - project/ (optionally cloned from repo_url or copied from local_path)
         - artifacts/
         - logs/
         - state/
         - cache/
         """
+        import subprocess
+
         root_dir = (
             custom_base
             if custom_base
@@ -75,13 +83,42 @@ class WorkspaceManager:
         # Create root and all subdirectories
         root_dir.mkdir(parents=True, exist_ok=True)
         for name, path in subdirs.items():
-            path.mkdir(parents=True, exist_ok=True)
+            if name != "project":
+                path.mkdir(parents=True, exist_ok=True)
+
+        # Populate project directory from repo_url, local_path, or create empty
+        if repo_url:
+            logger.info(f"Cloning repository '{repo_url}' into task workspace {task_id}...")
+            try:
+                subprocess.run(
+                    ["git", "clone", "--depth", "1", repo_url, str(subdirs["project"])],
+                    capture_output=True,
+                    text=True,
+                    check=True,
+                )
+                logger.info(f"Successfully cloned repository into {subdirs['project']}")
+            except subprocess.CalledProcessError as e:
+                logger.error(f"Failed to clone repository '{repo_url}': {e.stderr}")
+                subdirs["project"].mkdir(parents=True, exist_ok=True)
+                raise RuntimeError(f"Git clone failed for '{repo_url}': {e.stderr}") from e
+        elif local_path:
+            src_path = Path(local_path).resolve()
+            logger.info(f"Copying local codebase from '{src_path}' into task workspace {task_id}...")
+            if not src_path.exists():
+                raise FileNotFoundError(f"Local codebase path does not exist: {src_path}")
+            subdirs["project"].mkdir(parents=True, exist_ok=True)
+            shutil.copytree(src_path, subdirs["project"], dirs_exist_ok=True)
+            logger.info(f"Successfully copied local codebase from '{src_path}' into {subdirs['project']}")
+        else:
+            subdirs["project"].mkdir(parents=True, exist_ok=True)
 
         # Write metadata manifest
         manifest_file = root_dir / ".forge_workspace"
         manifest_content = (
             f"task_id: {task_id}\n"
             f"initialized: true\n"
+            f"repo_url: {repo_url or 'none'}\n"
+            f"local_path: {str(local_path) if local_path else 'none'}\n"
             f"subdirs: [project, artifacts, logs, state, cache]\n"
         )
         manifest_file.write_text(manifest_content, encoding="utf-8")

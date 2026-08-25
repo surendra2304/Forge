@@ -3,10 +3,10 @@ Failure Classifier for Project FORGE Recovery Subsystem.
 Analyzes failed verification evidence, stack traces, and test output to classify root causes.
 """
 
-from enum import Enum
 import re
-from typing import Any, Dict, List, Optional
-from pydantic import BaseModel, Field
+from enum import Enum
+
+from pydantic import BaseModel
 
 from app.verification.evidence import VerificationEvidence
 
@@ -24,10 +24,10 @@ class FailureClass(str, Enum):
 
 class FailureDiagnosis(BaseModel):
     failure_class: FailureClass
-    failing_file: Optional[str] = None
-    failing_line: Optional[int] = None
+    failing_file: str | None = None
+    failing_line: int | None = None
     error_message: str
-    stack_trace: Optional[str] = None
+    stack_trace: str | None = None
     suggested_strategy: str
     raw_evidence_summary: str = ""
 
@@ -38,14 +38,40 @@ class FailureClassifier:
     def classify(self, evidence: VerificationEvidence) -> FailureDiagnosis:
         text = f"{evidence.stderr}\n{evidence.stdout}"
 
-        # 1. Syntax Error check
-        if "SyntaxError:" in text or "IndentationError:" in text or "TabError:" in text:
-            file_match = re.search(r'File "([^"]+)", line (\d+)', text)
-            msg_match = re.search(r'(SyntaxError|IndentationError|TabError): (.*)', text)
+        # 1. Syntax Error check (AST checker or Python runtime/linter)
+        is_syntax = (
+            "syntaxerror" in text.lower()
+            or "indentationerror" in text.lower()
+            or "taberror" in text.lower()
+            or "invalid syntax" in text.lower()
+            or "syntax error" in text.lower()
+            or evidence.check_name == "Python AST Build & Syntax Check"
+        )
+        if is_syntax:
+            file_match = re.search(r'(?:File "|[\'"]file[\'"]:\s*[\'"]|([a-zA-Z0-9_\-./\\]+\.py)[,\s]+line\s+)(\d+)?', text)
+            # Try structured dictionary match from AST checker: [{'file': 'main.py', 'line': 12
+            dict_match = re.search(r"['\"]file['\"]:\s*['\"]([^'\"]+)['\"],\s*['\"]line['\"]:\s*(\d+)", text)
+            file_path_match = re.search(r'File "([^"]+)", line (\d+)', text)
+            paren_match = re.search(r'invalid syntax \(([^,]+),\s*line\s*(\d+)\)', text)
+
+            failing_f = None
+            failing_l = None
+
+            if dict_match:
+                failing_f = dict_match.group(1)
+                failing_l = int(dict_match.group(2))
+            elif file_path_match:
+                failing_f = file_path_match.group(1)
+                failing_l = int(file_path_match.group(2))
+            elif paren_match:
+                failing_f = paren_match.group(1)
+                failing_l = int(paren_match.group(2))
+
+            msg_match = re.search(r'(SyntaxError|IndentationError|TabError|invalid syntax)[\s:]*(.*)', text, re.IGNORECASE)
             return FailureDiagnosis(
                 failure_class=FailureClass.SYNTAX_ERROR,
-                failing_file=file_match.group(1) if file_match else None,
-                failing_line=int(file_match.group(2)) if file_match else None,
+                failing_file=failing_f,
+                failing_line=failing_l,
                 error_message=msg_match.group(0) if msg_match else "Syntax error detected",
                 stack_trace=text,
                 suggested_strategy="Inspect syntax error line and fix grammar, indentation, or unclosed delimiters.",

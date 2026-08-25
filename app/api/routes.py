@@ -39,8 +39,7 @@ from app.memory.models import (
 )
 from app.memory.state_store import StateStore
 from app.memory.task_lifecycle import InvalidStateTransitionError, TaskStateMachine
-from app.providers.base import ProviderCapabilities, ProviderHealthStatus
-from app.providers.direct import DirectProvider
+from app.providers import BaseModelProvider, ProviderCapabilities, ProviderHealthStatus, get_provider
 
 logger = get_logger("api.routes")
 router = APIRouter()
@@ -56,8 +55,8 @@ def get_task_lifecycle(store: StateStore = Depends(get_state_store)) -> TaskStat
     return TaskStateMachine(store)
 
 
-def get_default_provider(settings: Settings = Depends(get_settings)) -> DirectProvider:
-    return DirectProvider(model_name=settings.default_model)
+def get_default_provider(settings: Settings = Depends(get_settings)) -> BaseModelProvider:
+    return get_provider(provider_name=settings.default_provider, model_name=settings.default_model)
 
 
 def get_orchestrator(store: StateStore = Depends(get_state_store)) -> OrchestratorCore:
@@ -73,7 +72,7 @@ def get_workspace_manager() -> WorkspaceManager:
 @router.get("/health", response_model=HealthResponse, summary="System Health & Diagnostic Check")
 async def health_check(
     settings: Settings = Depends(get_settings),
-    provider: DirectProvider = Depends(get_default_provider),
+    provider: BaseModelProvider = Depends(get_default_provider),
 ) -> HealthResponse:
     """Check database connectivity and provider health status."""
     db_connected = False
@@ -104,7 +103,7 @@ async def health_check(
 @router.get("/capabilities", response_model=EngineCapabilitiesResponse, summary="Get FORGE Capabilities")
 async def get_capabilities(
     settings: Settings = Depends(get_settings),
-    provider: DirectProvider = Depends(get_default_provider),
+    provider: BaseModelProvider = Depends(get_default_provider),
 ) -> EngineCapabilitiesResponse:
     """Return engine, lifecycle, mode, and provider capabilities."""
     return EngineCapabilitiesResponse(
@@ -152,6 +151,8 @@ async def create_task(
         mode=request.mode,
         max_budget=request.max_budget,
         custom_workspace=request.workspace,
+        repo_url=request.repo_url,
+        local_path=request.local_path,
     )
 
     return TaskResponse(

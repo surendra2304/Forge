@@ -41,6 +41,11 @@ DEFAULT_ROLE_PERMISSIONS: Dict[str, Set[ToolPermission]] = {
         ToolPermission.FS_READ,
         ToolPermission.GIT_READ,
     },
+    "codebase_analyzer": {
+        ToolPermission.FS_READ,
+        ToolPermission.FS_WRITE,
+        ToolPermission.GIT_READ,
+    },
     "architect": {
         ToolPermission.FS_READ,
         ToolPermission.FS_WRITE,
@@ -92,6 +97,7 @@ DEFAULT_ROLE_PERMISSIONS: Dict[str, Set[ToolPermission]] = {
     },
     "security_reviewer": {
         ToolPermission.FS_READ,
+        ToolPermission.FS_WRITE,
         ToolPermission.TERMINAL_EXEC,
         ToolPermission.GIT_READ,
     },

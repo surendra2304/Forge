@@ -120,7 +120,8 @@ async def test_patch_applicator_and_recovery_flow(temp_dir: Path):
 
     # Attempt automated recovery
     failed_ev = next(e for e in report.evidence if not e.passed)
-    recovered, msg, patch = await recovery.attempt_recovery(task_id, failed_ev)
+    recovered, _msg, patch = await recovery.attempt_recovery(task_id, failed_ev)
 
+    assert recovered is True
     assert patch is not None
     assert patch.target_file == "broken.py"

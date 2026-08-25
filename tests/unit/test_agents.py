@@ -27,12 +27,13 @@ from app.execution.permissions import (
 from app.providers.direct import DirectProvider
 
 
-def test_registry_registers_10_specialist_roles():
+def test_registry_registers_11_specialist_roles():
     capabilities = agent_registry.list_all()
-    assert len(capabilities) == 10
+    assert len(capabilities) >= 11
 
     expected_roles = [
         "planner",
+        "codebase_analyzer",
         "architect",
         "developer",
         "frontend",

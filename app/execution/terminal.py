@@ -117,3 +117,36 @@ class TerminalTool:
             timed_out=timed_out,
             cwd=str(cwd),
         )
+
+    async def install_dependencies(
+        self,
+        task_id: str,
+        timeout_seconds: int = 120,
+        role: str = "developer",
+    ) -> CommandResult:
+        """
+        Inspect the project workspace and install project dependencies using the appropriate package manager:
+        - Node.js / TypeScript: npm install (or yarn install)
+        - Go: go mod tidy
+        - Python: pip install -r requirements.txt
+        """
+        paths = self.wm.get_workspace_paths(task_id) or self.wm.create_workspace(task_id)
+        project_dir = paths.project
+
+        if (project_dir / "package.json").exists():
+            cmd = "yarn install" if (project_dir / "yarn.lock").exists() else "npm install"
+            return await self.run_command(task_id, cmd, timeout_seconds=timeout_seconds, role=role)
+        elif (project_dir / "go.mod").exists():
+            return await self.run_command(task_id, "go mod tidy", timeout_seconds=timeout_seconds, role=role)
+        elif (project_dir / "requirements.txt").exists():
+            return await self.run_command(task_id, "pip install -r requirements.txt", timeout_seconds=timeout_seconds, role=role)
+
+        return CommandResult(
+            command="install_dependencies",
+            exit_code=0,
+            stdout="No recognized manifest (package.json, go.mod, requirements.txt) found.",
+            stderr="",
+            duration_ms=0.1,
+            timed_out=False,
+            cwd=str(project_dir),
+        )

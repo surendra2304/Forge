@@ -9,6 +9,7 @@ from app.core.logging import get_logger
 from app.core.workspace import WorkspaceManager, workspace_manager
 from app.execution.filesystem import FilesystemTool
 from app.execution.git_tool import GitStatusResult, GitTool, git_tool
+from app.execution.github import GitHubTool, github_tool
 from app.execution.permissions import (
     PermissionDeniedError,
     PermissionManager,
@@ -36,6 +37,7 @@ class ExecutionEngine:
         self.terminal = TerminalTool(wm=self.wm, pm=self.pm)
         self.process = ProcessManagerTool(wm=self.wm, pm=self.pm)
         self.git = GitTool(wm=self.wm, pm=self.pm)
+        self.github = GitHubTool(wm=self.wm, pm=self.pm, git=self.git)
 
     def check_permission(self, role: str, permission: ToolPermission) -> None:
         """Check role permissions."""

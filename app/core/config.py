@@ -5,7 +5,7 @@ FORGE Application Configuration using Pydantic Settings.
 from functools import lru_cache
 from pathlib import Path
 from typing import Optional
-from pydantic import Field
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -28,14 +28,58 @@ class Settings(BaseSettings):
     artifacts_dir: Path = Field(default_factory=lambda: Path("artifacts"))
 
     # Provider Defaults
-    default_provider: str = Field(default="direct", description="Default model provider")
-    default_model: str = Field(default="direct-default", description="Default model identifier")
-    model_temperature: float = Field(default=0.2, description="Default generation temperature")
+    default_provider: str = Field(
+        default="direct",
+        validation_alias=AliasChoices("DEFAULT_PROVIDER", "FORGE_DEFAULT_PROVIDER", "default_provider"),
+        description="Default model provider: openai, anthropic, direct, or mock",
+    )
+    default_model: str = Field(
+        default="direct-default",
+        validation_alias=AliasChoices("DEFAULT_MODEL", "FORGE_DEFAULT_MODEL", "default_model"),
+        description="Default model identifier",
+    )
+    model_temperature: float = Field(
+        default=0.2,
+        validation_alias=AliasChoices("MODEL_TEMPERATURE", "FORGE_MODEL_TEMPERATURE", "model_temperature"),
+        description="Default generation temperature",
+    )
 
     # API Keys (Optional)
-    openai_api_key: Optional[str] = Field(default=None, alias="OPENAI_API_KEY")
-    anthropic_api_key: Optional[str] = Field(default=None, alias="ANTHROPIC_API_KEY")
-    gemini_api_key: Optional[str] = Field(default=None, alias="GEMINI_API_KEY")
+    openai_api_key: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("OPENAI_API_KEY", "openai_api_key"),
+        description="OpenAI API Key",
+    )
+    openai_default_model: str = Field(
+        default="gpt-4o",
+        validation_alias=AliasChoices("OPENAI_DEFAULT_MODEL", "openai_default_model"),
+        description="Default OpenAI model",
+    )
+    anthropic_api_key: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("ANTHROPIC_API_KEY", "anthropic_api_key"),
+        description="Anthropic API Key",
+    )
+    anthropic_default_model: str = Field(
+        default="claude-3-5-sonnet-20241022",
+        validation_alias=AliasChoices("ANTHROPIC_DEFAULT_MODEL", "anthropic_default_model"),
+        description="Default Anthropic model",
+    )
+    gemini_api_key: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("GEMINI_API_KEY", "gemini_api_key"),
+        description="Gemini API Key",
+    )
+    github_token: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("GITHUB_TOKEN", "github_token"),
+        description="GitHub Personal Access Token or App Token for pushing and PR creation",
+    )
+    github_repo: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("GITHUB_REPO", "github_repo"),
+        description="Default GitHub repository (e.g. owner/repo)",
+    )
 
     model_config = SettingsConfigDict(
         env_file=".env",

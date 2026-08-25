@@ -4,7 +4,9 @@ Defines the required contract for all LLM / Inference Providers.
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, AsyncIterator, Dict, List, Optional, Type, TypeVar
+from collections.abc import AsyncIterator
+from typing import Any, TypeVar
+
 from pydantic import BaseModel, Field
 
 T = TypeVar("T", bound=BaseModel)
@@ -19,7 +21,7 @@ class UsageEstimate(BaseModel):
 
 class ProviderCapabilities(BaseModel):
     provider_name: str
-    supported_models: List[str]
+    supported_models: list[str]
     supports_streaming: bool = True
     supports_structured_output: bool = True
     supports_function_calling: bool = True
@@ -32,8 +34,8 @@ class ProviderHealthStatus(BaseModel):
     healthy: bool
     provider_name: str
     message: str = "Provider operational"
-    latency_ms: Optional[float] = None
-    details: Dict[str, Any] = Field(default_factory=dict)
+    latency_ms: float | None = None
+    details: dict[str, Any] = Field(default_factory=dict)
 
 
 class ProviderResponse(BaseModel):
@@ -41,13 +43,13 @@ class ProviderResponse(BaseModel):
     model: str
     finish_reason: str = "stop"
     usage: UsageEstimate = Field(default_factory=UsageEstimate)
-    raw_response: Optional[Dict[str, Any]] = None
+    raw_response: dict[str, Any] | None = None
 
 
 class BaseModelProvider(ABC):
     """Abstract base class for all FORGE model providers."""
 
-    def __init__(self, model_name: Optional[str] = None, **kwargs):
+    def __init__(self, model_name: str | None = None, **kwargs):
         self.model_name = model_name or "default-model"
         self.config = kwargs
 
@@ -55,49 +57,43 @@ class BaseModelProvider(ABC):
     async def generate(
         self,
         prompt: str,
-        system_prompt: Optional[str] = None,
+        system_prompt: str | None = None,
         temperature: float = 0.2,
-        max_tokens: Optional[int] = None,
+        max_tokens: int | None = None,
         **kwargs,
     ) -> ProviderResponse:
         """Generate a complete text completion."""
-        pass
 
     @abstractmethod
     async def stream(
         self,
         prompt: str,
-        system_prompt: Optional[str] = None,
+        system_prompt: str | None = None,
         temperature: float = 0.2,
-        max_tokens: Optional[int] = None,
+        max_tokens: int | None = None,
         **kwargs,
     ) -> AsyncIterator[str]:
         """Stream chunks of generated text tokens."""
-        pass
 
     @abstractmethod
     async def structured_output(
         self,
         prompt: str,
-        response_model: Type[T],
-        system_prompt: Optional[str] = None,
+        response_model: type[T],
+        system_prompt: str | None = None,
         temperature: float = 0.1,
         **kwargs,
     ) -> T:
         """Generate validated structured output parsed into a Pydantic model."""
-        pass
 
     @abstractmethod
-    def estimate_usage(self, prompt: str, output: Optional[str] = None) -> UsageEstimate:
+    def estimate_usage(self, prompt: str, output: str | None = None) -> UsageEstimate:
         """Estimate token usage and cost for prompt and optional output."""
-        pass
 
     @abstractmethod
     def capabilities(self) -> ProviderCapabilities:
         """Return provider capabilities, features, and context constraints."""
-        pass
 
     @abstractmethod
     async def health(self) -> ProviderHealthStatus:
         """Check provider operational status and connectivity."""
-        pass

@@ -4,7 +4,7 @@ Validates end-to-end autonomous synthesis of backend REST APIs with database mod
 """
 
 from pathlib import Path
-import json
+
 import pytest
 
 from app.core.config import Settings
@@ -43,17 +43,19 @@ async def test_golden_benchmark_fastapi_sqlite_service(temp_dir: Path):
         "Automated integration tests using FastAPI TestClient",
     ]
 
-    # 2. Intake and Planning
-    task, graph = await orchestrator.intake_and_plan(
-        goal=goal,
-        requirements=requirements,
-        mode=TaskMode.AUTONOMOUS,
-    )
-    task_id = task.id
-    assert task.state == TaskState.READY
+    task_id = None
+    try:
+        # 2. Intake and Planning
+        task, _graph = await orchestrator.intake_and_plan(
+            goal=goal,
+            requirements=requirements,
+            mode=TaskMode.AUTONOMOUS,
+        )
+        task_id = task.id
+        assert task.state == TaskState.READY
 
-    # 3. Scaffold Implementation in Workspace
-    app_code = """\"\"\"FastAPI Expense Tracker Application.\"\"\"
+        # 3. Scaffold Implementation in Workspace
+        app_code = """\"\"\"FastAPI Expense Tracker Application.\"\"\"
 from fastapi import FastAPI, HTTPException, status
 from pydantic import BaseModel, Field
 import sqlite3
@@ -132,7 +134,7 @@ if __name__ == "__main__":
     sys.exit(main())
 """
 
-    test_code = """\"\"\"Integration tests for Expense Tracker API.\"\"\"
+        test_code = """\"\"\"Integration tests for Expense Tracker API.\"\"\"
 from fastapi.testclient import TestClient
 from main import app, init_sqlite
 
@@ -168,37 +170,43 @@ def test_expense_crud_lifecycle():
     assert len(items) >= 1
 """
 
-    wm.write_project_file(task_id, "main.py", app_code)
-    wm.write_project_file(task_id, "test_main.py", test_code)
-    wm.write_project_file(task_id, "README.md", "# Expense Tracker API\n\nFastAPI REST service with SQLite.\n")
+        wm.write_project_file(task_id, "main.py", app_code)
+        wm.write_project_file(task_id, "test_main.py", test_code)
+        wm.write_project_file(task_id, "README.md", "# Expense Tracker API\n\nFastAPI REST service with SQLite.\n")
 
-    # 4. Autonomous DAG Execution
-    task = await orchestrator.run_task(task_id, max_iterations=10)
-    assert task.state == TaskState.COMPLETED
+        # 4. Autonomous DAG Execution
+        task = await orchestrator.run_task(task_id, max_iterations=10)
+        assert task.state == TaskState.COMPLETED
 
-    # 5. Verification Battery
-    report = await verifier.verify_task(task_id)
-    if not report.all_passed:
-        print("FASTAPI FAIL REASONS:", report.failure_reasons)
-        for ev in report.evidence:
-            print("EV:", ev.check_name, ev.passed, "ERR:", ev.stderr, "OUT:", ev.stdout)
-    assert report.all_passed is True
-    assert report.failed_checks == 0
+        # 5. Verification Battery
+        report = await verifier.verify_task(task_id)
+        if not report.all_passed:
+            print("FASTAPI FAIL REASONS:", report.failure_reasons)
+            for ev in report.evidence:
+                print("EV:", ev.check_name, ev.passed, "ERR:", ev.stderr, "OUT:", ev.stdout)
+        assert report.all_passed is True
+        assert report.failed_checks == 0
 
-    # 6. Delivery Packaging
-    packager = DeliveryPackager(engine=engine, wm=wm)
-    delivery = await packager.package_delivery(
-        task_id=task_id,
-        goal=goal,
-        requirements=requirements,
-        stack="Python / FastAPI / SQLite",
-        tag_name="v1.0-forge-delivery",
-    )
+        # 6. Delivery Packaging
+        packager = DeliveryPackager(engine=engine, wm=wm)
+        delivery = await packager.package_delivery(
+            task_id=task_id,
+            goal=goal,
+            requirements=requirements,
+            stack="Python / FastAPI / SQLite",
+            tag_name="v1.0-forge-delivery",
+        )
 
-    assert delivery.release_tag == "v1.0-forge-delivery"
-    assert delivery.stack == "Python / FastAPI / SQLite"
+        assert delivery.release_tag == "v1.0-forge-delivery"
+        assert delivery.stack == "Python / FastAPI / SQLite"
 
-    # 7. Verification Artifacts
-    artifacts_dir = wm.get_task_workspace_dir(task_id) / "artifacts"
-    assert (artifacts_dir / "completion_report.json").exists()
-    assert (artifacts_dir / "COMPLETION_REPORT.md").exists()
+        # 7. Verification Artifacts
+        artifacts_dir = wm.get_task_workspace_dir(task_id) / "artifacts"
+        assert (artifacts_dir / "completion_report.json").exists()
+        assert (artifacts_dir / "COMPLETION_REPORT.md").exists()
+    finally:
+        if task_id:
+            import shutil
+            ws_dir = wm.get_task_workspace_dir(task_id)
+            if ws_dir.exists():
+                shutil.rmtree(ws_dir, ignore_errors=True)

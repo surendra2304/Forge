@@ -31,10 +31,8 @@ FORGE/
 │   └── golden/                     # 3 Golden Regression Benchmarks (CLI, FastAPI, Static Web)
 ├── docs/
 │   └── architecture.md             # System architecture and design documentation
-├── .agents/rules/                  # Permanent engineering rules & diary governance
-├── diary/                          # Day-wise engineering development chronicles
-├── FORGE_DIARY.md                  # Master consolidated development diary
-├── FORGE_DIARY_SPEC.md             # Diary specification standard
+├── diary/                          # Day-wise engineering development chronicles (e.g. 2026-08-25.md)
+├── diary.md                        # Master diary index and summary
 ├── pyproject.toml                  # Modern Python packaging configuration
 └── README.md                       # Project overview and documentation
 ```
@@ -85,7 +83,6 @@ pytest -v tests/
 
 ## 📖 Development Diary
 
-FORGE adheres to a strict, day-wise development chronicle governance model:
-- **[FORGE_DIARY.md](FORGE_DIARY.md)**: Consolidated master diary and navigation index.
-- **[FORGE_DIARY_SPEC.md](FORGE_DIARY_SPEC.md)**: Specification and structural rules.
-- **[diary/](diary/)**: Date-stamped chronicle entries.
+Keep track of daily progress and updates:
+- **[diary.md](diary.md)**: Main diary index and project overview.
+- **[diary/2026-08-25.md](diary/2026-08-25.md)**: Day 1 diary entry.

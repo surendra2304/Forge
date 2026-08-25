@@ -36,7 +36,13 @@ if hasattr(sys.stdout, "reconfigure"):
 console = Console()
 
 
-async def handle_build(goal: str, requirements: list[str], max_budget: float):
+async def handle_build(
+    goal: str,
+    requirements: list[str],
+    max_budget: float,
+    push_to_github: bool = False,
+    github_repo: Optional[str] = None,
+):
     """Executes full autonomous software engineering loop."""
     console.print(Panel.fit(f"[bold cyan]FORGE Engine[/bold cyan] -- Autonomous Software Synthesis\n[bold yellow]Goal:[/bold yellow] {goal}", title="Project FORGE"))
 
@@ -259,6 +265,8 @@ def main():
     build_parser.add_argument("goal", type=str, help="High-level engineering goal")
     build_parser.add_argument("--req", "-r", action="append", default=[], help="Explicit constraint or requirement")
     build_parser.add_argument("--budget", "-b", type=float, default=10.0, help="Max budget in USD")
+    build_parser.add_argument("--push-to-github", "-p", action="store_true", default=False, help="Push delivery branch to GitHub and open a Pull Request")
+    build_parser.add_argument("--github-repo", "--repo", type=str, default=None, help="Target GitHub repository (e.g. owner/repo)")
 
     # forge status
     status_parser = subparsers.add_parser("status", help="Inspect task status and progress")
@@ -295,7 +303,15 @@ def main():
         sys.exit(1)
 
     if args.command == "build":
-        asyncio.run(handle_build(args.goal, args.req, args.budget))
+        asyncio.run(
+            handle_build(
+                goal=args.goal,
+                requirements=args.req,
+                max_budget=args.budget,
+                push_to_github=args.push_to_github,
+                github_repo=args.github_repo,
+            )
+        )
     elif args.command == "status":
         asyncio.run(handle_status(args.task_id))
     elif args.command == "logs":

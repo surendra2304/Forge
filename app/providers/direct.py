@@ -7,18 +7,20 @@ import asyncio
 import json
 import re
 import time
-from typing import Any, AsyncIterator, Dict, List, Optional, Type, TypeVar
+from collections.abc import AsyncIterator
+from typing import Any
+
 from pydantic import BaseModel, ValidationError
 
+from app.core.logging import get_logger
 from app.providers.base import (
     BaseModelProvider,
     ProviderCapabilities,
     ProviderHealthStatus,
     ProviderResponse,
-    UsageEstimate,
     T,
+    UsageEstimate,
 )
-from app.core.logging import get_logger
 
 logger = get_logger("providers.direct")
 
@@ -32,9 +34,9 @@ class DirectProvider(BaseModelProvider):
 
     def __init__(
         self,
-        model_name: Optional[str] = None,
+        model_name: str | None = None,
         mock_mode: bool = False,
-        mock_response: Optional[str] = None,
+        mock_response: str | None = None,
         cost_per_1k_input: float = 0.0015,
         cost_per_1k_output: float = 0.002,
         **kwargs,
@@ -45,7 +47,7 @@ class DirectProvider(BaseModelProvider):
         self.cost_per_1k_input = cost_per_1k_input
         self.cost_per_1k_output = cost_per_1k_output
 
-    def estimate_usage(self, prompt: str, output: Optional[str] = None) -> UsageEstimate:
+    def estimate_usage(self, prompt: str, output: str | None = None) -> UsageEstimate:
         """Estimate token usage based on approximate ~4 chars per token rule."""
         prompt_tokens = max(1, len(prompt) // 4)
         completion_tokens = max(0, len(output) // 4) if output else 0
@@ -94,16 +96,16 @@ class DirectProvider(BaseModelProvider):
             return ProviderHealthStatus(
                 healthy=False,
                 provider_name="DirectProvider",
-                message=f"Health check failed: {str(e)}",
+                message=f"Health check failed: {e!s}",
                 latency_ms=None,
             )
 
     async def generate(
         self,
         prompt: str,
-        system_prompt: Optional[str] = None,
+        system_prompt: str | None = None,
         temperature: float = 0.2,
-        max_tokens: Optional[int] = None,
+        max_tokens: int | None = None,
         **kwargs,
     ) -> ProviderResponse:
         """Generate response directly or return deterministic mock response."""
@@ -115,7 +117,7 @@ class DirectProvider(BaseModelProvider):
             # Default direct completion format
             content = (
                 f"[Direct Completion from {self.model_name}]\n"
-                f"Prompt Processed: {prompt.strip()}\n"
+                f"Prompt Summary: {prompt.strip()[:80]}...\n"
                 f"Status: Executed successfully."
             )
 
@@ -131,9 +133,9 @@ class DirectProvider(BaseModelProvider):
     async def stream(
         self,
         prompt: str,
-        system_prompt: Optional[str] = None,
+        system_prompt: str | None = None,
         temperature: float = 0.2,
-        max_tokens: Optional[int] = None,
+        max_tokens: int | None = None,
         **kwargs,
     ) -> AsyncIterator[str]:
         """Stream generated response token by token."""
@@ -154,8 +156,8 @@ class DirectProvider(BaseModelProvider):
     async def structured_output(
         self,
         prompt: str,
-        response_model: Type[T],
-        system_prompt: Optional[str] = None,
+        response_model: type[T],
+        system_prompt: str | None = None,
         temperature: float = 0.1,
         **kwargs,
     ) -> T:
@@ -184,7 +186,7 @@ class DirectProvider(BaseModelProvider):
             # Fallback attempt
             return response_model.model_validate(self._synthesize_dict_for_model(response_model))
 
-    def _extract_json(self, text: str) -> Dict[str, Any]:
+    def _extract_json(self, text: str) -> dict[str, Any]:
         """Extract JSON object from string with regex tolerance for markdown codeblocks."""
         text = text.strip()
         # Look for ```json ... ``` blocks
@@ -204,7 +206,7 @@ class DirectProvider(BaseModelProvider):
                     pass
             return {}
 
-    def _synthesize_dict_for_model(self, model: Type[BaseModel]) -> Dict[str, Any]:
+    def _synthesize_dict_for_model(self, model: type[BaseModel]) -> dict[str, Any]:
         """Synthesize default valid dictionary matching model fields."""
         data = {}
         for field_name, field_info in model.model_fields.items():
@@ -228,6 +230,6 @@ class DirectProvider(BaseModelProvider):
                 data[field_name] = None
         return data
 
-    def _synthesize_json_for_model(self, model: Type[BaseModel]) -> str:
+    def _synthesize_json_for_model(self, model: type[BaseModel]) -> str:
         """Synthesize JSON representation for model."""
         return json.dumps(self._synthesize_dict_for_model(model))

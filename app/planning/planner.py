@@ -3,10 +3,9 @@ Planner Engine for Project FORGE.
 Synthesizes natural language requirements into the standard 8-stage hierarchical tree and durable executable DAG.
 """
 
-from typing import List, Optional
 from uuid import uuid4
+
 from app.core.logging import get_logger
-from app.memory.models import TaskGraph
 from app.planning.graph import ExecutableTaskDAG
 from app.planning.tree import (
     HierarchicalTaskTree,
@@ -14,8 +13,7 @@ from app.planning.tree import (
     TaskTreeNode,
     TreeNodeType,
 )
-from app.providers.base import BaseModelProvider
-from app.providers.direct import DirectProvider
+from app.providers import BaseModelProvider, get_provider
 
 logger = get_logger("planning.planner")
 
@@ -23,21 +21,22 @@ logger = get_logger("planning.planner")
 class PlannerEngine:
     """Decomposes engineering goals into standard 8-stage trees and executable DAGs."""
 
-    def __init__(self, provider: Optional[BaseModelProvider] = None):
-        self.provider = provider or DirectProvider(model_name="direct-planner")
+    def __init__(self, provider: BaseModelProvider | None = None):
+        self.provider = provider or get_provider()
 
     async def plan(
         self,
         task_id: str,
         goal: str,
-        requirements: Optional[List[str]] = None,
+        requirements: list[str] | None = None,
+        has_existing_codebase: bool = False,
     ) -> HierarchicalTaskTree:
         """
-        Synthesize goal and requirements into the canonical 8-stage pipeline tree:
-        Project -> Requirements -> Architecture -> Implementation -> Integration -> Verification -> Security -> Release.
+        Synthesize goal and requirements into the canonical pipeline tree:
+        Project -> Requirements -> [Codebase Analysis] -> Architecture -> Implementation -> Integration -> Verification -> Security -> Release.
         """
         req_list = requirements or []
-        logger.info(f"Synthesizing 8-stage plan for task '{task_id}': {goal[:80]}...")
+        logger.info(f"Synthesizing plan for task '{task_id}' (existing_codebase={has_existing_codebase}): {goal[:80]}...")
 
         # 1. Project Root
         root = TaskTreeNode(
@@ -60,6 +59,24 @@ class PlannerEngine:
             dependencies=[],
         )
 
+        children = [node_req]
+        arch_deps = [node_req.id]
+
+        # Check if existing codebase onboarding / analysis is required
+        combined_text = f"{goal} {' '.join(req_list)}".lower()
+        if has_existing_codebase or any(k in combined_text for k in ["existing codebase", "modify repo", "refactor repo", "onboarding", "codebase"]):
+            node_analysis = TaskTreeNode(
+                id=str(uuid4()),
+                title="Codebase Analysis & Project Context Mapping",
+                description="Inspect existing codebase architecture, package manifests, entrypoints, and directory structure.",
+                stage=PipelineStage.REQUIREMENTS,
+                node_type=TreeNodeType.TASK,
+                assigned_role="codebase_analyzer",
+                dependencies=[node_req.id],
+            )
+            children.append(node_analysis)
+            arch_deps = [node_analysis.id]
+
         # 3. Stage: Architecture
         node_arch = TaskTreeNode(
             id=str(uuid4()),
@@ -68,30 +85,69 @@ class PlannerEngine:
             stage=PipelineStage.ARCHITECTURE,
             node_type=TreeNodeType.TASK,
             assigned_role="architect",
-            dependencies=[node_req.id],
+            dependencies=arch_deps,
+        )
+        children.append(node_arch)
+
+        # Check for full-stack frontend/backend parallel division
+        is_fullstack = (
+            any(k in combined_text for k in ["full-stack", "fullstack", "react", "frontend", "ui", "web dashboard", "weather dashboard"])
+            and any(k in combined_text for k in ["fastapi", "backend", "api", "sqlite", "server", "rest"])
         )
 
-        # 4. Stage: Implementation
-        node_impl_core = TaskTreeNode(
-            id=str(uuid4()),
-            title="Core Implementation & Logic Synthesis",
-            description="Author clean, idiomatic implementation conforming to architecture specification.",
-            stage=PipelineStage.IMPLEMENTATION,
-            node_type=TreeNodeType.TASK,
-            assigned_role="developer",
-            dependencies=[node_arch.id],
-        )
+        if is_fullstack:
+            # Parallel branch: Frontend UI & Backend API
+            node_fe = TaskTreeNode(
+                id=str(uuid4()),
+                title="Frontend Component & UI Synthesis",
+                description="Build responsive client interface, state management, and user views.",
+                stage=PipelineStage.IMPLEMENTATION,
+                node_type=TreeNodeType.TASK,
+                assigned_role="frontend",
+                dependencies=[node_arch.id],
+            )
+            node_be = TaskTreeNode(
+                id=str(uuid4()),
+                title="Backend API & Data Layer Synthesis",
+                description="Implement REST endpoints, schemas, and database persistence.",
+                stage=PipelineStage.IMPLEMENTATION,
+                node_type=TreeNodeType.TASK,
+                assigned_role="backend",
+                dependencies=[node_arch.id],
+            )
+            node_integration = TaskTreeNode(
+                id=str(uuid4()),
+                title="Full-Stack Integration & Configuration Wiring",
+                description="Connect frontend client with backend REST API.",
+                stage=PipelineStage.INTEGRATION,
+                node_type=TreeNodeType.TASK,
+                assigned_role="developer",
+                dependencies=[node_fe.id, node_be.id],
+            )
+            children.extend([node_fe, node_be, node_integration])
+        else:
+            # 4. Stage: Implementation
+            node_impl_core = TaskTreeNode(
+                id=str(uuid4()),
+                title="Core Implementation & Logic Synthesis",
+                description="Author clean, idiomatic implementation conforming to architecture specification.",
+                stage=PipelineStage.IMPLEMENTATION,
+                node_type=TreeNodeType.TASK,
+                assigned_role="developer",
+                dependencies=[node_arch.id],
+            )
 
-        # 5. Stage: Integration
-        node_integration = TaskTreeNode(
-            id=str(uuid4()),
-            title="Module Integration & Configuration Wiring",
-            description="Connect components, environment variables, and dependencies.",
-            stage=PipelineStage.INTEGRATION,
-            node_type=TreeNodeType.TASK,
-            assigned_role="developer",
-            dependencies=[node_impl_core.id],
-        )
+            # 5. Stage: Integration
+            node_integration = TaskTreeNode(
+                id=str(uuid4()),
+                title="Module Integration & Configuration Wiring",
+                description="Connect components, environment variables, and dependencies.",
+                stage=PipelineStage.INTEGRATION,
+                node_type=TreeNodeType.TASK,
+                assigned_role="developer",
+                dependencies=[node_impl_core.id],
+            )
+            children.extend([node_impl_core, node_integration])
 
         # 6. Stage: Verification
         node_verify = TaskTreeNode(
@@ -128,15 +184,8 @@ class PlannerEngine:
             dependencies=[node_sec.id],
         )
 
-        root.children = [
-            node_req,
-            node_arch,
-            node_impl_core,
-            node_integration,
-            node_verify,
-            node_sec,
-            node_release,
-        ]
+        children.extend([node_verify, node_sec, node_release])
+        root.children = children
 
         tree = HierarchicalTaskTree(
             project_id=task_id,
@@ -150,7 +199,7 @@ class PlannerEngine:
         self,
         task_id: str,
         goal: str,
-        requirements: Optional[List[str]] = None,
+        requirements: list[str] | None = None,
     ) -> ExecutableTaskDAG:
         """Helper to create tree and immediately return the executable DAG."""
         tree = await self.plan(task_id, goal, requirements)

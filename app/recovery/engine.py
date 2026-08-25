@@ -3,7 +3,7 @@ Recovery & Self-Healing Engine for Project FORGE.
 Coordinates diagnosis, anti-loop governance, surgical patch application, and re-verification.
 """
 
-from typing import Optional, Tuple
+
 from app.core.logging import get_logger
 from app.execution.engine import ExecutionEngine, execution_engine
 from app.memory.db import db_manager
@@ -14,9 +14,9 @@ from app.recovery.classifier import (
     failure_classifier,
 )
 from app.recovery.loop_guard import AntiLoopController, anti_loop_controller
-from app.recovery.repair import PatchApplicator, RepairPatch, patch_applicator
+from app.recovery.repair import PatchApplicator, RepairPatch
 from app.verification.engine import VerificationEngine, verification_engine
-from app.verification.evidence import VerificationEvidence, VerificationReport
+from app.verification.evidence import VerificationEvidence
 
 logger = get_logger("recovery.engine")
 
@@ -26,25 +26,30 @@ class RecoveryEngine:
 
     def __init__(
         self,
-        classifier: Optional[FailureClassifier] = None,
-        loop_guard: Optional[AntiLoopController] = None,
-        applicator: Optional[PatchApplicator] = None,
-        verifier: Optional[VerificationEngine] = None,
-        store: Optional[StateStore] = None,
-        exec_engine: Optional[ExecutionEngine] = None,
+        classifier: FailureClassifier | None = None,
+        loop_guard: AntiLoopController | None = None,
+        applicator: PatchApplicator | None = None,
+        verifier: VerificationEngine | None = None,
+        store: StateStore | None = None,
+        exec_engine: ExecutionEngine | None = None,
     ):
+        self.exec_engine = exec_engine or execution_engine
         self.classifier = classifier or failure_classifier
         self.loop_guard = loop_guard or anti_loop_controller
-        self.applicator = applicator or patch_applicator
+        self.applicator = applicator or PatchApplicator(engine=self.exec_engine)
         self.verifier = verifier or verification_engine
         self.store = store or StateStore(db_manager)
-        self.exec_engine = exec_engine or execution_engine
+        self.provider = None
+
+    def set_provider(self, provider) -> None:
+        """Assign an active model provider for LLM-driven patch synthesis."""
+        self.provider = provider
 
     async def attempt_recovery(
         self,
         task_id: str,
         failed_evidence: VerificationEvidence,
-    ) -> Tuple[bool, str, Optional[RepairPatch]]:
+    ) -> tuple[bool, str, RepairPatch | None]:
         """
         Diagnose a failed check, check anti-loop constraints, apply minimal fix, and re-verify.
         Returns (recovered: bool, message: str, patch: Optional[RepairPatch]).
@@ -56,8 +61,8 @@ class RecoveryEngine:
             f"({diagnosis.error_message[:80]})"
         )
 
-        # 2. Synthesize minimal patch candidate
-        patch = self._synthesize_patch_for_diagnosis(task_id, diagnosis)
+        # 2. Synthesize minimal patch candidate (via LLM or heuristics)
+        patch = await self._synthesize_patch_for_diagnosis(task_id, diagnosis)
         if not patch:
             msg = f"Unable to synthesize automated patch for {diagnosis.failure_class.value}"
             logger.warning(f"[Task {task_id}] {msg}")
@@ -111,11 +116,13 @@ class RecoveryEngine:
             )
             return True, "Recovery succeeded. All checks passing.", patch
         else:
-            logger.warning(f"[Task {task_id}] Verification still failing after patch application.")
-            return False, "Re-verification failed after applying patch.", patch
+            logger.warning(f"[Task {task_id}] Verification still failing after patch application: {new_report.failure_reasons}")
+            return False, f"Re-verification failed after applying patch: {new_report.failure_reasons}", patch
 
-    def _synthesize_patch_for_diagnosis(self, task_id: str, diagnosis: FailureDiagnosis) -> Optional[RepairPatch]:
-        """Synthesize candidate repair patch based on diagnosis."""
+    async def _synthesize_patch_for_diagnosis(self, task_id: str, diagnosis: FailureDiagnosis) -> RepairPatch | None:
+        """Synthesize candidate repair patch based on diagnosis using LLM or heuristics."""
+        from app.agents.parser import LLMResponseParser
+
         target_file = diagnosis.failing_file
         if not target_file:
             py_files = self.exec_engine.fs.search_files(task_id, pattern="*.py", role="debugger")
@@ -132,17 +139,49 @@ class RecoveryEngine:
         except Exception:
             current_content = ""
 
-        # Basic syntax or indentation repair heuristics
+        # 1. LLM-driven patch synthesis if provider is assigned
+        if self.provider:
+            prompt = (
+                f"Fix failure in file '{target_file}':\n"
+                f"Failure Class: {diagnosis.failure_class.value}\n"
+                f"Error Message: {diagnosis.error_message}\n"
+                f"Suggested Strategy: {diagnosis.suggested_strategy}\n"
+                f"Current File Content:\n```python\n{current_content}\n```\n\n"
+                f"Output the complete fixed file delimited as:\n"
+                f"### File: {target_file}\n```python\n<fixed code>\n```"
+            )
+            try:
+                response = await self.provider.generate(
+                    prompt=prompt,
+                    system_prompt="You are an expert software debugger. Author verified, syntax-clean, bug-free fixes.",
+                )
+                extracted = LLMResponseParser.extract_files(response.content, default_filename=target_file)
+                if extracted:
+                    return RepairPatch(
+                        target_file=extracted[0].relative_path,
+                        replacement_snippet=extracted[0].content,
+                        explanation=f"LLM repaired {diagnosis.failure_class.value}: {diagnosis.error_message[:60]}",
+                        patch_type="rewrite",
+                    )
+            except Exception as e:
+                logger.warning(f"LLM patch synthesis failed: {e}. Falling back to rule-based repair.")
+
+        # 2. Basic syntax or indentation repair heuristics fallback
         if diagnosis.failure_class.value == "syntax_error":
             lines = current_content.splitlines()
             if diagnosis.failing_line and 0 < diagnosis.failing_line <= len(lines):
                 bad_line = lines[diagnosis.failing_line - 1]
-                # Fix unclosed quotes or missing colon
                 fixed_line = bad_line
                 if fixed_line.count('"') % 2 != 0:
                     fixed_line += '"'
                 if fixed_line.count("'") % 2 != 0:
                     fixed_line += "'"
+                if fixed_line.count("(") > fixed_line.count(")"):
+                    fixed_line += ")" * (fixed_line.count("(") - fixed_line.count(")"))
+                if fixed_line.count("[") > fixed_line.count("]"):
+                    fixed_line += "]" * (fixed_line.count("[") - fixed_line.count("]"))
+                if fixed_line.count("{") > fixed_line.count("}"):
+                    fixed_line += "}" * (fixed_line.count("{") - fixed_line.count("}"))
                 if (
                     fixed_line.strip().startswith(("def ", "class ", "if ", "for ", "while ", "elif ", "else", "try", "except", "finally"))
                     and not fixed_line.strip().endswith(":")

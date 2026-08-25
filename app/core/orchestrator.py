@@ -10,6 +10,7 @@ from uuid import uuid4
 
 from app.agents.registry import AgentRegistry, agent_registry
 from app.core.analyzer import TaskAnalysisResult, TaskAnalyzer, task_analyzer
+from app.core.context import ContextManager, context_manager
 from app.core.logging import get_logger
 from app.core.workspace import WorkspaceManager, workspace_manager
 from app.execution.engine import ExecutionEngine, execution_engine
@@ -43,6 +44,7 @@ class OrchestratorCore:
         planner: Optional[PlannerEngine] = None,
         registry: Optional[AgentRegistry] = None,
         engine: Optional[ExecutionEngine] = None,
+        ctx_manager: Optional[ContextManager] = None,
     ):
         self.store = store or StateStore(db_manager)
         self.wm = wm or workspace_manager
@@ -50,6 +52,7 @@ class OrchestratorCore:
         self.planner = planner or planner_engine
         self.registry = registry or agent_registry
         self.engine = engine or execution_engine
+        self.context_manager = ctx_manager or context_manager
         self.lifecycle = TaskStateMachine(self.store)
 
     async def intake_and_plan(
@@ -59,10 +62,12 @@ class OrchestratorCore:
         mode: TaskMode = TaskMode.AUTONOMOUS,
         max_budget: float = 10.0,
         custom_workspace: Optional[str] = None,
+        repo_url: Optional[str] = None,
+        local_path: Optional[str | Path] = None,
     ) -> tuple[TaskEntity, TaskGraph]:
         """
-        Intake a user request, create isolated workspace, run Task Analyzer,
-        synthesize 8-stage TaskGraph DAG, and transition task to READY.
+        Intake a user request, create isolated workspace (with optional git clone or local copy),
+        run Task Analyzer, synthesize TaskGraph DAG, and transition task to READY.
         """
         task_id = str(uuid4())
         req_list = requirements or []
@@ -70,7 +75,12 @@ class OrchestratorCore:
 
         # 1. Provision isolated workspace under workspaces/task_<id>/
         custom_base = Path(custom_workspace) if custom_workspace else None
-        ws_paths = self.wm.create_workspace(task_id, custom_base=custom_base)
+        ws_paths = self.wm.create_workspace(
+            task_id,
+            custom_base=custom_base,
+            repo_url=repo_url,
+            local_path=local_path,
+        )
 
         # 2. Persist initial task in PENDING state
         task = TaskEntity(
@@ -87,7 +97,13 @@ class OrchestratorCore:
         await self.store.record_event(
             task_id=task_id,
             event_type="task.created",
-            payload={"goal": goal, "mode": mode.value, "max_budget": max_budget},
+            payload={
+                "goal": goal,
+                "mode": mode.value,
+                "max_budget": max_budget,
+                "repo_url": repo_url,
+                "local_path": str(local_path) if local_path else None,
+            },
         )
 
         # 3. Call Task Analyzer
@@ -98,8 +114,20 @@ class OrchestratorCore:
             payload=analysis.model_dump(mode="json"),
         )
 
-        # 4. Route to Planner: Synthesize 8-stage tree and executable DAG
-        tree = await self.planner.plan(task_id, goal, req_list)
+        # Check if project workspace already contains existing files
+        has_existing_codebase = False
+        try:
+            has_existing_codebase = any(ws_paths.project.iterdir())
+        except Exception:
+            has_existing_codebase = False
+
+        # 4. Route to Planner: Synthesize tree and executable DAG
+        tree = await self.planner.plan(
+            task_id=task_id,
+            goal=goal,
+            requirements=req_list,
+            has_existing_codebase=has_existing_codebase,
+        )
         dag = ExecutableTaskDAG.from_tree(tree)
         saved_graph = await self.store.save_task_graph(dag.graph)
 
@@ -158,7 +186,13 @@ class OrchestratorCore:
             dag.mark_running(node.id)
 
             logger.info(f"[Parallel Wave] Dispatching node '{node.title}' to specialist agent '{role_name}' in task {task_id}")
-            context = {"goal": task.goal, "metadata": node.metadata}
+            context = self.context_manager.build_agent_context(
+                task_id=task_id,
+                role_name=role_name,
+                node_title=node.title,
+                base_context={"goal": task.goal, "metadata": node.metadata},
+                engine=self.engine,
+            )
 
             try:
                 result = await agent.execute_step(
@@ -183,6 +217,17 @@ class OrchestratorCore:
             if success:
                 dag.mark_completed(nid, result=res)
                 executed_nodes.append(nid)
+                if res and isinstance(res, dict):
+                    self.context_manager.record_step_result(task_id, nid, role, res)
+                    if "stdout" in res or "exit_code" in res:
+                        self.context_manager.record_terminal_output(
+                            task_id=task_id,
+                            command=res.get("command", f"{role} execution"),
+                            exit_code=res.get("exit_code", 0),
+                            stdout=res.get("stdout", ""),
+                            stderr=res.get("stderr", ""),
+                            role=role,
+                        )
                 await self.store.record_event(
                     task_id=task_id,
                     event_type="node.completed",

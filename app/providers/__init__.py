@@ -2,6 +2,7 @@
 Model Providers subsystem for Project FORGE.
 """
 
+from app.providers.anthropic import AnthropicProvider
 from app.providers.base import (
     BaseModelProvider,
     ProviderCapabilities,
@@ -10,12 +11,17 @@ from app.providers.base import (
     UsageEstimate,
 )
 from app.providers.direct import DirectProvider
+from app.providers.factory import get_provider
+from app.providers.openai import OpenAIProvider
 
 __all__ = [
+    "AnthropicProvider",
     "BaseModelProvider",
-    "ProviderResponse",
-    "UsageEstimate",
+    "DirectProvider",
+    "OpenAIProvider",
     "ProviderCapabilities",
     "ProviderHealthStatus",
-    "DirectProvider",
+    "ProviderResponse",
+    "UsageEstimate",
+    "get_provider",
 ]

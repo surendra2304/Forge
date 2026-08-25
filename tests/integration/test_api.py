@@ -32,9 +32,10 @@ async def test_agents_endpoint(async_client: AsyncClient):
     res = await async_client.get("/agents")
     assert res.status_code == 200
     agents = res.json()
-    assert len(agents) == 10
+    assert len(agents) >= 11
     agent_names = [a["name"] for a in agents]
     assert "planner" in agent_names
+    assert "codebase_analyzer" in agent_names
     assert "architect" in agent_names
     assert "developer" in agent_names
     assert "tester" in agent_names

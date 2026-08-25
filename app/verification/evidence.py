@@ -41,6 +41,7 @@ class VerificationReport(BaseModel):
     passed_checks: int
     failed_checks: int
     evidence: List[VerificationEvidence] = Field(default_factory=list)
+    baseline_comparison: Optional[Dict[str, Any]] = Field(default=None, description="Pre/post baseline regression comparison")
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
     @property

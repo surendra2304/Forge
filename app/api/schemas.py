@@ -17,6 +17,8 @@ class TaskCreateRequest(BaseModel):
     requirements: List[str] = Field(default_factory=list, description="Explicit constraints or requirements")
     mode: TaskMode = Field(default=TaskMode.AUTONOMOUS, description="Execution mode")
     workspace: Optional[str] = Field(default=None, description="Optional custom workspace path or identifier")
+    repo_url: Optional[str] = Field(default=None, description="Optional remote Git repository URL to clone")
+    local_path: Optional[str] = Field(default=None, description="Optional local directory path to copy into project sandbox")
     max_budget: float = Field(default=10.0, ge=0.1, description="Maximum allowed budget in USD")
 
 
