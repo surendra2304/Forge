@@ -32,7 +32,7 @@ FORGE/
 ├── docs/
 │   └── architecture.md             # System architecture and design documentation
 ├── diary/                          # Day-wise engineering development chronicles (e.g. 2026-08-25.md)
-├── diary.md                        # Master diary index and summary
+├── DIARY_SUMMARY.md                # Project summary and daily diary overview
 ├── pyproject.toml                  # Modern Python packaging configuration
 └── README.md                       # Project overview and documentation
 ```
@@ -84,5 +84,5 @@ pytest -v tests/
 ## 📖 Development Diary
 
 Keep track of daily progress and updates:
-- **[diary.md](diary.md)**: Main diary index and project overview.
-- **[diary/2026-08-25.md](diary/2026-08-25.md)**: Day 1 diary entry.
+- **[DIARY_SUMMARY.md](DIARY_SUMMARY.md)**: Short project overview and summary of each day's work.
+- **[diary/2026-08-25.md](diary/2026-08-25.md)**: Day 1 detailed diary entry.
