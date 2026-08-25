@@ -36,6 +36,7 @@ class TaskStateMachine:
         },
         TaskState.RUNNING: {
             TaskState.VERIFYING,
+            TaskState.COMPLETED,
             TaskState.BLOCKED,
             TaskState.FAILED,
             TaskState.CANCELLED,

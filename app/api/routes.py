@@ -24,6 +24,7 @@ from app.api.schemas import (
 )
 from app.core.config import Settings, get_settings
 from app.core.logging import get_logger
+from app.core.orchestrator import OrchestratorCore, orchestrator
 from app.core.workspace import WorkspaceManager, workspace_manager
 from app.memory.db import db_manager
 from app.memory.models import (
@@ -54,6 +55,10 @@ def get_task_lifecycle(store: StateStore = Depends(get_state_store)) -> TaskStat
 
 def get_default_provider(settings: Settings = Depends(get_settings)) -> DirectProvider:
     return DirectProvider(model_name=settings.default_model)
+
+
+def get_orchestrator(store: StateStore = Depends(get_state_store)) -> OrchestratorCore:
+    return OrchestratorCore(store=store)
 
 
 # --- System & Diagnostics ---
@@ -128,42 +133,18 @@ async def list_agents() -> List[AgentCapability]:
 async def create_task(
     request: TaskCreateRequest,
     settings: Settings = Depends(get_settings),
-    store: StateStore = Depends(get_state_store),
+    orchestrator: OrchestratorCore = Depends(get_orchestrator),
 ) -> TaskResponse:
     """
     Create a new engineering task, initialize its isolated workspace,
-    record the task.created audit event, and persist the task entity.
+    run Task Analyzer, synthesize 8-stage TaskGraph DAG, and transition to READY.
     """
-    task_id = str(uuid4())
-
-    # Create isolated directory structure under workspaces/task_<id>/
-    custom_base = Path(request.workspace) if request.workspace else None
-    ws_paths = workspace_manager.create_workspace(task_id, custom_base=custom_base)
-
-    task = TaskEntity(
-        id=task_id,
+    created_task, _ = await orchestrator.intake_and_plan(
         goal=request.goal,
         requirements=request.requirements,
         mode=request.mode,
-        workspace_path=str(ws_paths.root.resolve()),
         max_budget=request.max_budget,
-        budget_consumed=0.0,
-        state=TaskState.PENDING,
-        progress_percentage=0,
-    )
-
-    created_task = await store.create_task(task)
-
-    # Record structured event
-    await store.record_event(
-        task_id=task_id,
-        event_type="task.created",
-        payload={
-            "goal": request.goal,
-            "mode": request.mode.value,
-            "max_budget": request.max_budget,
-            "workspace_path": str(ws_paths.root.resolve()),
-        },
+        custom_workspace=request.workspace,
     )
 
     return TaskResponse(

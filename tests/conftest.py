@@ -12,6 +12,8 @@ import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 
 from app.core.config import Settings, get_settings
+from app.core.orchestrator import OrchestratorCore
+from app.core.workspace import WorkspaceManager
 from app.main import create_app
 from app.memory.db import DatabaseManager
 from app.memory.state_store import StateStore
@@ -79,6 +81,10 @@ async def async_client(test_db_manager: DatabaseManager, temp_dir: Path) -> Asyn
 
     app.dependency_overrides[get_settings] = get_test_settings
     app.dependency_overrides[routes_module.get_state_store] = lambda: StateStore(test_db_manager)
+    app.dependency_overrides[routes_module.get_orchestrator] = lambda: OrchestratorCore(
+        store=StateStore(test_db_manager),
+        wm=WorkspaceManager(settings=get_test_settings()),
+    )
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://testserver") as client:

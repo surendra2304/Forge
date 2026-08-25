@@ -32,12 +32,15 @@ async def test_agents_endpoint(async_client: AsyncClient):
     res = await async_client.get("/agents")
     assert res.status_code == 200
     agents = res.json()
-    assert len(agents) >= 4
+    assert len(agents) == 10
     agent_names = [a["name"] for a in agents]
     assert "planner" in agent_names
-    assert "coder" in agent_names
+    assert "architect" in agent_names
+    assert "developer" in agent_names
     assert "tester" in agent_names
-    assert "recovery" in agent_names
+    assert "debugger" in agent_names
+    assert "security_reviewer" in agent_names
+    assert "release_engineer" in agent_names
 
 
 @pytest.mark.asyncio
@@ -56,7 +59,7 @@ async def test_task_creation_and_inspection(async_client: AsyncClient):
 
     task_id = task["id"]
     assert task["goal"] == payload["goal"]
-    assert task["state"] == "PENDING"
+    assert task["state"] in ["PENDING", "READY"]
     assert task["max_budget"] == 12.5
     assert "workspace_path" in task
 
