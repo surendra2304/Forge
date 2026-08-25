@@ -1,7 +1,13 @@
 """
-Providers module for Project FORGE.
+Model Providers subsystem for Project FORGE.
 """
 
+from app.providers.ai_universe import (
+    AIUniverseProvider,
+    AIUniverseResponse,
+    ProvenanceRecord,
+    ReasoningMode,
+)
 from app.providers.base import (
     BaseModelProvider,
     ProviderCapabilities,
@@ -13,9 +19,13 @@ from app.providers.direct import DirectProvider
 
 __all__ = [
     "BaseModelProvider",
-    "DirectProvider",
-    "ProviderCapabilities",
-    "ProviderHealthStatus",
     "ProviderResponse",
     "UsageEstimate",
+    "ProviderCapabilities",
+    "ProviderHealthStatus",
+    "DirectProvider",
+    "AIUniverseProvider",
+    "AIUniverseResponse",
+    "ProvenanceRecord",
+    "ReasoningMode",
 ]

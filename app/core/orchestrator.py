@@ -3,6 +3,7 @@ Orchestrator Core for Project FORGE.
 Owns the end-to-end task lifecycle, coordinating Task Analyzer, Planner, Agent Registry, and Execution Engine.
 """
 
+import asyncio
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 from uuid import uuid4
@@ -150,12 +151,13 @@ class OrchestratorCore:
                 await self.store.record_event(task_id=task_id, event_type="task.completed")
             return task, []
 
-        for node in ready_nodes:
-            dag.mark_running(node.id)
+        # Execute all ready nodes concurrently in parallel wave
+        async def _execute_single_node(node) -> tuple[str, bool, Optional[Dict[str, Any]], Optional[str], str]:
             role_name = node.assigned_agent or "developer"
             agent = self.registry.create_agent(role_name)
+            dag.mark_running(node.id)
 
-            logger.info(f"Dispatching node '{node.title}' to specialist agent '{role_name}' in task {task_id}")
+            logger.info(f"[Parallel Wave] Dispatching node '{node.title}' to specialist agent '{role_name}' in task {task_id}")
             context = {"goal": task.goal, "metadata": node.metadata}
 
             try:
@@ -165,41 +167,55 @@ class OrchestratorCore:
                     context=context,
                     engine=self.engine,
                 )
-                dag.mark_completed(node.id, result=result)
-                executed_nodes.append(node.id)
+                return node.id, True, result, None, role_name
+            except Exception as e:
+                logger.error(f"Execution error on node '{node.title}': {e}")
+                return node.id, False, None, str(e), role_name
 
+        wave_tasks = [_execute_single_node(node) for node in ready_nodes]
+        wave_results = await asyncio.gather(*wave_tasks)
+
+        has_failed = False
+        first_error = ""
+
+        for nid, success, res, err, role in wave_results:
+            node = dag.graph.nodes[nid]
+            if success:
+                dag.mark_completed(nid, result=res)
+                executed_nodes.append(nid)
                 await self.store.record_event(
                     task_id=task_id,
                     event_type="node.completed",
-                    payload={"node_id": node.id, "title": node.title, "agent": role_name},
+                    payload={"node_id": nid, "title": node.title, "agent": role},
                 )
-
                 # Checkpoint upon completing verification gate or milestone
                 if node.metadata.get("node_type") in ["verification_gate", "milestone"]:
                     await self.lifecycle.checkpoint(
                         task_id=task_id,
-                        state_data={"completed_node": node.id, "stage": node.metadata.get("stage")},
+                        state_data={"completed_node": nid, "stage": node.metadata.get("stage")},
                         description=f"Checkpoint at gate: {node.title}",
                     )
-
-            except Exception as e:
-                logger.error(f"Execution error on node '{node.title}': {e}")
-                dag.mark_failed(node.id, error=str(e))
+            else:
+                has_failed = True
+                first_error = err or "Unknown error"
+                dag.mark_failed(nid, error=first_error)
                 await self.store.record_event(
                     task_id=task_id,
                     event_type="node.failed",
-                    payload={"node_id": node.id, "error": str(e)},
+                    payload={"node_id": nid, "error": first_error},
                 )
-                task = await self.lifecycle.transition(
-                    task_id=task_id,
-                    to_state=TaskState.FAILED,
-                    error_message=str(e),
-                )
-                await self.store.save_task_graph(dag.graph)
-                return task, executed_nodes
 
         # Update saved graph and task progress
         await self.store.save_task_graph(dag.graph)
+
+        if has_failed:
+            task = await self.lifecycle.transition(
+                task_id=task_id,
+                to_state=TaskState.FAILED,
+                error_message=first_error,
+            )
+            return task, executed_nodes
+
         progress = dag.get_progress_percentage()
 
         if dag.is_completed():
