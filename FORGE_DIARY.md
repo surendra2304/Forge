@@ -1,4 +1,4 @@
-# 🔨 Project FORGE — Development Diary Summary
+# 🔨 Project FORGE — Development Diary
 
 > *An autonomous software engineering engine that turns high-level ideas into verified, working software.*
 
