@@ -1,5 +1,5 @@
 """
-Pydantic data models for State, Memory, Task Graphs, and Checkpoints in FORGE.
+Pydantic data models for State, Memory, Task Lifecycle, Checkpoints, and Audit Events in FORGE.
 """
 
 from datetime import datetime, timezone
@@ -9,13 +9,28 @@ from uuid import uuid4
 from pydantic import BaseModel, Field
 
 
-class TaskStatus(str, Enum):
+class TaskState(str, Enum):
+    """The 8 formal states of the FORGE Task State Lifecycle."""
     PENDING = "PENDING"
-    IN_PROGRESS = "IN_PROGRESS"
-    COMPLETED = "COMPLETED"
-    FAILED = "FAILED"
-    PAUSED = "PAUSED"
+    READY = "READY"
+    RUNNING = "RUNNING"
     BLOCKED = "BLOCKED"
+    FAILED = "FAILED"
+    VERIFYING = "VERIFYING"
+    COMPLETED = "COMPLETED"
+    CANCELLED = "CANCELLED"
+
+
+# Backward compatibility alias
+TaskStatus = TaskState
+
+
+class TaskMode(str, Enum):
+    """Execution modes for FORGE tasks."""
+    AUTONOMOUS = "autonomous"
+    INTERACTIVE = "interactive"
+    PLAN_ONLY = "plan_only"
+    VERIFY_ONLY = "verify_only"
 
 
 class ProjectWorkspace(BaseModel):
@@ -28,11 +43,48 @@ class ProjectWorkspace(BaseModel):
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
+class TaskEntity(BaseModel):
+    """Persistent representation of an engineering task in FORGE."""
+    id: str = Field(default_factory=lambda: str(uuid4()))
+    goal: str = Field(..., description="High-level engineering objective")
+    requirements: List[str] = Field(default_factory=list, description="Explicit functional or technical constraints")
+    mode: TaskMode = Field(default=TaskMode.AUTONOMOUS, description="Execution mode")
+    workspace_path: str = Field(..., description="Root path of task isolated sandbox")
+    max_budget: float = Field(default=10.0, description="Max USD budget allocated for this task")
+    budget_consumed: float = Field(default=0.0, description="Total USD budget spent on provider inference")
+    state: TaskState = Field(default=TaskState.PENDING, description="Current lifecycle state")
+    progress_percentage: int = Field(default=0, ge=0, le=100, description="Estimated completion progress")
+    error_message: Optional[str] = Field(default=None, description="Error reason if state is FAILED or BLOCKED")
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class AuditEvent(BaseModel):
+    """Structured telemetry/audit event emitted during task lifecycle."""
+    id: str = Field(default_factory=lambda: str(uuid4()))
+    task_id: str = Field(..., description="Associated Task ID")
+    event_type: str = Field(..., description="Event identifier (e.g. task.created, plan.created, etc.)")
+    payload: Dict[str, Any] = Field(default_factory=dict, description="Event payload data")
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class ArtifactRecord(BaseModel):
+    """Metadata record for files generated in the artifacts directory."""
+    id: str = Field(default_factory=lambda: str(uuid4()))
+    task_id: str = Field(..., description="Associated Task ID")
+    name: str = Field(..., description="Artifact filename or identifier")
+    path: str = Field(..., description="Filesystem path to artifact")
+    file_type: str = Field(default="text/plain", description="MIME or file type")
+    size_bytes: int = Field(default=0, description="File size in bytes")
+    checksum: Optional[str] = Field(default=None, description="SHA256 checksum")
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
 class TaskNode(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid4()))
     title: str = Field(..., description="Short task title")
     description: str = Field(default="", description="Detailed step instructions")
-    status: TaskStatus = Field(default=TaskStatus.PENDING)
+    status: TaskState = Field(default=TaskState.PENDING)
     dependencies: List[str] = Field(default_factory=list, description="IDs of prerequisite tasks")
     assigned_agent: Optional[str] = Field(default=None, description="Agent type or name assigned")
     metadata: Dict[str, Any] = Field(default_factory=dict, description="Arbitrary task context and metadata")
@@ -50,11 +102,11 @@ class TaskEdge(BaseModel):
 
 class TaskGraph(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid4()))
-    project_id: str = Field(..., description="Associated ProjectWorkspace ID")
+    project_id: str = Field(..., description="Associated ProjectWorkspace or Task ID")
     goal: str = Field(..., description="High-level engineering goal")
     nodes: Dict[str, TaskNode] = Field(default_factory=dict, description="Lookup of task nodes by ID")
     edges: List[TaskEdge] = Field(default_factory=list, description="Directed dependencies between nodes")
-    status: TaskStatus = Field(default=TaskStatus.PENDING)
+    status: TaskState = Field(default=TaskState.PENDING)
     current_node_id: Optional[str] = Field(default=None, description="Currently executing node")
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
@@ -70,7 +122,7 @@ class TaskGraph(BaseModel):
 
 class Checkpoint(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid4()))
-    project_id: str = Field(..., description="Associated ProjectWorkspace ID")
+    project_id: str = Field(..., description="Associated ProjectWorkspace or Task ID")
     task_id: Optional[str] = Field(default=None, description="Current TaskNode ID at checkpoint")
     step_number: int = Field(default=0, description="Sequential step counter")
     state_data: Dict[str, Any] = Field(default_factory=dict, description="Serialized snapshot state")

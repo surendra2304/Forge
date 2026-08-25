@@ -1,14 +1,24 @@
 """
 StateStore: Memory and state persistence interface for FORGE.
-Handles projects, task graphs, node updates, and step-by-step checkpoints.
+Handles projects, tasks, task graphs, checkpoints, audit events, and artifact records.
 """
 
 import json
 from datetime import datetime, timezone
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 from app.memory.db import DatabaseManager, db_manager
-from app.memory.models import Checkpoint, ProjectWorkspace, TaskGraph, TaskNode, TaskStatus
+from app.memory.models import (
+    ArtifactRecord,
+    AuditEvent,
+    Checkpoint,
+    ProjectWorkspace,
+    TaskEntity,
+    TaskGraph,
+    TaskMode,
+    TaskNode,
+    TaskState,
+)
 from app.core.logging import get_logger
 
 logger = get_logger("memory.state_store")
@@ -82,6 +92,226 @@ class StateStore:
                     for row in rows
                 ]
 
+    # --- Task Management ---
+
+    async def create_task(self, task: TaskEntity) -> TaskEntity:
+        """Persist a new task entity."""
+        async with self.db.connection() as conn:
+            await conn.execute(
+                """
+                INSERT INTO tasks (id, goal, requirements, mode, workspace_path, max_budget, budget_consumed, state, progress_percentage, error_message, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    task.id,
+                    task.goal,
+                    json.dumps(task.requirements),
+                    task.mode.value,
+                    task.workspace_path,
+                    task.max_budget,
+                    task.budget_consumed,
+                    task.state.value,
+                    task.progress_percentage,
+                    task.error_message,
+                    task.created_at.isoformat(),
+                    task.updated_at.isoformat(),
+                ),
+            )
+            await conn.commit()
+        logger.debug(f"Created task: {task.id}")
+        return task
+
+    async def get_task(self, task_id: str) -> Optional[TaskEntity]:
+        """Retrieve task entity by ID."""
+        async with self.db.connection() as conn:
+            async with conn.execute(
+                "SELECT * FROM tasks WHERE id = ?",
+                (task_id,),
+            ) as cursor:
+                row = await cursor.fetchone()
+                if not row:
+                    return None
+                return TaskEntity(
+                    id=row["id"],
+                    goal=row["goal"],
+                    requirements=json.loads(row["requirements"]),
+                    mode=TaskMode(row["mode"]),
+                    workspace_path=row["workspace_path"],
+                    max_budget=row["max_budget"],
+                    budget_consumed=row["budget_consumed"],
+                    state=TaskState(row["state"]),
+                    progress_percentage=row["progress_percentage"],
+                    error_message=row["error_message"],
+                    created_at=datetime.fromisoformat(row["created_at"]),
+                    updated_at=datetime.fromisoformat(row["updated_at"]),
+                )
+
+    async def update_task_state(
+        self,
+        task_id: str,
+        state: TaskState,
+        progress_percentage: Optional[int] = None,
+        error_message: Optional[str] = None,
+        budget_increment: float = 0.0,
+    ) -> Optional[TaskEntity]:
+        """Update task state, progress, and budget consumed."""
+        now = datetime.now(timezone.utc).isoformat()
+        async with self.db.connection() as conn:
+            async with conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)) as cursor:
+                row = await cursor.fetchone()
+                if not row:
+                    return None
+
+            new_progress = progress_percentage if progress_percentage is not None else row["progress_percentage"]
+            new_budget = row["budget_consumed"] + budget_increment
+
+            await conn.execute(
+                """
+                UPDATE tasks
+                SET state = ?, progress_percentage = ?, error_message = ?, budget_consumed = ?, updated_at = ?
+                WHERE id = ?
+                """,
+                (state.value, new_progress, error_message, new_budget, now, task_id),
+            )
+            await conn.commit()
+
+        return await self.get_task(task_id)
+
+    async def list_tasks(self, limit: int = 50) -> List[TaskEntity]:
+        """List tasks ordered by created_at DESC."""
+        async with self.db.connection() as conn:
+            async with conn.execute(
+                "SELECT * FROM tasks ORDER BY created_at DESC LIMIT ?", (limit,)
+            ) as cursor:
+                rows = await cursor.fetchall()
+                return [
+                    TaskEntity(
+                        id=row["id"],
+                        goal=row["goal"],
+                        requirements=json.loads(row["requirements"]),
+                        mode=TaskMode(row["mode"]),
+                        workspace_path=row["workspace_path"],
+                        max_budget=row["max_budget"],
+                        budget_consumed=row["budget_consumed"],
+                        state=TaskState(row["state"]),
+                        progress_percentage=row["progress_percentage"],
+                        error_message=row["error_message"],
+                        created_at=datetime.fromisoformat(row["created_at"]),
+                        updated_at=datetime.fromisoformat(row["updated_at"]),
+                    )
+                    for row in rows
+                ]
+
+    # --- Audit Events ---
+
+    async def record_event(self, task_id: str, event_type: str, payload: Optional[Dict[str, Any]] = None) -> AuditEvent:
+        """Record an audit / telemetry event for a task."""
+        event = AuditEvent(
+            task_id=task_id,
+            event_type=event_type,
+            payload=payload or {},
+        )
+        async with self.db.connection() as conn:
+            await conn.execute(
+                """
+                INSERT INTO audit_events (id, task_id, event_type, payload, timestamp)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (
+                    event.id,
+                    event.task_id,
+                    event.event_type,
+                    json.dumps(event.payload),
+                    event.timestamp.isoformat(),
+                ),
+            )
+            await conn.commit()
+        logger.debug(f"Audit event recorded [{event_type}] for task {task_id}")
+        return event
+
+    async def get_audit_trail(self, task_id: str) -> List[AuditEvent]:
+        """Retrieve chronological audit trail for a task/run."""
+        async with self.db.connection() as conn:
+            async with conn.execute(
+                "SELECT * FROM audit_events WHERE task_id = ? ORDER BY timestamp ASC",
+                (task_id,),
+            ) as cursor:
+                rows = await cursor.fetchall()
+                return [
+                    AuditEvent(
+                        id=row["id"],
+                        task_id=row["task_id"],
+                        event_type=row["event_type"],
+                        payload=json.loads(row["payload"]),
+                        timestamp=datetime.fromisoformat(row["timestamp"]),
+                    )
+                    for row in rows
+                ]
+
+    # --- Artifact Records ---
+
+    async def record_artifact(self, artifact: ArtifactRecord) -> ArtifactRecord:
+        """Persist an artifact metadata record."""
+        async with self.db.connection() as conn:
+            await conn.execute(
+                """
+                INSERT INTO artifacts (id, task_id, name, path, file_type, size_bytes, checksum, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    artifact.id,
+                    artifact.task_id,
+                    artifact.name,
+                    artifact.path,
+                    artifact.file_type,
+                    artifact.size_bytes,
+                    artifact.checksum,
+                    artifact.created_at.isoformat(),
+                ),
+            )
+            await conn.commit()
+        logger.debug(f"Recorded artifact: {artifact.id} ({artifact.name})")
+        return artifact
+
+    async def get_artifact(self, artifact_id: str) -> Optional[ArtifactRecord]:
+        """Retrieve artifact record by ID."""
+        async with self.db.connection() as conn:
+            async with conn.execute("SELECT * FROM artifacts WHERE id = ?", (artifact_id,)) as cursor:
+                row = await cursor.fetchone()
+                if not row:
+                    return None
+                return ArtifactRecord(
+                    id=row["id"],
+                    task_id=row["task_id"],
+                    name=row["name"],
+                    path=row["path"],
+                    file_type=row["file_type"],
+                    size_bytes=row["size_bytes"],
+                    checksum=row["checksum"],
+                    created_at=datetime.fromisoformat(row["created_at"]),
+                )
+
+    async def list_artifacts_for_task(self, task_id: str) -> List[ArtifactRecord]:
+        """List all artifacts generated by a task."""
+        async with self.db.connection() as conn:
+            async with conn.execute(
+                "SELECT * FROM artifacts WHERE task_id = ? ORDER BY created_at ASC", (task_id,)
+            ) as cursor:
+                rows = await cursor.fetchall()
+                return [
+                    ArtifactRecord(
+                        id=row["id"],
+                        task_id=row["task_id"],
+                        name=row["name"],
+                        path=row["path"],
+                        file_type=row["file_type"],
+                        size_bytes=row["size_bytes"],
+                        checksum=row["checksum"],
+                        created_at=datetime.fromisoformat(row["created_at"]),
+                    )
+                    for row in rows
+                ]
+
     # --- Task Graph Persistence ---
 
     async def save_task_graph(self, graph: TaskGraph) -> TaskGraph:
@@ -139,14 +369,14 @@ class StateStore:
                     goal=row["goal"],
                     nodes=nodes,
                     edges=raw_edges,
-                    status=TaskStatus(row["status"]),
+                    status=TaskState(row["status"]),
                     current_node_id=row["current_node_id"],
                     created_at=datetime.fromisoformat(row["created_at"]),
                     updated_at=datetime.fromisoformat(row["updated_at"]),
                 )
 
     async def get_latest_task_graph_for_project(self, project_id: str) -> Optional[TaskGraph]:
-        """Fetch the most recent task graph for a project."""
+        """Fetch the most recent task graph for a project or task."""
         async with self.db.connection() as conn:
             async with conn.execute(
                 "SELECT id FROM task_graphs WHERE project_id = ? ORDER BY created_at DESC LIMIT 1",
@@ -179,11 +409,11 @@ class StateStore:
                 ),
             )
             await conn.commit()
-        logger.debug(f"Saved checkpoint {checkpoint.id} for project {checkpoint.project_id} (step {checkpoint.step_number})")
+        logger.debug(f"Saved checkpoint {checkpoint.id} for task/project {checkpoint.project_id} (step {checkpoint.step_number})")
         return checkpoint
 
     async def list_checkpoints(self, project_id: str) -> List[Checkpoint]:
-        """List checkpoints for a project ordered by step number."""
+        """List checkpoints for a task or project ordered by step number."""
         async with self.db.connection() as conn:
             async with conn.execute(
                 "SELECT * FROM checkpoints WHERE project_id = ? ORDER BY step_number ASC, timestamp ASC",
@@ -205,7 +435,7 @@ class StateStore:
                 ]
 
     async def get_latest_checkpoint(self, project_id: str) -> Optional[Checkpoint]:
-        """Retrieve the most recent checkpoint for a project."""
+        """Retrieve the most recent checkpoint for a task or project."""
         async with self.db.connection() as conn:
             async with conn.execute(
                 "SELECT * FROM checkpoints WHERE project_id = ? ORDER BY step_number DESC, timestamp DESC LIMIT 1",

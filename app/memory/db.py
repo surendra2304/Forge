@@ -26,6 +26,42 @@ CREATE TABLE IF NOT EXISTS projects (
     updated_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS tasks (
+    id TEXT PRIMARY KEY,
+    goal TEXT NOT NULL,
+    requirements TEXT NOT NULL DEFAULT '[]',
+    mode TEXT NOT NULL DEFAULT 'autonomous',
+    workspace_path TEXT NOT NULL,
+    max_budget REAL NOT NULL DEFAULT 10.0,
+    budget_consumed REAL NOT NULL DEFAULT 0.0,
+    state TEXT NOT NULL DEFAULT 'PENDING',
+    progress_percentage INTEGER NOT NULL DEFAULT 0,
+    error_message TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS audit_events (
+    id TEXT PRIMARY KEY,
+    task_id TEXT NOT NULL,
+    event_type TEXT NOT NULL,
+    payload TEXT NOT NULL DEFAULT '{}',
+    timestamp TEXT NOT NULL,
+    FOREIGN KEY(task_id) REFERENCES tasks(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS artifacts (
+    id TEXT PRIMARY KEY,
+    task_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    path TEXT NOT NULL,
+    file_type TEXT NOT NULL DEFAULT 'text/plain',
+    size_bytes INTEGER NOT NULL DEFAULT 0,
+    checksum TEXT,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY(task_id) REFERENCES tasks(id) ON DELETE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS task_graphs (
     id TEXT PRIMARY KEY,
     project_id TEXT NOT NULL,
@@ -35,8 +71,7 @@ CREATE TABLE IF NOT EXISTS task_graphs (
     status TEXT NOT NULL DEFAULT 'PENDING',
     current_node_id TEXT,
     created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL,
-    FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE
+    updated_at TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS checkpoints (
@@ -47,10 +82,12 @@ CREATE TABLE IF NOT EXISTS checkpoints (
     state_data TEXT NOT NULL DEFAULT '{}',
     checksum TEXT,
     timestamp TEXT NOT NULL,
-    description TEXT,
-    FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE
+    description TEXT
 );
 
+CREATE INDEX IF NOT EXISTS idx_tasks_state ON tasks(state);
+CREATE INDEX IF NOT EXISTS idx_audit_events_task ON audit_events(task_id, timestamp);
+CREATE INDEX IF NOT EXISTS idx_artifacts_task ON artifacts(task_id);
 CREATE INDEX IF NOT EXISTS idx_task_graphs_project ON task_graphs(project_id);
 CREATE INDEX IF NOT EXISTS idx_checkpoints_project ON checkpoints(project_id);
 CREATE INDEX IF NOT EXISTS idx_checkpoints_step ON checkpoints(project_id, step_number);
