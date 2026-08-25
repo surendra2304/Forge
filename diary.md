@@ -1,23 +1,12 @@
 # Project FORGE — Development Diary
 
-Welcome to the development diary for **Project FORGE** (Autonomous Software Engineering Engine).
+Welcome to the development diary for Project FORGE.
 
-This diary is where I track my daily progress, thoughts, decisions, architectural updates, and test results as I build FORGE into a complete, standalone autonomous engineering tool.
-
----
-
-## Diary Index
-
-| Date | Title | Summary | Tests Passed |
-| :--- | :--- | :--- | :--- |
-| **[2026-08-25](diary/2026-08-25.md)** | **Day 1: Inception and Complete Engine Build** | Initialized repository, SQLite memory store, 8-state task lifecycle, 10 specialist agent roles, parallel wave execution, verification battery with Playwright browser testing, self-healing recovery loop, standalone CLI, delivery packaging, and 3 golden benchmarks. | 61 / 61 (100%) |
+This diary is where I record my daily journey, progress, architecture decisions, challenges, and milestones as I build FORGE into an autonomous software engineering engine.
 
 ---
 
-## About FORGE
+## 2026-08-25 — Inception and Complete Engine Build
+- **Full Entry:** [diary/2026-08-25.md](diary/2026-08-25.md)
 
-FORGE takes a high-level goal and turns it into real, verified, packaged software through autonomous planning, execution, verification, and recovery:
-- **Evidence Over Confidence:** Everything is verified through AST compilation, Ruff linting, Pytest, and real Playwright browser checks.
-- **Strict Sandboxing:** All task work stays isolated inside `workspaces/task_<id>/`.
-- **Self-Healing:** Automatic debugging and repair with strict retry limits and patch deduplication to prevent loops.
-- **Standalone:** Completely independent product runnable via CLI (`forge build`) or local REST API.
+Today I started Project FORGE and built the complete standalone core engine. I set up the workspace sandboxing to keep all generated code safe and isolated, created the 8-state task lifecycle with SQLite persistence, and defined 10 specialist engineering agent roles. I added parallel task execution using asynchronous DAG waves, built a verification suite with real Playwright headless browser testing and screenshot captures, and implemented a self-healing recovery engine with anti-loop retry controls. Finally, I built the standalone CLI and packaged 3 golden regression benchmarks. All 61 tests are passing.
