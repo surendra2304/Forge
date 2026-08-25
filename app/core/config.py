@@ -33,7 +33,6 @@ class Settings(BaseSettings):
     model_temperature: float = Field(default=0.2, description="Default generation temperature")
 
     # API Keys (Optional)
-    api_key: Optional[str] = Field(default=None, alias="FORGE_API_KEY", description="Master API Key for securing FORGE endpoints")
     openai_api_key: Optional[str] = Field(default=None, alias="OPENAI_API_KEY")
     anthropic_api_key: Optional[str] = Field(default=None, alias="ANTHROPIC_API_KEY")
     gemini_api_key: Optional[str] = Field(default=None, alias="GEMINI_API_KEY")

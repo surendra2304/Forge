@@ -2,12 +2,6 @@
 Model Providers subsystem for Project FORGE.
 """
 
-from app.providers.ai_universe import (
-    AIUniverseProvider,
-    AIUniverseResponse,
-    ProvenanceRecord,
-    ReasoningMode,
-)
 from app.providers.base import (
     BaseModelProvider,
     ProviderCapabilities,
@@ -24,8 +18,4 @@ __all__ = [
     "ProviderCapabilities",
     "ProviderHealthStatus",
     "DirectProvider",
-    "AIUniverseProvider",
-    "AIUniverseResponse",
-    "ProvenanceRecord",
-    "ReasoningMode",
 ]

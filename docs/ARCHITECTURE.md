@@ -1,19 +1,16 @@
-# FORGE System Architecture & FRIDAY Ecosystem Integration
+# FORGE Architecture: Independent Autonomous Software Engineering Engine
 
-Project FORGE is an **Autonomous Software Engineering Engine** engineered to intake high-level software objectives and autonomously synthesize, verify, debug, package, and deliver verified production software artifacts.
+Project FORGE is an **Independent Autonomous Software Engineering Engine** designed to intake high-level software goals and autonomously synthesize, verify, debug, package, and deliver verified production software artifacts.
 
 ---
 
-## 1. High-Level Ecosystem Topology
+## 1. High-Level Engine Architecture
 
 ```text
        +-------------------------------------------------------------+
-       |                           FRIDAY                            |
-       |       (High-Level Executive Assistant & Project Owner)       |
+       |                      DEVELOPER / USER                       |
+       |                (CLI: forge build / REST API)                |
        +------------------------------+------------------------------+
-                                      |
-                      POST /friday/delegate (API Key Auth)
-                      FRIDAYTaskRequest -> FORGETaskResult
                                       |
                                       v
        +-------------------------------------------------------------+
@@ -28,10 +25,10 @@ Project FORGE is an **Autonomous Software Engineering Engine** engineered to int
        |             |                                 |             |
        |             v                                 v             |
        |  +-----------------------+       +-----------------------+  |
-       |  |   Specialist Agents   |       |  Sandboxed Workspace  |  |
+       |  |   Specialist Agents   |       |  Isolated Sandboxes   |  |
        |  |   (Planner, Architect,|       |  (workspaces/task_id) |  |
        |  |   Developer, Tester,  |       |  - project/           |  |
-       |  |   Release Engineer)   |       |  - artifacts/         |  |
+       |  |   Debugger, Release)  |       |  - artifacts/         |  |
        |  +-----------+-----------+       +-----------+-----------+  |
        |              |                               |              |
        |              +---------------+---------------+              |
@@ -47,61 +44,22 @@ Project FORGE is an **Autonomous Software Engineering Engine** engineered to int
        |  |            Delivery Packager & Git Tagging            |  |
        |  |  (completion_report.json, COMPLETION_REPORT.md, tag)  |  |
        |  +-------------------------------------------------------+  |
-       +------------------------------+------------------------------+
-                                      |
-                                      v
-       +-------------------------------------------------------------+
-       |                     AI Universe Swarms                      |
-       |    (AIUniverseProvider: FAST | REVIEW | DEBATE Modes)       |
        +-------------------------------------------------------------+
 ```
 
 ---
 
-## 2. FRIDAY Integration Contract
+## 2. Core Principles & Isolation
 
-FORGE exposes an authenticated, boundary-enforced contract tailored for FRIDAY delegation:
-
-### Endpoints:
-- **`POST /friday/delegate`**: Intakes `FRIDAYTaskRequest`, verifies API Key and sandbox permission scope, provisions workspace, executes parallel DAG waves, and returns `FORGETaskResult`.
-- **`GET /friday/tasks/{task_id}/result`**: Retrieves full deliverable manifest for a completed task.
-- **`GET /tasks/{task_id}/timeline`**: Returns chronological telemetry stream for external dashboards.
-
-### Correlation ID Propagation:
-$$\text{FRIDAY Task ID} \longrightarrow \text{FORGE Task ID} \longrightarrow \text{FORGE Run ID} \longrightarrow \text{Git Release Tag}$$
-
----
-
-## 3. Security & Permission Boundaries
-
-1. **Workspace Sandbox Isolation**:
-   - All file mutations, process spawns, and git commits are strictly confined to `workspaces/task_<id>/`.
-   - Host path traversals outside the task directory are blocked with `SandboxViolationError`.
-2. **Permission Boundary Enforcement**:
-   - Operations requesting `unrestricted`, `modify_personal_files`, or `production_deploy` without explicit user authorization return `403 Forbidden: Permission Denied`.
-3. **API Key Authentication**:
-   - Requests are authenticated via `X-API-Key` or `Authorization: Bearer <key>` headers against `FORGE_API_KEY`.
-4. **Secret Redaction**:
-   - `SecretRedactor` automatically masks API keys (`sk-...`, `ghp_...`, `AIza...`), tokens, and credentials from all audit event streams and logs.
-
----
-
-## 4. Verification & Self-Repair ("Evidence Over Confidence")
-
-FORGE enforces strict objective verification gates:
-1. **AST Build Check**: Syntax and AST parse validation.
-2. **Static Code Linter**: `ruff check . --select=E,F`.
-3. **Pytest Suite Runner**: Test execution and assertion validation.
-4. **Runtime Smoke Check**: CLI `--help` or entrypoint execution.
-5. **Headless Browser Checker**: Playwright Chromium automation verifying console logs, network errors (4xx/5xx), missing assets, DOM interactivity, and PNG screenshot capture.
-
-If verification fails, `RecoveryEngine` classifies root cause, deduplicates patches with SHA256 hashes, caps retries to 3 per failure class, and applies self-repair fixes.
-
----
-
-## 5. Multi-Agent Intelligence Adapter (`AIUniverseProvider`)
-
-Connects FORGE to external or simulated multi-agent swarm intelligence:
-- **`FAST`**: Single-pass high-speed optimal reasoning.
-- **`REVIEW`**: Multi-persona review (`ArchitectPersona`, `SeniorDevPersona`, `JudgeEvaluator`) $\rightarrow$ compare $\rightarrow$ select optimal architecture.
-- **`DEBATE`**: Adversarial debate protocol (`ProponentSpecialist`, `AdversaryCritique`, `RebuttalSpecialist`, `ConsensusSynthesizer`) $\rightarrow$ rebuttal-tested consensus with provenance and dissent tracking.
+1. **Independent Standalone Execution**:
+   - FORGE runs natively via CLI (`forge build`, `forge status`, `forge inspect`) or standalone REST API without external platform dependencies.
+   - External platform integrations (such as FRIDAY / Jarvis or external swarm adapters) are explicitly deferred until FORGE achieves mature standalone product readiness.
+2. **Evidence Over Model Confidence**:
+   - Software correctness is established through objective runtime verification (AST syntax verification, Ruff linting, Pytest execution, and Playwright browser checks), not LLM self-reporting.
+3. **Workspace Sandbox Isolation**:
+   - All code generation, process execution, and git operations are confined to `workspaces/task_<id>/`.
+4. **Self-Healing Anti-Loop Controls**:
+   - `RecoveryEngine` performs root-cause analysis, deduplicates patches using SHA256 hashes, and caps retries to 3 per failure class to prevent infinite repair loops.
+5. **Durable Task Lifecycle & Parallel DAG Waves**:
+   - Tasks progress through 8 formal lifecycle states (`PENDING`, `READY`, `RUNNING`, `BLOCKED`, `FAILED`, `VERIFYING`, `COMPLETED`, `CANCELLED`).
+   - Independent DAG nodes run concurrently in parallel waves via `asyncio.gather`.

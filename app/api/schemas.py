@@ -122,34 +122,3 @@ class TimelineResponse(BaseModel):
     total_events: int
     stages_covered: List[str]
     timeline: List[TimelineEvent]
-
-
-class FRIDAYTaskRequest(BaseModel):
-    """Integration contract request sent from FRIDAY to FORGE."""
-    friday_task_id: Optional[str] = Field(default=None, description="Correlated FRIDAY task identifier")
-    goal: str = Field(..., description="High-level engineering objective")
-    requirements: List[str] = Field(default_factory=list, description="Explicit technical requirements")
-    repo_context: Optional[Dict[str, Any]] = Field(default=None, description="Optional existing repository context")
-    permission_scope: str = Field(default="sandbox", description="Requested permission scope ('sandbox', 'production_deploy', etc.)")
-    user_authorized: bool = Field(default=False, description="Whether explicit user approval was granted for restricted scopes")
-    resource_time_budget: Optional[Dict[str, Any]] = Field(default=None, description="Maximum iterations or cost budget")
-    acceptance_criteria: List[str] = Field(default_factory=list, description="Verification acceptance gates")
-    mode: str = Field(default="autonomous", description="Execution mode ('autonomous', 'supervised')")
-
-
-class FORGETaskResult(BaseModel):
-    """Structured deliverable manifest returned to FRIDAY upon task completion."""
-    friday_task_id: Optional[str] = None
-    forge_task_id: str
-    forge_run_id: str
-    ai_universe_task_id: Optional[str] = None
-    status: str
-    artifact_location: str
-    implementation_summary: Dict[str, Any] = Field(default_factory=dict)
-    tests_build_evidence: Dict[str, Any] = Field(default_factory=dict)
-    browser_evidence: List[str] = Field(default_factory=list)
-    known_limitations: List[str] = Field(default_factory=list)
-    major_diffs: str = ""
-    agents_models_used: List[str] = Field(default_factory=lambda: ["direct-model"])
-    follow_up_suggestions: List[str] = Field(default_factory=list)
-    completed_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
