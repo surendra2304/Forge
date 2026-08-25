@@ -1,6 +1,8 @@
 # Project FORGE 🔨
 
-**FORGE** is an **Autonomous Software Engineering Engine** that takes a high-level software goal and turns it into an actual, verified software artifact through autonomous planning, execution, verification, and recovery.
+**FORGE** is an **Autonomous Software Engineering Engine** that transforms high-level software goals into verified, packaged, and production-ready software artifacts through autonomous planning, execution, verification, and self-repair.
+
+FORGE is designed to operate both as an independent autonomous CLI/API and as the core software engineering delegation engine for **FRIDAY** and the **AI Universe**.
 
 ---
 
@@ -10,31 +12,27 @@
 FORGE/
 ├── app/
 │   ├── main.py                     # FastAPI application entry point
-│   ├── api/                        # HTTP REST API endpoints (/health, /projects)
-│   ├── core/                       # App configuration (pydantic-settings) & logging
-│   ├── agents/                     # Specialized agent personas and workflows
-│   ├── planning/                   # Goal decomposition & task graph synthesis
-│   ├── execution/                  # Code generation & sandboxed execution
-│   ├── verification/               # Automated test runners & correctness checks
-│   ├── recovery/                   # Self-healing, rollback & error mitigation
-│   ├── memory/                     # SQLite persistence (StateStore, TaskGraph, Checkpoints)
-│   └── providers/                  # BaseModelProvider abstraction & DirectProvider
+│   ├── cli.py                      # Standalone Rich CLI MVP (forge build, status, logs)
+│   ├── api/                        # REST API, Auth, Permission Boundaries, FRIDAY routes
+│   ├── core/                       # Orchestrator, Workspace Manager, Events & Telemetry
+│   ├── agents/                     # 10 Specialist Agent Roles (Planner, Architect, Dev, Tester, etc.)
+│   ├── planning/                   # 8-Stage Hierarchical Tree & Executable DAG
+│   ├── execution/                  # Sandboxed Tools (Filesystem, Terminal, Process, Git, Delivery)
+│   ├── verification/               # Evidence Battery (Build, Lint, Pytest, Playwright Browser)
+│   ├── recovery/                   # Self-Repair, Anti-Loop Controller, Failure Classifier
+│   ├── memory/                     # SQLite WAL StateStore & 8-State Task Lifecycle
+│   └── providers/                  # DirectProvider & AIUniverseProvider (Fast, Review, Debate)
 ├── data/                           # SQLite database storage (forge.db)
-├── workspaces/                     # Isolated project sandboxes
-├── artifacts/                      # Generated builds, logs, and artifacts
+├── workspaces/                     # Isolated project sandboxes (workspaces/task_<id>/)
+├── artifacts/                      # Completion reports, verification manifests, screenshots
 ├── tests/
-│   ├── unit/                       # Unit tests (providers, memory, models)
+│   ├── unit/                       # Unit tests (agents, lifecycle, providers, recovery, timeline)
 │   ├── integration/                # API and multi-component tests
-│   ├── execution/                  # Sandbox and execution tests
-│   ├── verification/               # Verification engine tests
-│   ├── security/                   # Boundary and permission tests
-│   └── golden/                     # Benchmark and evaluation suites
-├── docs/                           # Architecture and design documentation
-├── .agents/rules/                  # Permanent engineering rules & memory policies
+│   └── golden/                     # 3 Golden Regression Benchmarks (CLI, FastAPI, Static Web)
+├── docs/
+│   └── architecture.md             # System architecture & FRIDAY integration spec
+├── .agents/rules/                  # Permanent engineering rules & diary governance
 ├── diary/                          # Day-wise engineering development chronicles
-├── scripts/                        # Management and automation scripts
-├── .env.example                    # Environment configuration template
-├── .gitignore                      # Git ignore rules
 ├── FORGE_DIARY.md                  # Master consolidated development diary
 ├── FORGE_DIARY_SPEC.md             # Diary specification standard
 ├── pyproject.toml                  # Modern Python packaging configuration
@@ -58,30 +56,51 @@ Copy the environment template:
 cp .env.example .env
 ```
 
-### 3. Running the Server
+### 3. Running the Standalone CLI
+```bash
+# Autonomously build a software project from specification
+forge build "Create a robust CLI Todo utility with JSON persistence"
+
+# Inspect task status, timeline, or logs
+forge status <task_id>
+forge logs <task_id>
+forge inspect <task_id>
+```
+
+### 4. Running the REST API Server
 ```bash
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-### 4. Running Tests
+### 5. Running the Complete Test Suite
 ```bash
 pytest -v tests/
 ```
 
 ---
 
-## 🔌 Core API Endpoints
+## 🤝 FRIDAY Ecosystem Integration Contract
 
-- **`GET /health`**: Health status, database connectivity, and provider telemetry.
-- **`POST /projects`**: Provision a new isolated project workspace.
-- **`GET /projects`**: List all project workspaces.
-- **`GET /projects/{project_id}`**: Retrieve project details by ID.
+FORGE exposes a secure, boundary-enforced contract for FRIDAY assistant delegation:
+
+- **`POST /friday/delegate`**: Authenticated task delegation (`FRIDAYTaskRequest` $\rightarrow$ `FORGETaskResult`).
+- **`GET /friday/tasks/{task_id}/result`**: Delivers structured manifests, test evidence, screenshots, and release tags.
+- **`GET /tasks/{task_id}/timeline`**: Real-time chronological event stream with automatic secret redaction.
+
+---
+
+## 🛡️ Security & Sandbox Boundaries
+
+- **Sandbox Isolation**: All file operations and shell commands run exclusively inside `workspaces/task_<id>/`.
+- **Permission Boundary**: Requests exceeding the sandbox without explicit user authorization return `HTTP 403 Forbidden`.
+- **API Key Security**: Endpoints authenticate via `X-API-Key` or `Authorization: Bearer <key>`.
+- **Secret Redaction**: API keys and tokens are automatically masked across all logs and telemetry streams.
 
 ---
 
 ## 📖 Development Diary
 
-Forge adheres to a strict, day-wise development chronicle governance model:
+FORGE adheres to a strict, day-wise development chronicle governance model:
 - **[FORGE_DIARY.md](FORGE_DIARY.md)**: Consolidated master diary and navigation index.
 - **[FORGE_DIARY_SPEC.md](FORGE_DIARY_SPEC.md)**: Specification and structural rules.
 - **[diary/](diary/)**: Date-stamped chronicle entries.

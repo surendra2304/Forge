@@ -10,10 +10,14 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
 from app.agents.registry import AgentCapability, agent_registry
+from app.api.auth import verify_api_key
+from app.api.permissions import enforce_permission_boundary
 from app.api.schemas import (
     ArtifactResponse,
     AuditEventResponse,
     EngineCapabilitiesResponse,
+    FORGETaskResult,
+    FRIDAYTaskRequest,
     HealthResponse,
     RunAuditResponse,
     TaskActionRequest,
@@ -28,6 +32,7 @@ from app.core.config import Settings, get_settings
 from app.core.logging import get_logger
 from app.core.orchestrator import OrchestratorCore, orchestrator
 from app.core.workspace import WorkspaceManager, workspace_manager
+from app.execution.delivery import DeliveryPackager, delivery_packager
 from app.memory.db import db_manager
 from app.memory.models import (
     ArtifactRecord,
@@ -61,6 +66,10 @@ def get_default_provider(settings: Settings = Depends(get_settings)) -> DirectPr
 
 def get_orchestrator(store: StateStore = Depends(get_state_store)) -> OrchestratorCore:
     return OrchestratorCore(store=store)
+
+
+def get_workspace_manager() -> WorkspaceManager:
+    return workspace_manager
 
 
 # --- System & Diagnostics ---
@@ -425,3 +434,155 @@ async def get_project(project_id: str, store: StateStore = Depends(get_state_sto
     if not project:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Project with ID '{project_id}' not found")
     return project
+
+
+# --- FRIDAY Integration Contract ---
+
+@router.post(
+    "/friday/delegate",
+    response_model=FORGETaskResult,
+    status_code=status.HTTP_200_OK,
+    summary="Delegate Software Task from FRIDAY to FORGE",
+)
+async def delegate_from_friday(
+    request: FRIDAYTaskRequest,
+    api_key_auth: Optional[str] = Depends(verify_api_key),
+    store: StateStore = Depends(get_state_store),
+    orch: OrchestratorCore = Depends(get_orchestrator),
+    wm: WorkspaceManager = Depends(get_workspace_manager),
+) -> FORGETaskResult:
+    """
+    FRIDAY <-> FORGE secure integration endpoint.
+    Receives delegation request from FRIDAY, validates permission boundary,
+    executes autonomous synthesis & verification DAG waves, and returns complete deliverable manifest.
+    """
+    # 1. Enforce Permission Boundaries
+    enforce_permission_boundary(
+        permission_scope=request.permission_scope,
+        user_authorized=request.user_authorized,
+    )
+
+    # 2. Intake and Plan Task Graph with Correlated IDs
+    mode_enum = TaskMode.AUTONOMOUS if request.mode.lower() == "autonomous" else TaskMode.SUPERVISED
+    task, graph = await orch.intake_and_plan(
+        goal=request.goal,
+        requirements=request.requirements,
+        mode=mode_enum,
+    )
+    forge_task_id = task.id
+    forge_run_id = f"run_{forge_task_id[:8]}"
+
+    # Record correlation event
+    await store.record_event(
+        task_id=forge_task_id,
+        event_type="friday.delegated",
+        payload={
+            "friday_task_id": request.friday_task_id,
+            "forge_task_id": forge_task_id,
+            "forge_run_id": forge_run_id,
+            "permission_scope": request.permission_scope,
+            "goal": request.goal,
+        },
+    )
+
+    if request.friday_task_id:
+        task.metadata["friday_task_id"] = request.friday_task_id
+        await store.update_task_state(forge_task_id, state=task.state)
+
+    # 3. Execute Autonomous DAG Waves
+    completed_task = await orch.run_task(forge_task_id, max_iterations=12)
+
+    # 4. Package Delivery & Generate Completion Reports
+    packager = DeliveryPackager(engine=orch.engine, wm=wm)
+    report_data = await packager.package_delivery(
+        task_id=forge_task_id,
+        goal=request.goal,
+        requirements=request.requirements,
+        tag_name=f"v1.0-friday-{request.friday_task_id or forge_task_id[:8]}",
+    )
+
+    # 5. Assemble FORGETaskResult
+    artifacts_dir = wm.get_task_workspace_dir(forge_task_id) / "artifacts"
+    return FORGETaskResult(
+        friday_task_id=request.friday_task_id,
+        forge_task_id=forge_task_id,
+        forge_run_id=forge_run_id,
+        ai_universe_task_id=None,
+        status=completed_task.state.value,
+        artifact_location=str(artifacts_dir.resolve()),
+        implementation_summary=report_data.implementation_summary,
+        tests_build_evidence=report_data.test_build_status,
+        browser_evidence=report_data.browser_verification_evidence,
+        known_limitations=report_data.known_limitations,
+        major_diffs=report_data.major_diffs,
+        agents_models_used=report_data.models_used,
+        follow_up_suggestions=[
+            "Deploy candidate to staging container",
+            "Perform live end-to-end integration tests with FRIDAY dashboard",
+        ],
+        completed_at=report_data.generated_at,
+    )
+
+
+@router.get(
+    "/friday/tasks/{task_id}/result",
+    response_model=FORGETaskResult,
+    summary="Get Delivered Task Result for FRIDAY",
+)
+async def get_friday_task_result(
+    task_id: str,
+    api_key_auth: Optional[str] = Depends(verify_api_key),
+    store: StateStore = Depends(get_state_store),
+    wm: WorkspaceManager = Depends(get_workspace_manager),
+) -> FORGETaskResult:
+    """Retrieve full deliverable result for a completed delegated task."""
+    task = await store.get_task(task_id)
+    if not task:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Task '{task_id}' not found")
+
+    artifacts_dir = wm.get_task_workspace_dir(task_id) / "artifacts"
+    report_file = artifacts_dir / "completion_report.json"
+
+    import json
+    impl_summary = {}
+    test_evidence = {}
+    screenshots = [f.name for f in artifacts_dir.glob("screenshot_*.png")]
+    git_diffs = ""
+    limitations = []
+    models = ["direct-model"]
+
+    if report_file.exists():
+        try:
+            data = json.loads(report_file.read_text(encoding="utf-8"))
+            impl_summary = data.get("implementation_summary", {})
+            test_evidence = data.get("test_build_status", {})
+            screenshots = data.get("browser_verification_evidence", screenshots)
+            git_diffs = data.get("major_diffs", "")
+            limitations = data.get("known_limitations", [])
+            models = data.get("models_used", models)
+        except Exception:
+            pass
+
+    # Retrieve correlated friday_task_id from audit trail or metadata
+    events = await store.get_audit_trail(task_id)
+    friday_task_id = task.metadata.get("friday_task_id") if task.metadata else None
+    if not friday_task_id:
+        for ev in events:
+            if ev.event_type == "friday.delegated" and ev.payload:
+                friday_task_id = ev.payload.get("friday_task_id")
+                break
+
+    return FORGETaskResult(
+        friday_task_id=friday_task_id,
+        forge_task_id=task.id,
+        forge_run_id=f"run_{task.id[:8]}",
+        status=task.state.value,
+        artifact_location=str(artifacts_dir.resolve()),
+        implementation_summary=impl_summary,
+        tests_build_evidence=test_evidence,
+        browser_evidence=screenshots,
+        known_limitations=limitations or ["Local development sandbox."],
+        major_diffs=git_diffs,
+        agents_models_used=models,
+        follow_up_suggestions=["Ready for staging deployment"],
+    )

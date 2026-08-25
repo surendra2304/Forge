@@ -1,59 +1,107 @@
-# FORGE System Architecture
+# FORGE System Architecture & FRIDAY Ecosystem Integration
 
-## Overview
-**Project FORGE** is an Autonomous Software Engineering Engine designed to translate high-level software goals into verifiable, production-ready software artifacts through autonomous decomposition, generation, testing, and self-healing recovery.
+Project FORGE is an **Autonomous Software Engineering Engine** engineered to intake high-level software objectives and autonomously synthesize, verify, debug, package, and deliver verified production software artifacts.
 
 ---
 
-## Core Components
+## 1. High-Level Ecosystem Topology
 
+```text
+       +-------------------------------------------------------------+
+       |                           FRIDAY                            |
+       |       (High-Level Executive Assistant & Project Owner)       |
+       +------------------------------+------------------------------+
+                                      |
+                      POST /friday/delegate (API Key Auth)
+                      FRIDAYTaskRequest -> FORGETaskResult
+                                      |
+                                      v
+       +-------------------------------------------------------------+
+       |                        FORGE ENGINE                         |
+       |                                                             |
+       |  +-------------------------------------------------------+  |
+       |  |                    Orchestrator                       |  |
+       |  |  (Task Analyzer -> 8-Stage Planning DAG -> Scheduler) |  |
+       |  +---------------------------+---------------------------+  |
+       |                              |                              |
+       |             +----------------+----------------+             |
+       |             |                                 |             |
+       |             v                                 v             |
+       |  +-----------------------+       +-----------------------+  |
+       |  |   Specialist Agents   |       |  Sandboxed Workspace  |  |
+       |  |   (Planner, Architect,|       |  (workspaces/task_id) |  |
+       |  |   Developer, Tester,  |       |  - project/           |  |
+       |  |   Release Engineer)   |       |  - artifacts/         |  |
+       |  +-----------+-----------+       +-----------+-----------+  |
+       |              |                               |              |
+       |              +---------------+---------------+              |
+       |                              |                              |
+       |                              v                              |
+       |  +-------------------------------------------------------+  |
+       |  |           Objective Verification Engine               |  |
+       |  |   (AST Build, Ruff Lint, Pytest, Playwright Browser)  |  |
+       |  +---------------------------+---------------------------+  |
+       |                              |                              |
+       |                              v                              |
+       |  +-------------------------------------------------------+  |
+       |  |            Delivery Packager & Git Tagging            |  |
+       |  |  (completion_report.json, COMPLETION_REPORT.md, tag)  |  |
+       |  +-------------------------------------------------------+  |
+       +------------------------------+------------------------------+
+                                      |
+                                      v
+       +-------------------------------------------------------------+
+       |                     AI Universe Swarms                      |
+       |    (AIUniverseProvider: FAST | REVIEW | DEBATE Modes)       |
+       +-------------------------------------------------------------+
 ```
-FORGE/
-├── app/
-│   ├── main.py                     # FastAPI application setup and lifecycle management
-│   ├── api/                        # HTTP REST API routers (/health, /projects)
-│   ├── core/                       # Settings, Configuration, and Structured Logging
-│   ├── agents/                     # Specialized agent personas and execution loops
-│   ├── planning/                   # Goal decomposition, task dependency graphs
-│   ├── execution/                  # Code generation, tool execution, terminal interactions
-│   ├── verification/               # Test runner, static analysis, boundary verifiers
-│   ├── recovery/                   # Self-healing, rollback, error mitigation
-│   ├── memory/                     # SQLite persistence, StateStore, TaskGraph, Checkpoints
-│   └── providers/                  # BaseModelProvider abstraction and DirectProvider implementation
-├── data/                           # SQLite database storage (forge.db)
-├── workspaces/                     # Isolated project execution environments
-├── artifacts/                      # Final generated builds, logs, and outputs
-└── tests/                          # Multi-tiered automated test suite
-```
 
 ---
 
-## 1. Database & State Layer (`app/memory/`)
+## 2. FRIDAY Integration Contract
 
-- **SQLite Backend**: Using `aiosqlite` with Write-Ahead Logging (`WAL`) mode and foreign keys enabled.
-- **`ProjectWorkspace`**: Entity representing a software project and its dedicated filesystem sandbox.
-- **`TaskGraph`**: Directed acyclic graph (DAG) representing goal decomposition into distinct `TaskNode` units with dependency constraints.
-- **`Checkpoint`**: Step-by-step state snapshot allowing rollbacks and post-mortem auditing.
-- **`StateStore`**: Asynchronous persistence service managing projects, graph transitions, and checkpoints.
+FORGE exposes an authenticated, boundary-enforced contract tailored for FRIDAY delegation:
 
----
+### Endpoints:
+- **`POST /friday/delegate`**: Intakes `FRIDAYTaskRequest`, verifies API Key and sandbox permission scope, provisions workspace, executes parallel DAG waves, and returns `FORGETaskResult`.
+- **`GET /friday/tasks/{task_id}/result`**: Retrieves full deliverable manifest for a completed task.
+- **`GET /tasks/{task_id}/timeline`**: Returns chronological telemetry stream for external dashboards.
 
-## 2. Model Providers (`app/providers/`)
-
-- **`BaseModelProvider` (ABC)**:
-  - `generate()`: Single-turn or multi-turn text completions.
-  - `stream()`: Asynchronous token generator.
-  - `structured_output()`: Schema-driven JSON extraction validated via Pydantic.
-  - `estimate_usage()`: Token and cost estimation.
-  - `capabilities()`: Provider feature set and context window metadata.
-  - `health()`: Operational status and latency probing.
-- **`DirectProvider`**:
-  - Standalone implementation capable of direct text generation, streaming token emission, mock synthesis, and Pydantic validation.
+### Correlation ID Propagation:
+$$\text{FRIDAY Task ID} \longrightarrow \text{FORGE Task ID} \longrightarrow \text{FORGE Run ID} \longrightarrow \text{Git Release Tag}$$
 
 ---
 
-## 3. FastAPI Service & Workspaces (`app/main.py`, `app/api/`)
+## 3. Security & Permission Boundaries
 
-- **`GET /health`**: Health status, database connectivity, and active provider telemetry.
-- **`POST /projects`**: Provisions an isolated workspace inside `workspaces/<project_id>`, creates standard project subdirectories (`src/`, `tests/`, `.forge`), and persists metadata in SQLite.
-- **`GET /projects` & `GET /projects/{id}`**: Workspace queries and retrieval.
+1. **Workspace Sandbox Isolation**:
+   - All file mutations, process spawns, and git commits are strictly confined to `workspaces/task_<id>/`.
+   - Host path traversals outside the task directory are blocked with `SandboxViolationError`.
+2. **Permission Boundary Enforcement**:
+   - Operations requesting `unrestricted`, `modify_personal_files`, or `production_deploy` without explicit user authorization return `403 Forbidden: Permission Denied`.
+3. **API Key Authentication**:
+   - Requests are authenticated via `X-API-Key` or `Authorization: Bearer <key>` headers against `FORGE_API_KEY`.
+4. **Secret Redaction**:
+   - `SecretRedactor` automatically masks API keys (`sk-...`, `ghp_...`, `AIza...`), tokens, and credentials from all audit event streams and logs.
+
+---
+
+## 4. Verification & Self-Repair ("Evidence Over Confidence")
+
+FORGE enforces strict objective verification gates:
+1. **AST Build Check**: Syntax and AST parse validation.
+2. **Static Code Linter**: `ruff check . --select=E,F`.
+3. **Pytest Suite Runner**: Test execution and assertion validation.
+4. **Runtime Smoke Check**: CLI `--help` or entrypoint execution.
+5. **Headless Browser Checker**: Playwright Chromium automation verifying console logs, network errors (4xx/5xx), missing assets, DOM interactivity, and PNG screenshot capture.
+
+If verification fails, `RecoveryEngine` classifies root cause, deduplicates patches with SHA256 hashes, caps retries to 3 per failure class, and applies self-repair fixes.
+
+---
+
+## 5. Multi-Agent Intelligence Adapter (`AIUniverseProvider`)
+
+Connects FORGE to external or simulated multi-agent swarm intelligence:
+- **`FAST`**: Single-pass high-speed optimal reasoning.
+- **`REVIEW`**: Multi-persona review (`ArchitectPersona`, `SeniorDevPersona`, `JudgeEvaluator`) $\rightarrow$ compare $\rightarrow$ select optimal architecture.
+- **`DEBATE`**: Adversarial debate protocol (`ProponentSpecialist`, `AdversaryCritique`, `RebuttalSpecialist`, `ConsensusSynthesizer`) $\rightarrow$ rebuttal-tested consensus with provenance and dissent tracking.

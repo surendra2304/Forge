@@ -55,6 +55,7 @@ class TaskEntity(BaseModel):
     state: TaskState = Field(default=TaskState.PENDING, description="Current lifecycle state")
     progress_percentage: int = Field(default=0, ge=0, le=100, description="Estimated completion progress")
     error_message: Optional[str] = Field(default=None, description="Error reason if state is FAILED or BLOCKED")
+    metadata: Dict[str, Any] = Field(default_factory=dict, description="Arbitrary task metadata and correlated identifiers")
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
