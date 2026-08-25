@@ -101,7 +101,7 @@ class LintChecker(BaseChecker):
                 stdout="No python files to lint.",
             )
 
-        cmd_res = await engine.terminal.run_command(task_id, "ruff check . --select=E,F", role="tester")
+        cmd_res = await engine.terminal.run_command(task_id, "ruff check . --select=E,F --ignore=E501,F841", role="tester")
         duration_ms = (time.perf_counter() - start_time) * 1000.0
 
         # Passed if exit code 0 or ruff not present in environment

@@ -214,6 +214,19 @@ class ReleaseEngineerRole(BaseAgent):
         )
 
     async def execute_step(self, task_id: str, node_title: str, context: Dict[str, Any], engine) -> Dict[str, Any]:
-        git_status = await engine.git.status(task_id=task_id, role=self.role_name)
-        tag_name = await engine.git.checkpoint(task_id=task_id, checkpoint_name="release", role=self.role_name)
-        return {"status": "success", "tag": tag_name, "clean": git_status.clean, "agent": self.role_name}
+        from app.execution.delivery import DeliveryPackager
+        packager = DeliveryPackager(engine=engine, wm=engine.wm)
+        goal = context.get("goal", "Autonomous Engineering Project")
+        reqs = context.get("requirements", [])
+        report_data = await packager.package_delivery(
+            task_id=task_id,
+            goal=goal,
+            requirements=reqs,
+            tag_name="v1.0-forge-delivery",
+        )
+        return {
+            "status": "success",
+            "release_tag": report_data.release_tag,
+            "completion_report": report_data.model_dump(mode="json"),
+            "agent": self.role_name,
+        }

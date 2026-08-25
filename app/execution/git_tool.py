@@ -140,6 +140,21 @@ class GitTool:
         logger.info(f"Created git checkpoint tag '{tag_name}' (sha={sha[:8]}) in task {task_id}")
         return tag_name
 
+    async def tag_release(self, task_id: str, tag_name: str = "v1.0-forge-delivery", role: str = "release_engineer") -> str:
+        """Create a final tagged release checkpoint before delivery."""
+        self.pm.check_permission(role, ToolPermission.GIT_WRITE)
+        await self.init_repo(task_id, role=role)
+        await self.commit(task_id, f"Release delivery: {tag_name}", role=role)
+        await self._run_git(task_id, ["tag", "-f", tag_name])
+        logger.info(f"Created git release tag '{tag_name}' in task {task_id}")
+        return tag_name
+
+    async def get_log(self, task_id: str, max_count: int = 10, role: str = "developer") -> str:
+        """Retrieve recent git commit log."""
+        self.pm.check_permission(role, ToolPermission.GIT_READ)
+        code, out, err = await self._run_git(task_id, ["log", f"-n{max_count}", "--oneline"])
+        return out.strip() if code == 0 else ""
+
     async def rollback(self, task_id: str, target_tag_or_sha: str, role: str = "developer") -> bool:
         """Hard reset workspace to the specified checkpoint tag or commit SHA."""
         self.pm.check_permission(role, ToolPermission.GIT_WRITE)
