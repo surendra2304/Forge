@@ -32,12 +32,17 @@ class AIUniverseClient:
         self,
         base_url: Optional[str] = None,
         api_key: Optional[str] = None,
-        timeout: float = 30.0,
+        timeout: Optional[float | httpx.Timeout] = None,
     ):
         settings: Settings = get_settings()
         self.base_url = (base_url or settings.ai_universe_url).rstrip("/")
         self.api_key = api_key if api_key is not None else settings.ai_universe_api_key
-        self.timeout = timeout
+        if timeout is None:
+            self.timeout = httpx.Timeout(10.0, connect=1.0)
+        elif isinstance(timeout, (int, float)):
+            self.timeout = httpx.Timeout(timeout, connect=min(timeout, 2.0))
+        else:
+            self.timeout = timeout
 
     def _get_headers(self) -> Dict[str, str]:
         """Construct request headers with API key authentication."""

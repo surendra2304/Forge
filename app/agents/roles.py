@@ -158,6 +158,67 @@ class DeveloperRole(BaseAgent):
                 [f"File: {p}\n```\n{c}\n```" for p, c in context["existing_files"].items()]
             )
 
+        # 1. Primary Code Generation via AI Universe Client
+        ai_response_text = None
+        run_id = None
+        try:
+            from app.integrations.ai_universe_client import get_ai_universe_client
+            ai_client = get_ai_universe_client()
+            ask_prompt = f"Write the Python code for: {goal or node_title}. Return ONLY the raw code."
+            ai_res = await ai_client.ask(question=ask_prompt, mode="auto")
+
+            if ai_res and ai_res.confidence >= 0.70 and ai_res.answer and ai_res.answer.strip():
+                ai_response_text = ai_res.answer
+                run_id = ai_res.run_id
+                if hasattr(engine, "store") and engine.store:
+                    await engine.store.record_event(
+                        task_id=task_id,
+                        event_type="ai_universe.code_generated",
+                        payload={"run_id": run_id, "confidence": ai_res.confidence, "stage": "developer"},
+                    )
+            elif ai_res and ai_res.confidence < 0.70:
+                logger.warning(
+                    f"AI Universe code generation confidence ({ai_res.confidence:.2f}) below threshold 0.70. Falling back to local model."
+                )
+        except Exception as e:
+            logger.warning(f"AI Universe code generation call failed ({e}). Falling back to local model.")
+
+        if ai_response_text:
+            # Parse answer and write to workspace
+            written = self.apply_extracted_files(
+                task_id=task_id,
+                response_text=ai_response_text,
+                engine=engine,
+                default_filename="main.py",
+            )
+            # If the response was purely raw code without markdown headers or code fences, create main.py directly
+            if not written and ai_response_text.strip():
+                clean_code = ai_response_text.strip()
+                if clean_code.startswith("```"):
+                    lines = clean_code.splitlines()
+                    if lines and lines[0].startswith("```"):
+                        lines = lines[1:]
+                    if lines and lines[-1].startswith("```"):
+                        lines = lines[:-1]
+                    clean_code = "\n".join(lines)
+
+                engine.fs.create_file(
+                    task_id=task_id,
+                    relative_path="main.py",
+                    content=clean_code,
+                    role=self.role_name,
+                )
+                written.append("main.py")
+
+            return {
+                "status": "success",
+                "files_written": written,
+                "implementation_output": ai_response_text,
+                "agent": self.role_name,
+                "ai_universe_run_id": run_id,
+            }
+
+        # 2. Fallback to local LLM / DirectProvider
         prompt = (
             f"Objective: {goal}\n"
             f"Task: {node_title}\n"
