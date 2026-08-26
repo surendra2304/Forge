@@ -45,7 +45,7 @@ class WorkspaceManager:
     def get_task_workspace_dir(self, task_id: str) -> Path:
         """Return the root path for a given task ID."""
         # Sanitize task_id prefix if needed
-        folder_name = task_id if task_id.startswith("task_") else f"task_{task_id}"
+        folder_name = task_id if task_id.startswith("task") else f"task_{task_id}"
         base_workspaces = self.settings.base_dir / self.settings.workspaces_dir
         return base_workspaces / folder_name
 

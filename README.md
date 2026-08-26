@@ -84,5 +84,6 @@ pytest -v tests/
 ## 📖 Development Diary
 
 Keep track of daily progress and updates:
-- **[FORGE_DIARY.md](FORGE_DIARY.md)**: Short project overview and summary of each day's work.
-- **[diary/2026-08-25.md](diary/2026-08-25.md)**: Day 1 detailed diary entry.
+- **[FORGE_DIARY.md](FORGE_DIARY.md)**: Project overview and development diary summary table.
+- **[diary/2026-08-25.md](diary/2026-08-25.md)**: Day 1 — Inception & Complete Engine Build.
+- **[diary/2026-08-26.md](diary/2026-08-26.md)**: Day 2 — AI Universe Peer Reasoning, Multi-File Synthesis & Strict Verification.

@@ -5,6 +5,7 @@ Validates end-to-end autonomous synthesis of frontend web projects with BrowserC
 
 from pathlib import Path
 import json
+from unittest.mock import AsyncMock, patch
 import pytest
 
 from app.core.config import Settings
@@ -12,6 +13,7 @@ from app.core.orchestrator import OrchestratorCore
 from app.core.workspace import WorkspaceManager
 from app.execution.delivery import DeliveryPackager
 from app.execution.engine import ExecutionEngine
+from app.integrations.ai_universe_client import AIUniverseResponse
 from app.memory.db import DatabaseManager
 from app.memory.models import TaskMode, TaskState
 from app.memory.state_store import StateStore
@@ -154,14 +156,22 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 """
 
-    wm.write_project_file(task_id, "index.html", html_content)
-    wm.write_project_file(task_id, "style.css", css_content)
-    wm.write_project_file(task_id, "app.js", js_content)
-    wm.write_project_file(task_id, "README.md", "# Static Web Application\n\nResponsive landing page created by FORGE.\n")
+    responses = {
+        "index.html": html_content,
+        "style.css": css_content,
+        "app.js": js_content,
+        "README.md": "# Static Web Application\n",
+    }
+    async def mock_ask_impl(question: str, mode: str = "auto"):
+        for fname, code in responses.items():
+            if fname in question:
+                return AIUniverseResponse(answer=code, confidence=0.95, run_id=f"run_{fname}")
+        return AIUniverseResponse(answer=html_content, confidence=0.95, run_id="run_default")
 
     # 4. Autonomous DAG Execution
-    task = await orchestrator.run_task(task_id, max_iterations=10)
-    assert task.state == TaskState.COMPLETED
+    with patch("app.integrations.ai_universe_client.AIUniverseClient.ask", side_effect=mock_ask_impl):
+        task = await orchestrator.run_task(task_id, max_iterations=10)
+        assert task.state == TaskState.COMPLETED
 
     # 5. Browser Verification
     browser_checker = BrowserChecker()

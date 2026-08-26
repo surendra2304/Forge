@@ -16,6 +16,7 @@ class CheckCategory(str, Enum):
     TEST = "test"
     RUNTIME = "runtime"
     SECURITY = "security"
+    FEATURE = "feature"
 
 
 class VerificationEvidence(BaseModel):

@@ -83,18 +83,27 @@ async def test_parallel_wave_dependency_scheduling(temp_dir: Path):
     assert nid_be in ready_ids
     assert nid_integ not in ready_ids  # Node C must wait for both
 
-    # Execute wave 1 via orchestrator
-    updated_task, executed_wave_1 = await orchestrator.step_task(task_id)
-    assert len(executed_wave_1) == 2
-    assert nid_fe in executed_wave_1
-    assert nid_be in executed_wave_1
+    from unittest.mock import AsyncMock, patch
+    from app.integrations.ai_universe_client import AIUniverseResponse
 
-    # 4. Step 2: Now that both frontend and backend are completed, Integration is ready
-    updated_task, executed_wave_2 = await orchestrator.step_task(task_id)
-    assert len(executed_wave_2) == 1
-    assert executed_wave_2[0] == nid_integ
+    with patch("app.integrations.ai_universe_client.AIUniverseClient.ask", new_callable=AsyncMock) as mock_ask:
+        mock_ask.return_value = AIUniverseResponse(
+            answer="def handle(): return True\n",
+            confidence=0.95,
+            run_id="run_parallel_orch",
+        )
+        # Execute wave 1 via orchestrator
+        updated_task, executed_wave_1 = await orchestrator.step_task(task_id)
+        assert len(executed_wave_1) == 2
+        assert nid_fe in executed_wave_1
+        assert nid_be in executed_wave_1
 
-    # 5. Step 3: All nodes complete -> Task transitions to COMPLETED
-    updated_task, executed_wave_3 = await orchestrator.step_task(task_id)
-    assert updated_task.state == TaskState.COMPLETED
-    assert updated_task.progress_percentage == 100
+        # 4. Step 2: Now that both frontend and backend are completed, Integration is ready
+        updated_task, executed_wave_2 = await orchestrator.step_task(task_id)
+        assert len(executed_wave_2) == 1
+        assert executed_wave_2[0] == nid_integ
+
+        # 5. Step 3: All nodes complete -> Task transitions to COMPLETED
+        updated_task, executed_wave_3 = await orchestrator.step_task(task_id)
+        assert updated_task.state == TaskState.COMPLETED
+        assert updated_task.progress_percentage == 100

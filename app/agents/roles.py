@@ -148,14 +148,14 @@ class ArchitectRole(BaseAgent):
 
         if not manifest_files:
             goal_lower = goal.lower()
-            if any(k in goal_lower for k in ["website", "landing page", "web page", "html", "portfolio", "css", "calculator website", "static"]):
+            if any(k in goal_lower for k in ["full-stack", "fullstack", "dashboard"]):
+                manifest_files = ["main.py", "test_main.py", "index.html", "style.css", "app.js", "requirements.txt", "README.md"]
+            elif any(k in goal_lower for k in ["website", "landing page", "web page", "html", "portfolio", "css", "calculator website", "static"]):
                 manifest_files = ["index.html", "style.css", "app.js"]
             elif any(k in goal_lower for k in ["fastapi", "rest api", "backend", "database", "sqlite", "service"]):
                 manifest_files = ["main.py", "test_main.py", "README.md"]
             elif any(k in goal_lower for k in ["cli", "python tool", "command-line", "script"]):
                 manifest_files = ["main.py", "test_main.py", "README.md"]
-            elif any(k in goal_lower for k in ["full-stack", "fullstack"]):
-                manifest_files = ["main.py", "index.html", "style.css", "app.js", "requirements.txt"]
             else:
                 manifest_files = ["main.py", "README.md"]
 
@@ -229,6 +229,7 @@ class DeveloperRole(BaseAgent):
                 file_manifest = ["main.py"]
 
         written: list[str] = []
+        fallback_files: list[str] = []
         last_run_id = None
 
         # 2. Iterate through each file in File Manifest and synthesize code
@@ -290,7 +291,8 @@ class DeveloperRole(BaseAgent):
                     if filename not in written:
                         written.append(filename)
             else:
-                # Fallback to local LLM / DirectProvider
+                # Fallback to local LLM / DirectProvider (stub generator)
+                fallback_files.append(filename)
                 prompt = (
                     f"Objective: {goal}\n"
                     f"Task: {node_title}\n"
@@ -312,11 +314,29 @@ class DeveloperRole(BaseAgent):
                     if p not in written:
                         written.append(p)
 
+        # Flag fallback_stub in workspace state
+        if fallback_files:
+            import json as py_json
+            fallback_meta = {"fallback_stub": True, "fallback_files": fallback_files}
+            paths = engine.wm.get_workspace_paths(task_id) or engine.wm.create_workspace(task_id)
+            (paths.state / "FALLBACK_STUB.json").write_text(py_json.dumps(fallback_meta, indent=2), encoding="utf-8")
+            if hasattr(engine, "store") and engine.store:
+                try:
+                    await engine.store.record_event(
+                        task_id=task_id,
+                        event_type="task.fallback_stub",
+                        payload=fallback_meta,
+                    )
+                except Exception:
+                    pass
+
         ret: dict[str, Any] = {
             "status": "success",
             "files_written": written,
             "implementation_output": f"Generated files: {written}",
             "agent": self.role_name,
+            "fallback_stub": bool(fallback_files),
+            "fallback_files": fallback_files,
         }
         if last_run_id is not None:
             ret["ai_universe_run_id"] = last_run_id

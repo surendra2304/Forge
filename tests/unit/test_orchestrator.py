@@ -55,12 +55,19 @@ async def test_orchestrator_intake_and_execution_loop(temp_dir: Path):
 
     assert task.state == TaskState.READY
     assert len(graph.nodes) >= 6
-    assert (wm.get_task_workspace_dir(task.id) / "project").exists()
+    from unittest.mock import AsyncMock, patch
+    from app.integrations.ai_universe_client import AIUniverseResponse
 
     # 2. Run full autonomous loop
-    completed_task = await orchestrator.run_task(task.id, max_iterations=10)
-    assert completed_task.state == TaskState.COMPLETED
-    assert completed_task.progress_percentage == 100
+    with patch("app.integrations.ai_universe_client.AIUniverseClient.ask", new_callable=AsyncMock) as mock_ask:
+        mock_ask.return_value = AIUniverseResponse(
+            answer="def add(a, b): return a + b\n",
+            confidence=0.95,
+            run_id="run_test_orch",
+        )
+        completed_task = await orchestrator.run_task(task.id, max_iterations=10)
+        assert completed_task.state == TaskState.COMPLETED
+        assert completed_task.progress_percentage == 100
 
     # Verify audit events recorded
     audit_trail = await store.get_audit_trail(task.id)

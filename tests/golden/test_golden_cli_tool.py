@@ -6,6 +6,7 @@ Validates end-to-end autonomous synthesis, execution, verification, and delivery
 import json
 from pathlib import Path
 
+from unittest.mock import AsyncMock, patch
 import pytest
 
 from app.core.config import Settings
@@ -13,6 +14,7 @@ from app.core.orchestrator import OrchestratorCore
 from app.core.workspace import WorkspaceManager
 from app.execution.delivery import DeliveryPackager
 from app.execution.engine import ExecutionEngine
+from app.integrations.ai_universe_client import AIUniverseResponse
 from app.memory.db import DatabaseManager
 from app.memory.models import TaskMode, TaskState
 from app.memory.state_store import StateStore
@@ -153,12 +155,22 @@ def test_todo_lifecycle(tmp_path, monkeypatch):
 
         wm.write_project_file(task_id, "main.py", cli_code)
         wm.write_project_file(task_id, "test_main.py", test_code)
-        wm.write_project_file(task_id, "README.md", "# CLI Todo Application\n\nBuilt by FORGE Autonomous Engine.\n")
+        responses = {
+            "test_main.py": test_code,
+            "main.py": cli_code,
+            "README.md": "# CLI Todo Application\n",
+        }
+        async def mock_ask_impl(question: str, mode: str = "auto"):
+            for fname in ["test_main.py", "main.py", "README.md"]:
+                if fname in question:
+                    return AIUniverseResponse(answer=responses[fname], confidence=0.95, run_id=f"run_{fname}")
+            return AIUniverseResponse(answer=cli_code, confidence=0.95, run_id="run_default")
 
         # 4. Execute TaskGraph
-        task = await orchestrator.run_task(task_id, max_iterations=10)
-        assert task.state == TaskState.COMPLETED
-        assert task.progress_percentage == 100
+        with patch("app.integrations.ai_universe_client.AIUniverseClient.ask", side_effect=mock_ask_impl):
+            task = await orchestrator.run_task(task_id, max_iterations=10)
+            assert task.state == TaskState.COMPLETED
+            assert task.progress_percentage == 100
 
         # 5. Verification Battery Gates
         report = await verifier.verify_task(task_id)

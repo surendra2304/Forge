@@ -5,6 +5,7 @@ Validates end-to-end autonomous synthesis of backend REST APIs with database mod
 
 from pathlib import Path
 
+from unittest.mock import AsyncMock, patch
 import pytest
 
 from app.core.config import Settings
@@ -12,6 +13,7 @@ from app.core.orchestrator import OrchestratorCore
 from app.core.workspace import WorkspaceManager
 from app.execution.delivery import DeliveryPackager
 from app.execution.engine import ExecutionEngine
+from app.integrations.ai_universe_client import AIUniverseResponse
 from app.memory.db import DatabaseManager
 from app.memory.models import TaskMode, TaskState
 from app.memory.state_store import StateStore
@@ -171,12 +173,21 @@ def test_expense_crud_lifecycle():
 """
 
         wm.write_project_file(task_id, "main.py", app_code)
-        wm.write_project_file(task_id, "test_main.py", test_code)
-        wm.write_project_file(task_id, "README.md", "# Expense Tracker API\n\nFastAPI REST service with SQLite.\n")
+        responses = {
+            "test_main.py": test_code,
+            "main.py": app_code,
+            "README.md": "# Expense Tracker API\n",
+        }
+        async def mock_ask_impl(question: str, mode: str = "auto"):
+            for fname in ["test_main.py", "main.py", "README.md"]:
+                if fname in question:
+                    return AIUniverseResponse(answer=responses[fname], confidence=0.95, run_id=f"run_{fname}")
+            return AIUniverseResponse(answer=app_code, confidence=0.95, run_id="run_default")
 
         # 4. Autonomous DAG Execution
-        task = await orchestrator.run_task(task_id, max_iterations=10)
-        assert task.state == TaskState.COMPLETED
+        with patch("app.integrations.ai_universe_client.AIUniverseClient.ask", side_effect=mock_ask_impl):
+            task = await orchestrator.run_task(task_id, max_iterations=10)
+            assert task.state == TaskState.COMPLETED
 
         # 5. Verification Battery
         report = await verifier.verify_task(task_id)

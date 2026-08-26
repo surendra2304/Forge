@@ -520,6 +520,7 @@ class BrowserChecker(BaseChecker):
         console_errors = []
         network_failures = []
         missing_assets = []
+        paths.artifacts.mkdir(parents=True, exist_ok=True)
         screenshot_path = paths.artifacts / f"screenshot_{int(time.time())}.png"
         artifacts_inspected = [str(f.relative_to(paths.project)) for f in html_files]
 
@@ -764,6 +765,136 @@ class SecurityChecker(BaseChecker):
             check_name=self.name,
             category=self.category,
             command="security_scan(secrets, bandit, npm_audit)",
+            exit_code=0 if passed else 1,
+            passed=passed,
+            duration_ms=round(duration_ms, 2),
+            stdout=stdout,
+            stderr=stderr,
+            artifacts_inspected=artifacts_inspected,
+            issues=issues,
+        )
+
+
+class FeaturePresenceChecker(BaseChecker):
+    """
+    Validates that requested frameworks, libraries, modules, and domain features
+    are actually present and implemented in generated workspace files.
+    Detects and fails if files are missing or consist only of untouched scaffold stubs.
+    """
+
+    def __init__(self):
+        super().__init__(name="Keyword & Feature Presence Verifier", category=CheckCategory.FEATURE)
+
+    async def run_check(self, task_id: str, engine: ExecutionEngine) -> VerificationEvidence:
+        start_time = time.perf_counter()
+        paths = engine.wm.get_workspace_paths(task_id)
+        if not paths or not paths.project.exists():
+            return VerificationEvidence(
+                check_name=self.name,
+                category=self.category,
+                exit_code=1,
+                passed=False,
+                stderr="Workspace project path does not exist.",
+            )
+
+        # 1. Retrieve Task Goal & Requirements from store if available
+        goal = ""
+        requirements = []
+        if hasattr(engine, "store") and engine.store:
+            try:
+                task = await engine.store.get_task(task_id)
+                if task:
+                    goal = task.goal or ""
+                    requirements = task.requirements or []
+            except Exception:
+                pass
+
+        # 2. Check if Fallback Stub flag exists in workspace state
+        fallback_stub_detected = False
+        if (paths.state / "FALLBACK_STUB.json").exists():
+            fallback_stub_detected = True
+
+        # 3. Collect all project text contents
+        all_text = ""
+        files_map = {}
+        artifacts_inspected = []
+        for file_path in paths.project.rglob("*"):
+            if file_path.is_file() and not any(p in file_path.parts for p in [".git", "node_modules", "__pycache__", "artifacts", "state", "logs", "cache"]):
+                rel_path = str(file_path.relative_to(paths.project))
+                artifacts_inspected.append(rel_path)
+                try:
+                    content = file_path.read_text(encoding="utf-8", errors="ignore")
+                    files_map[rel_path] = content
+                    all_text += f"\n--- {rel_path} ---\n" + content
+                except Exception:
+                    pass
+
+        issues = []
+        goal_lower = goal.lower()
+        all_text_lower = all_text.lower()
+
+        # Check: If fallback stub was flagged
+        if fallback_stub_detected:
+            issues.append({"error": "Task files were generated using fallback stub generator due to AI Universe unavailability or low confidence.", "rule": "fallback_stub"})
+
+        # Check: Detect untouched placeholder stubs in files
+        for rel_path, content in files_map.items():
+            if 'print("Running: ' in content and 'def main():' in content and len(content.splitlines()) <= 15:
+                issues.append({"file": rel_path, "error": "Contains untouched default scaffold placeholder stub without feature implementation.", "rule": "placeholder_stub"})
+
+        # Check: Goal-specific feature presence
+        # FastAPI
+        if "fastapi" in goal_lower:
+            has_fastapi = any(
+                k in all_text for k in ["from fastapi", "import fastapi", "FastAPI(", "fastapi."]
+            )
+            if not has_fastapi:
+                issues.append({"error": "Objective specifies 'FastAPI', but no FastAPI library imports or application instances were found in project files.", "rule": "fastapi_presence"})
+
+        # Flask
+        if "flask" in goal_lower:
+            has_flask = any(
+                k in all_text for k in ["from flask", "import flask", "Flask(", "flask."]
+            )
+            if not has_flask:
+                issues.append({"error": "Objective specifies 'Flask', but no Flask library imports or application instances were found in project files.", "rule": "flask_presence"})
+
+        # SQLite / Database
+        if "sqlite" in goal_lower or ("database" in goal_lower and "sql" in goal_lower):
+            if not any(k in all_text_lower for k in ["sqlite3", "sqlalchemy", "cursor", "execute(", "create table", "select "]):
+                issues.append({"error": "Objective specifies SQLite/Database, but no database operations or queries were found in project files.", "rule": "sqlite_presence"})
+
+        # Portfolio Website / Dark Mode / Hero
+        if "dark mode" in goal_lower or "dark-mode" in goal_lower:
+            if not any(k in all_text_lower for k in ["dark", "toggle", "theme", "mode"]):
+                issues.append({"error": "Objective specifies 'dark mode', but no dark mode toggle or theme styling was found in HTML/CSS/JS.", "rule": "dark_mode_presence"})
+
+        if "hero" in goal_lower:
+            if not any(k in all_text_lower for k in ["hero", "header", "banner", "intro"]):
+                issues.append({"error": "Objective specifies 'hero section', but no hero section was found in HTML/CSS.", "rule": "hero_presence"})
+
+        if any(w in goal_lower for w in ["portfolio", "portfolio website"]):
+            if not any(k in all_text_lower for k in ["portfolio", "project", "about", "skill", "contact"]):
+                issues.append({"error": "Objective specifies 'portfolio website', but core portfolio sections (projects, about, skills, contact) were missing.", "rule": "portfolio_presence"})
+
+        # Multi-file static web files if explicitly required in goal
+        if "index.html" in goal_lower and "index.html" not in files_map:
+            issues.append({"file": "index.html", "error": "Objective required 'index.html', but index.html was not generated.", "rule": "file_manifest_presence"})
+        if "style.css" in goal_lower and "style.css" not in files_map:
+            issues.append({"file": "style.css", "error": "Objective required 'style.css', but style.css was not generated.", "rule": "file_manifest_presence"})
+        if ("script.js" in goal_lower or "app.js" in goal_lower) and not any(f in files_map for f in ["script.js", "app.js"]):
+            issues.append({"file": "script.js", "error": "Objective required JavaScript file ('script.js' / 'app.js'), but neither was found.", "rule": "file_manifest_presence"})
+
+        duration_ms = (time.perf_counter() - start_time) * 1000.0
+        passed = len(issues) == 0
+
+        stdout = f"Verified {len(artifacts_inspected)} project files. All requested features, libraries, and objective elements are present and implemented." if passed else ""
+        stderr = f"Feature presence verification failed:\n" + "\n".join(f"- {issue.get('error', issue)}" for issue in issues) if not passed else ""
+
+        return VerificationEvidence(
+            check_name=self.name,
+            category=self.category,
+            command="feature_presence_verification(goal, project_files)",
             exit_code=0 if passed else 1,
             passed=passed,
             duration_ms=round(duration_ms, 2),

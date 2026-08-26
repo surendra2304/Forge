@@ -198,15 +198,24 @@ test('TaskService delete task', (t) => {
 ```
 """
 
+        from unittest.mock import AsyncMock, patch
+        from app.integrations.ai_universe_client import AIUniverseResponse
+
         provider = DirectProvider(mock_response=mock_developer_code)
         dev_agent = agent_registry.create_agent("developer", provider=provider)
 
-        exec_res = await dev_agent.execute_step(
-            task_id=task_id,
-            node_title="Implement Express & TypeScript Task API",
-            context={"goal": goal, "requirements": requirements},
-            engine=engine,
-        )
+        with patch("app.integrations.ai_universe_client.AIUniverseClient.ask", new_callable=AsyncMock) as mock_ask:
+            mock_ask.return_value = AIUniverseResponse(
+                answer=mock_developer_code,
+                confidence=0.95,
+                run_id="run_golden_node_001",
+            )
+            exec_res = await dev_agent.execute_step(
+                task_id=task_id,
+                node_title="Implement Express & TypeScript Task API",
+                context={"goal": goal, "requirements": requirements},
+                engine=engine,
+            )
 
         assert exec_res["status"] == "success"
         assert len(exec_res["files_written"]) >= 4

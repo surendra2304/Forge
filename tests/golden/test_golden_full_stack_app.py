@@ -7,6 +7,7 @@ Playwright/Browser headless UI verification, asset resolution, and delivery repo
 import shutil
 from pathlib import Path
 
+from unittest.mock import AsyncMock, patch
 import pytest
 
 from app.core.config import Settings
@@ -14,6 +15,7 @@ from app.core.orchestrator import OrchestratorCore
 from app.core.workspace import WorkspaceManager
 from app.execution.delivery import DeliveryPackager
 from app.execution.engine import ExecutionEngine
+from app.integrations.ai_universe_client import AIUniverseResponse
 from app.memory.db import DatabaseManager
 from app.memory.models import TaskMode, TaskState
 from app.memory.state_store import StateStore
@@ -282,15 +284,26 @@ document.addEventListener("DOMContentLoaded", () => {
 
         wm.write_project_file(task_id, "main.py", backend_code)
         wm.write_project_file(task_id, "test_main.py", test_code)
-        wm.write_project_file(task_id, "index.html", html_code)
-        wm.write_project_file(task_id, "style.css", css_code)
-        wm.write_project_file(task_id, "app.js", js_code)
-        wm.write_project_file(task_id, "README.md", "# Full-Stack Weather Dashboard\nFastAPI & Interactive Web UI.\n")
+        responses = {
+            "test_main.py": test_code,
+            "main.py": backend_code,
+            "index.html": html_code,
+            "style.css": css_code,
+            "app.js": js_code,
+            "requirements.txt": "fastapi\nuvicorn\nrequests\n",
+            "README.md": "# Full-Stack Weather Dashboard\n",
+        }
+        async def mock_ask_impl(question: str, mode: str = "auto"):
+            for fname in ["test_main.py", "main.py", "index.html", "style.css", "app.js", "requirements.txt", "README.md"]:
+                if fname in question:
+                    return AIUniverseResponse(answer=responses[fname], confidence=0.95, run_id=f"run_{fname}")
+            return AIUniverseResponse(answer=backend_code, confidence=0.95, run_id="run_default")
 
         # 4. Autonomous DAG Execution
-        task = await orchestrator.run_task(task_id, max_iterations=12)
-        assert task.state == TaskState.COMPLETED
-        assert task.progress_percentage == 100
+        with patch("app.integrations.ai_universe_client.AIUniverseClient.ask", side_effect=mock_ask_impl):
+            task = await orchestrator.run_task(task_id, max_iterations=12)
+            assert task.state == TaskState.COMPLETED
+            assert task.progress_percentage == 100
 
         # 5. Verification Battery Gates
         report = await verifier.verify_task(task_id)

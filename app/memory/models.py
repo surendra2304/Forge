@@ -33,6 +33,12 @@ class TaskMode(str, Enum):
     VERIFY_ONLY = "verify_only"
 
 
+def generate_task_id(sequence_num: int = 1) -> str:
+    """Generate a human-readable task identifier formatted as: task<task_num><DDMMYYYY><HHMMSS>."""
+    now = datetime.now()
+    return f"task{sequence_num:02d}{now.strftime('%d%m%Y%H%M%S')}"
+
+
 class ProjectWorkspace(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid4()))
     name: str = Field(..., description="Project name")
@@ -45,7 +51,7 @@ class ProjectWorkspace(BaseModel):
 
 class TaskEntity(BaseModel):
     """Persistent representation of an engineering task in FORGE."""
-    id: str = Field(default_factory=lambda: str(uuid4()))
+    id: str = Field(default_factory=generate_task_id)
     goal: str = Field(..., description="High-level engineering objective")
     requirements: List[str] = Field(default_factory=list, description="Explicit functional or technical constraints")
     mode: TaskMode = Field(default=TaskMode.AUTONOMOUS, description="Execution mode")

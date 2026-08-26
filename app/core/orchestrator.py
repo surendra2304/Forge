@@ -69,11 +69,16 @@ class OrchestratorCore:
         Intake a user request, create isolated workspace (with optional git clone or local copy),
         run Task Analyzer, synthesize TaskGraph DAG, and transition task to READY.
         """
-        task_id = str(uuid4())
+        from app.memory.models import generate_task_id
+
+        # Determine sequence number for new task
+        tasks = await self.store.list_tasks()
+        task_seq = len(tasks) + 1
+        task_id = generate_task_id(task_seq)
         req_list = requirements or []
         logger.info(f"Orchestrator intaking task '{task_id}': {goal[:80]}...")
 
-        # 1. Provision isolated workspace under workspaces/task_<id>/
+        # 1. Provision isolated workspace under workspaces/<task_id>/
         custom_base = Path(custom_workspace) if custom_workspace else None
         ws_paths = self.wm.create_workspace(
             task_id,
@@ -175,8 +180,37 @@ class OrchestratorCore:
 
         if not ready_nodes:
             if dag.is_completed():
-                task = await self.lifecycle.transition(task_id, TaskState.COMPLETED, progress_percentage=100)
-                await self.store.record_event(task_id=task_id, event_type="task.completed")
+                # Check if any file was generated using fallback_stub mode
+                has_fallback_stub = False
+                fallback_reason = "TASK FAILED: Fell back to stub generation. Please check API keys and try again."
+                try:
+                    paths = self.wm.get_workspace_paths(task_id)
+                    if paths and (paths.state / "FALLBACK_STUB.json").exists():
+                        has_fallback_stub = True
+                except Exception:
+                    pass
+
+                if not has_fallback_stub:
+                    for n in dag.graph.nodes.values():
+                        if n.result and isinstance(n.result, dict) and n.result.get("fallback_stub"):
+                            has_fallback_stub = True
+                            break
+
+                if has_fallback_stub:
+                    task = await self.lifecycle.transition(
+                        task_id,
+                        TaskState.FAILED,
+                        error_message=fallback_reason,
+                        progress_percentage=100,
+                    )
+                    await self.store.record_event(
+                        task_id=task_id,
+                        event_type="task.failed",
+                        payload={"reason": fallback_reason, "fallback_stub": True},
+                    )
+                else:
+                    task = await self.lifecycle.transition(task_id, TaskState.COMPLETED, progress_percentage=100)
+                    await self.store.record_event(task_id=task_id, event_type="task.completed")
             return task, []
 
         # Execute all ready nodes concurrently in parallel wave
@@ -264,8 +298,36 @@ class OrchestratorCore:
         progress = dag.get_progress_percentage()
 
         if dag.is_completed():
-            task = await self.lifecycle.transition(task_id, TaskState.COMPLETED, progress_percentage=100)
-            await self.store.record_event(task_id=task_id, event_type="task.completed")
+            has_fallback_stub = False
+            fallback_reason = "TASK FAILED: Fell back to stub generation. Please check API keys and try again."
+            try:
+                paths = self.wm.get_workspace_paths(task_id)
+                if paths and (paths.state / "FALLBACK_STUB.json").exists():
+                    has_fallback_stub = True
+            except Exception:
+                pass
+
+            if not has_fallback_stub:
+                for n in dag.graph.nodes.values():
+                    if n.result and isinstance(n.result, dict) and n.result.get("fallback_stub"):
+                        has_fallback_stub = True
+                        break
+
+            if has_fallback_stub:
+                task = await self.lifecycle.transition(
+                    task_id,
+                    TaskState.FAILED,
+                    error_message=fallback_reason,
+                    progress_percentage=100,
+                )
+                await self.store.record_event(
+                    task_id=task_id,
+                    event_type="task.failed",
+                    payload={"reason": fallback_reason, "fallback_stub": True},
+                )
+            else:
+                task = await self.lifecycle.transition(task_id, TaskState.COMPLETED, progress_percentage=100)
+                await self.store.record_event(task_id=task_id, event_type="task.completed")
         else:
             task = await self.store.update_task_state(task_id, state=task.state, progress_percentage=progress)
 

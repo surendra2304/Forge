@@ -11,6 +11,7 @@ from app.execution.engine import ExecutionEngine, execution_engine
 from app.verification.checkers import (
     BaseChecker,
     BuildChecker,
+    FeaturePresenceChecker,
     LintChecker,
     RuntimeChecker,
     SecurityChecker,
@@ -38,6 +39,7 @@ class VerificationEngine:
             TestChecker(),
             RuntimeChecker(),
             SecurityChecker(),
+            FeaturePresenceChecker(),
         ]
 
     async def capture_baseline(self, task_id: str) -> VerificationReport:

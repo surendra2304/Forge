@@ -119,19 +119,49 @@ async def handle_build(
                     else:
                         console.print(f"[red][FAIL] Self-Repair warning:[/red] {msg}")
 
-        progress.update(task_p, advance=25, description="[green]Build Complete & Checkpointed!")
+        # Re-check task status from store to reflect accurate final state
+        store = StateStore(db_manager)
+        final_task = await store.get_task(task_id)
+        if final_task:
+            task = final_task
+
+        has_fallback = (
+            task.state == TaskState.FAILED
+            or (task.error_message and "fallback" in task.error_message.lower())
+            or not report.all_passed
+        )
+        paths = workspace_manager.get_workspace_paths(task_id)
+        if paths and (paths.state / "FALLBACK_STUB.json").exists():
+            has_fallback = True
+
+        completion_desc = "[red]Build Finished (Failed / Fallback Detected)" if has_fallback else "[green]Build Complete & Checkpointed!"
+        progress.update(task_p, advance=25, description=completion_desc)
+
+    # If fallback or failure occurred, print large red warning panel
+    if has_fallback:
+        console.print()
+        console.print(
+            Panel(
+                "[bold white on red] TASK FAILED: Fell back to stub generation. Please check API keys and try again. [/bold white on red]",
+                style="bold red",
+                expand=False,
+            )
+        )
+        console.print()
 
     # Summary Report
-    table = Table(title=f"Task Completion Report: {task_id}", show_header=True, header_style="bold green")
+    header_style = "bold red" if has_fallback else "bold green"
+    table = Table(title=f"Task Completion Report: {task_id}", show_header=True, header_style=header_style)
     table.add_column("Property", style="cyan")
     table.add_column("Value", style="white")
 
     table.add_row("Task ID", task.id)
     table.add_row("Goal", task.goal)
-    table.add_row("State", task.state.value)
+    table.add_row("State", task.state.value, style="bold red" if task.state == TaskState.FAILED else "bold green")
     table.add_row("Progress", f"{task.progress_percentage}%")
     table.add_row("Workspace Root", task.workspace_path)
-    table.add_row("Checks Passed", f"{report.passed_checks}/{report.total_checks}")
+    checks_color = "red" if not report.all_passed else "green"
+    table.add_row("Checks Passed", f"[{checks_color}]{report.passed_checks}/{report.total_checks}[/{checks_color}]")
 
     console.print(table)
 
