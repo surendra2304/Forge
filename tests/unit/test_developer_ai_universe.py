@@ -61,7 +61,8 @@ async def test_developer_role_calls_ai_universe_ask_and_writes_raw_code(temp_eng
         # Verify mock call prompt
         mock_ask.assert_called_once()
         call_prompt = mock_ask.call_args[1]["question"]
-        assert "Write the Python code for: Build an expense calculator utility. Return ONLY the raw code." in call_prompt
+        assert "Write the complete code for main.py based on the overall architecture" in call_prompt
+        assert "Build an expense calculator utility" in call_prompt
 
         # Verify file content on disk
         written_content = engine.fs.read_file(task_id, "main.py", role="developer")

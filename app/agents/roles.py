@@ -95,18 +95,26 @@ class ArchitectRole(BaseAgent):
             f"Stage: {node_title}\n"
             f"{workspace_summary}\n"
             f"{consensus_info}\n"
-            f"Please synthesize the complete Architecture Specification for this project. "
-            f"Define system modules, interfaces, schema definitions, and file layout.\n"
-            f"Format the primary specification document as:\n"
+            f"Please synthesize the complete Architecture Specification and File Manifest for this project. "
+            f"Define system modules, interfaces, schema definitions, and file layout.\n\n"
+            f"Format your output as:\n"
             f"### File: docs/ARCHITECTURE_SPEC.md\n"
             f"```markdown\n"
             f"# Architecture Specification: {goal}\n"
             f"...\n"
+            f"```\n\n"
+            f"### File: docs/FILE_MANIFEST.json\n"
+            f"```json\n"
+            f"[\n"
+            f"  \"index.html\",\n"
+            f"  \"style.css\",\n"
+            f"  \"app.js\"\n"
+            f"]\n"
             f"```"
         )
         response = await self.prompt_model(prompt)
 
-        # Apply extracted files (e.g. docs/ARCHITECTURE_SPEC.md)
+        # Apply extracted files (e.g. docs/ARCHITECTURE_SPEC.md, docs/FILE_MANIFEST.json)
         written = self.apply_extracted_files(
             task_id=task_id,
             response_text=response.content,
@@ -124,9 +132,48 @@ class ArchitectRole(BaseAgent):
             )
             written.append("docs/ARCHITECTURE_SPEC.md")
 
+        # Parse or generate File Manifest
+        manifest_files: list[str] = []
+        if "docs/FILE_MANIFEST.json" in written:
+            try:
+                import json
+                raw_json = engine.fs.read_file(task_id, "docs/FILE_MANIFEST.json", role=self.role_name)
+                parsed = json.loads(raw_json)
+                if isinstance(parsed, list):
+                    manifest_files = [str(x) for x in parsed if x]
+                elif isinstance(parsed, dict) and "files" in parsed:
+                    manifest_files = [str(x) for x in parsed["files"] if x]
+            except Exception:
+                pass
+
+        if not manifest_files:
+            goal_lower = goal.lower()
+            if any(k in goal_lower for k in ["website", "landing page", "web page", "html", "portfolio", "css", "calculator website", "static"]):
+                manifest_files = ["index.html", "style.css", "app.js"]
+            elif any(k in goal_lower for k in ["fastapi", "rest api", "backend", "database", "sqlite", "service"]):
+                manifest_files = ["main.py", "test_main.py", "README.md"]
+            elif any(k in goal_lower for k in ["cli", "python tool", "command-line", "script"]):
+                manifest_files = ["main.py", "test_main.py", "README.md"]
+            elif any(k in goal_lower for k in ["full-stack", "fullstack"]):
+                manifest_files = ["main.py", "index.html", "style.css", "app.js", "requirements.txt"]
+            else:
+                manifest_files = ["main.py", "README.md"]
+
+            import json
+            engine.fs.create_file(
+                task_id=task_id,
+                relative_path="docs/FILE_MANIFEST.json",
+                content=json.dumps(manifest_files, indent=2),
+                role=self.role_name,
+            )
+            if "docs/FILE_MANIFEST.json" not in written:
+                written.append("docs/FILE_MANIFEST.json")
+
         return {
             "status": "success",
             "spec_file": "docs/ARCHITECTURE_SPEC.md",
+            "manifest_file": "docs/FILE_MANIFEST.json",
+            "file_manifest": manifest_files,
             "files_written": written,
             "agent": self.role_name,
         }
@@ -158,91 +205,122 @@ class DeveloperRole(BaseAgent):
                 [f"File: {p}\n```\n{c}\n```" for p, c in context["existing_files"].items()]
             )
 
-        # 1. Primary Code Generation via AI Universe Client
-        ai_response_text = None
-        run_id = None
-        try:
-            from app.integrations.ai_universe_client import get_ai_universe_client
-            ai_client = get_ai_universe_client()
-            ask_prompt = f"Write the Python code for: {goal or node_title}. Return ONLY the raw code."
-            ai_res = await ai_client.ask(question=ask_prompt, mode="auto")
+        # 1. Retrieve File Manifest (from context, docs/FILE_MANIFEST.json, or project goal)
+        file_manifest = context.get("file_manifest")
+        if not file_manifest:
+            try:
+                import json
+                raw_json = engine.fs.read_file(task_id, "docs/FILE_MANIFEST.json", role=self.role_name)
+                parsed = json.loads(raw_json)
+                if isinstance(parsed, list):
+                    file_manifest = [str(x) for x in parsed if x]
+                elif isinstance(parsed, dict) and "files" in parsed:
+                    file_manifest = [str(x) for x in parsed["files"] if x]
+            except Exception:
+                pass
 
-            if ai_res and ai_res.confidence >= 0.70 and ai_res.answer and ai_res.answer.strip():
-                ai_response_text = ai_res.answer
-                run_id = ai_res.run_id
-                if hasattr(engine, "store") and engine.store:
-                    await engine.store.record_event(
-                        task_id=task_id,
-                        event_type="ai_universe.code_generated",
-                        payload={"run_id": run_id, "confidence": ai_res.confidence, "stage": "developer"},
+        if not file_manifest:
+            goal_lower = goal.lower()
+            if any(k in goal_lower for k in ["website", "landing page", "web page", "html", "portfolio", "css", "calculator website", "static"]):
+                file_manifest = ["index.html", "style.css", "app.js"]
+            elif any(k in goal_lower for k in ["full-stack", "fullstack"]):
+                file_manifest = ["main.py", "index.html", "style.css", "app.js"]
+            else:
+                file_manifest = ["main.py"]
+
+        written: list[str] = []
+        last_run_id = None
+
+        # 2. Iterate through each file in File Manifest and synthesize code
+        for filename in file_manifest:
+            if not filename or not isinstance(filename, str):
+                continue
+
+            ai_code = None
+            try:
+                from app.integrations.ai_universe_client import get_ai_universe_client
+                ai_client = get_ai_universe_client()
+                ask_prompt = f"Write the complete code for {filename} based on the overall architecture: {goal or node_title}. Return ONLY the raw code."
+                ai_res = await ai_client.ask(question=ask_prompt, mode="auto")
+
+                if ai_res and ai_res.confidence >= 0.70 and ai_res.answer and ai_res.answer.strip():
+                    ai_code = ai_res.answer
+                    last_run_id = ai_res.run_id
+                    if hasattr(engine, "store") and engine.store:
+                        await engine.store.record_event(
+                            task_id=task_id,
+                            event_type="ai_universe.code_generated",
+                            payload={"file": filename, "run_id": ai_res.run_id, "confidence": ai_res.confidence, "stage": "developer"},
+                        )
+                elif ai_res and ai_res.confidence < 0.70:
+                    logger.warning(
+                        f"AI Universe code generation for '{filename}' confidence ({ai_res.confidence:.2f}) below threshold 0.70. Falling back to local model."
                     )
-            elif ai_res and ai_res.confidence < 0.70:
-                logger.warning(
-                    f"AI Universe code generation confidence ({ai_res.confidence:.2f}) below threshold 0.70. Falling back to local model."
-                )
-        except Exception as e:
-            logger.warning(f"AI Universe code generation call failed ({e}). Falling back to local model.")
+            except Exception as e:
+                logger.warning(f"AI Universe code generation call for '{filename}' failed ({e}). Falling back to local model.")
 
-        if ai_response_text:
-            # Parse answer and write to workspace
-            written = self.apply_extracted_files(
-                task_id=task_id,
-                response_text=ai_response_text,
-                engine=engine,
-                default_filename="main.py",
-            )
-            # If the response was purely raw code without markdown headers or code fences, create main.py directly
-            if not written and ai_response_text.strip():
-                clean_code = ai_response_text.strip()
-                if clean_code.startswith("```"):
-                    lines = clean_code.splitlines()
-                    if lines and lines[0].startswith("```"):
-                        lines = lines[1:]
-                    if lines and lines[-1].startswith("```"):
-                        lines = lines[:-1]
-                    clean_code = "\n".join(lines)
-
-                engine.fs.create_file(
+            if ai_code:
+                # Extract structured file blocks or save directly to filename
+                extracted = self.apply_extracted_files(
                     task_id=task_id,
-                    relative_path="main.py",
-                    content=clean_code,
-                    role=self.role_name,
+                    response_text=ai_code,
+                    engine=engine,
+                    default_filename=filename,
                 )
-                written.append("main.py")
+                if extracted:
+                    for p in extracted:
+                        if p not in written:
+                            written.append(p)
+                else:
+                    clean_code = ai_code.strip()
+                    if clean_code.startswith("```"):
+                        lines = clean_code.splitlines()
+                        if lines and lines[0].startswith("```"):
+                            lines = lines[1:]
+                        if lines and lines[-1].startswith("```"):
+                            lines = lines[:-1]
+                        clean_code = "\n".join(lines)
 
-            return {
-                "status": "success",
-                "files_written": written,
-                "implementation_output": ai_response_text,
-                "agent": self.role_name,
-                "ai_universe_run_id": run_id,
-            }
+                    engine.fs.create_file(
+                        task_id=task_id,
+                        relative_path=filename,
+                        content=clean_code,
+                        role=self.role_name,
+                    )
+                    if filename not in written:
+                        written.append(filename)
+            else:
+                # Fallback to local LLM / DirectProvider
+                prompt = (
+                    f"Objective: {goal}\n"
+                    f"Task: {node_title}\n"
+                    f"Implement complete code for file: {filename}\n"
+                    f"{workspace_summary}\n"
+                    f"{existing_code_summary}\n\n"
+                    f"Please implement the complete code for '{filename}'.\n"
+                    f"Delimit each file clearly with:\n"
+                    f"### File: {filename}\n```\n<code>\n```"
+                )
+                response = await self.prompt_model(prompt)
+                extracted = self.apply_extracted_files(
+                    task_id=task_id,
+                    response_text=response.content,
+                    engine=engine,
+                    default_filename=filename,
+                )
+                for p in extracted:
+                    if p not in written:
+                        written.append(p)
 
-        # 2. Fallback to local LLM / DirectProvider
-        prompt = (
-            f"Objective: {goal}\n"
-            f"Task: {node_title}\n"
-            f"{workspace_summary}\n"
-            f"{existing_code_summary}\n\n"
-            f"Please implement the required code for this task. "
-            f"Ensure all files are complete with full implementations and no placeholders. "
-            f"Delimit each file clearly with:\n"
-            f"### File: path/to/file.py\n```python\n<code>\n```"
-        )
-        response = await self.prompt_model(prompt)
-
-        written = self.apply_extracted_files(
-            task_id=task_id,
-            response_text=response.content,
-            engine=engine,
-        )
-
-        return {
+        ret: dict[str, Any] = {
             "status": "success",
             "files_written": written,
-            "implementation_output": response.content,
+            "implementation_output": f"Generated files: {written}",
             "agent": self.role_name,
         }
+        if last_run_id is not None:
+            ret["ai_universe_run_id"] = last_run_id
+        return ret
 
 
 class FrontendEngineerRole(BaseAgent):

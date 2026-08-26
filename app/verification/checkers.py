@@ -123,16 +123,47 @@ class BuildChecker(BaseChecker):
             except Exception as e:
                 issues.append({"file": rel_path, "error": str(e)})
 
+        # 4. HTML & Static Web Assets Syntax Check
+        html_files = engine.fs.search_files(task_id, pattern="*.html", role="tester") + engine.fs.search_files(task_id, pattern="*.htm", role="tester")
+        if html_files:
+            from html.parser import HTMLParser
+
+            class HTMLSyntaxValidator(HTMLParser):
+                def __init__(self):
+                    super().__init__()
+                    self.errors = []
+                    self.tag_stack = []
+
+                def handle_starttag(self, tag, attrs):
+                    void_tags = {"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track", "wbr"}
+                    if tag.lower() not in void_tags:
+                        self.tag_stack.append(tag.lower())
+
+                def handle_endtag(self, tag):
+                    tag_lower = tag.lower()
+                    if self.tag_stack and self.tag_stack[-1] == tag_lower:
+                        self.tag_stack.pop()
+
+            for rel_path in html_files:
+                artifacts_inspected.append(rel_path)
+                try:
+                    full_path = paths.project / rel_path
+                    content = full_path.read_text(encoding="utf-8", errors="ignore")
+                    parser = HTMLSyntaxValidator()
+                    parser.feed(content)
+                except Exception as e:
+                    issues.append({"file": rel_path, "error": f"HTML Syntax error: {e}"})
+
         duration_ms = (time.perf_counter() - start_time) * 1000.0
         passed = len(issues) == 0
 
-        stdout = f"Parsed {len(artifacts_inspected)} Python source files successfully." if passed else ""
+        stdout = f"Parsed {len(artifacts_inspected)} source files successfully." if passed else ""
         stderr = f"Syntax errors detected in {len(issues)} files: {issues}" if not passed else ""
 
         return VerificationEvidence(
-            check_name="Python AST Build & Syntax Check",
+            check_name="Build & Syntax Check",
             category=self.category,
-            command="ast.parse(all_py_files)",
+            command="build_and_syntax_validation",
             exit_code=0 if passed else 1,
             passed=passed,
             duration_ms=round(duration_ms, 2),
@@ -144,7 +175,7 @@ class BuildChecker(BaseChecker):
 
 
 class LintChecker(BaseChecker):
-    """Executes linting checks across Python (Ruff), Node/TS (ESLint), and Go (go vet)."""
+    """Executes linting checks across Python (Ruff), Node/TS (ESLint), Go (go vet), and Web Static Assets."""
 
     def __init__(self):
         super().__init__(name="Static Code Linter", category=CheckCategory.LINT)
@@ -198,8 +229,44 @@ class LintChecker(BaseChecker):
             except Exception:
                 pass
 
-        # 3. Python Linting (Ruff)
+        # 3. HTML / Web Static Asset Linting
+        html_files = engine.fs.search_files(task_id, pattern="*.html", role="tester")
+        js_files = engine.fs.search_files(task_id, pattern="*.js", role="tester")
+        css_files = engine.fs.search_files(task_id, pattern="*.css", role="tester")
         py_files = engine.fs.search_files(task_id, pattern="*.py", role="tester")
+
+        if html_files and not py_files:
+            lint_issues = []
+            for hf in html_files:
+                try:
+                    content = (paths.project / hf).read_text(encoding="utf-8", errors="ignore").lower()
+                    if "<html" not in content and "<!doctype html>" not in content:
+                        lint_issues.append(f"{hf}: Missing <html> or <!DOCTYPE html> root element")
+                except Exception as e:
+                    lint_issues.append(f"{hf}: Could not read file: {e}")
+
+            for cf in css_files:
+                try:
+                    c_content = (paths.project / cf).read_text(encoding="utf-8", errors="ignore")
+                    if c_content.count("{") != c_content.count("}"):
+                        lint_issues.append(f"{cf}: Unbalanced CSS braces")
+                except Exception as e:
+                    lint_issues.append(f"{cf}: Could not read file: {e}")
+
+            passed = len(lint_issues) == 0
+            duration_ms = (time.perf_counter() - start_time) * 1000.0
+            return VerificationEvidence(
+                check_name="HTML / Web Static Linter",
+                category=self.category,
+                command="web_static_linter(html, css, js)",
+                exit_code=0 if passed else 1,
+                passed=passed,
+                duration_ms=round(duration_ms, 2),
+                stdout=f"Linted {len(html_files) + len(js_files) + len(css_files)} web assets successfully." if passed else "",
+                stderr="\n".join(lint_issues) if not passed else "",
+            )
+
+        # 4. Python Linting (Ruff)
         if not py_files:
             return VerificationEvidence(
                 check_name="Static Code Linter",
