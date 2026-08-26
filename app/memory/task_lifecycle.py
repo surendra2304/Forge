@@ -3,7 +3,8 @@ Task State Lifecycle & State Machine for Project FORGE.
 Implements transition validation, checkpointing, pause, resume, cancel, and recovery.
 """
 
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any
+
 from app.core.logging import get_logger
 from app.memory.models import Checkpoint, TaskEntity, TaskState
 from app.memory.state_store import StateStore
@@ -13,7 +14,6 @@ logger = get_logger("memory.lifecycle")
 
 class InvalidStateTransitionError(Exception):
     """Raised when an illegal lifecycle transition is attempted."""
-    pass
 
 
 class TaskStateMachine:
@@ -22,7 +22,7 @@ class TaskStateMachine:
     """
 
     # Allowed state transition map
-    TRANSITION_MATRIX: Dict[TaskState, Set[TaskState]] = {
+    TRANSITION_MATRIX: dict[TaskState, set[TaskState]] = {
         TaskState.PENDING: {
             TaskState.READY,
             TaskState.RUNNING,
@@ -78,10 +78,10 @@ class TaskStateMachine:
         self,
         task_id: str,
         to_state: TaskState,
-        reason: Optional[str] = None,
-        progress_percentage: Optional[int] = None,
-        error_message: Optional[str] = None,
-        event_payload: Optional[Dict[str, Any]] = None,
+        reason: str | None = None,
+        progress_percentage: int | None = None,
+        error_message: str | None = None,
+        event_payload: dict[str, Any] | None = None,
     ) -> TaskEntity:
         """
         Validate and execute state transition, emitting an audit event.
@@ -122,8 +122,8 @@ class TaskStateMachine:
         self,
         task_id: str,
         reason: str = "User requested pause",
-        snapshot_state: Optional[Dict[str, Any]] = None,
-    ) -> Tuple[TaskEntity, Checkpoint]:
+        snapshot_state: dict[str, Any] | None = None,
+    ) -> tuple[TaskEntity, Checkpoint]:
         """
         Pause a task, create a checkpoint, and transition to BLOCKED state.
         """
@@ -165,7 +165,7 @@ class TaskStateMachine:
         self,
         task_id: str,
         reason: str = "User requested resume",
-    ) -> Tuple[TaskEntity, Optional[Checkpoint]]:
+    ) -> tuple[TaskEntity, Checkpoint | None]:
         """
         Resume a paused / blocked / failed task from its latest checkpoint.
         """
@@ -216,8 +216,8 @@ class TaskStateMachine:
     async def checkpoint(
         self,
         task_id: str,
-        state_data: Dict[str, Any],
-        description: Optional[str] = None,
+        state_data: dict[str, Any],
+        description: str | None = None,
     ) -> Checkpoint:
         """
         Create a checkpoint during task execution for recovery without pausing.

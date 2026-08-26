@@ -4,10 +4,10 @@ Provides sandboxed file operations (list, read, create, edit, move, delete, sear
 """
 
 import fnmatch
-from pathlib import Path
 import shutil
-from typing import Any, Dict, List, Optional
-from pydantic import BaseModel, Field
+from pathlib import Path
+
+from pydantic import BaseModel
 
 from app.core.logging import get_logger
 from app.core.workspace import WorkspaceManager, workspace_manager
@@ -32,8 +32,8 @@ class FilesystemTool:
 
     def __init__(
         self,
-        wm: Optional[WorkspaceManager] = None,
-        pm: Optional[PermissionManager] = None,
+        wm: WorkspaceManager | None = None,
+        pm: PermissionManager | None = None,
     ):
         self.wm = wm or workspace_manager
         self.pm = pm or permission_manager
@@ -42,7 +42,7 @@ class FilesystemTool:
         paths = self.wm.get_workspace_paths(task_id) or self.wm.create_workspace(task_id)
         return paths.project
 
-    def list_dir(self, task_id: str, relative_path: str = ".", role: str = "developer") -> List[FileItem]:
+    def list_dir(self, task_id: str, relative_path: str = ".", role: str = "developer") -> list[FileItem]:
         """List files and directories within the sandbox project root."""
         self.pm.check_permission(role, ToolPermission.FS_READ)
         root = self._get_project_root(task_id)
@@ -146,7 +146,7 @@ class FilesystemTool:
         pattern: str = "*",
         relative_path: str = ".",
         role: str = "developer",
-    ) -> List[str]:
+    ) -> list[str]:
         """Search for files matching glob pattern inside the sandbox."""
         self.pm.check_permission(role, ToolPermission.FS_READ)
         root = self._get_project_root(task_id)

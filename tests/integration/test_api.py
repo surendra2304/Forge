@@ -3,8 +3,8 @@ Integration tests for FORGE FastAPI REST endpoints.
 Covers Tasks, Lifecycle Transitions, Runs/Audit Events, Artifacts, Agents, Capabilities, and Health.
 """
 
-from pathlib import Path
 from uuid import uuid4
+
 import pytest
 from httpx import AsyncClient
 
@@ -131,8 +131,8 @@ async def test_runs_audit_trail(async_client: AsyncClient):
 
 @pytest.mark.asyncio
 async def test_artifact_endpoint(async_client: AsyncClient, test_db_manager):
-    from app.memory.state_store import StateStore
     from app.memory.models import ArtifactRecord, TaskEntity
+    from app.memory.state_store import StateStore
 
     store = StateStore(test_db_manager)
     task_id = str(uuid4())

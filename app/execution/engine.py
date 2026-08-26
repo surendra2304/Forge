@@ -3,22 +3,18 @@ Unified Execution Engine for Project FORGE.
 Dispatches filesystem, terminal, process, and git actions while enforcing permission boundaries.
 """
 
-from pathlib import Path
-from typing import Dict, List, Optional
 from app.core.logging import get_logger
 from app.core.workspace import WorkspaceManager, workspace_manager
 from app.execution.filesystem import FilesystemTool
-from app.execution.git_tool import GitStatusResult, GitTool, git_tool
-from app.execution.github import GitHubTool, github_tool
+from app.execution.git_tool import GitTool
+from app.execution.github import GitHubTool
 from app.execution.permissions import (
-    PermissionDeniedError,
     PermissionManager,
-    SandboxViolationError,
     ToolPermission,
     permission_manager,
 )
-from app.execution.process_manager import ProcessInfo, ProcessManagerTool, process_manager_tool
-from app.execution.terminal import CommandResult, TerminalTool
+from app.execution.process_manager import ProcessManagerTool
+from app.execution.terminal import TerminalTool
 
 logger = get_logger("execution.engine")
 
@@ -28,8 +24,8 @@ class ExecutionEngine:
 
     def __init__(
         self,
-        wm: Optional[WorkspaceManager] = None,
-        pm: Optional[PermissionManager] = None,
+        wm: WorkspaceManager | None = None,
+        pm: PermissionManager | None = None,
     ):
         self.wm = wm or workspace_manager
         self.pm = pm or permission_manager

@@ -4,7 +4,7 @@ Prevents infinite repair loops, duplicate patch application, and escalates unres
 """
 
 import hashlib
-from typing import Dict, List, Optional, Set, Tuple
+
 from app.core.logging import get_logger
 from app.recovery.classifier import FailureClass
 
@@ -18,9 +18,9 @@ class AntiLoopController:
         self.max_retries_per_class = max_retries_per_class
         self.max_total_retries = max_total_retries
         # task_id -> {FailureClass: count}
-        self._class_retries: Dict[str, Dict[FailureClass, int]] = {}
+        self._class_retries: dict[str, dict[FailureClass, int]] = {}
         # task_id -> Set of patch hashes
-        self._patch_hashes: Dict[str, Set[str]] = {}
+        self._patch_hashes: dict[str, set[str]] = {}
 
     def _get_hash(self, patch_content: str) -> str:
         return hashlib.sha256(patch_content.strip().encode("utf-8")).hexdigest()
@@ -29,8 +29,8 @@ class AntiLoopController:
         self,
         task_id: str,
         failure_class: FailureClass,
-        patch_content: Optional[str] = None,
-    ) -> Tuple[bool, str]:
+        patch_content: str | None = None,
+    ) -> tuple[bool, str]:
         """
         Check if a repair attempt is permitted under anti-loop constraints.
         Returns (allowed: bool, reason: str).
@@ -82,7 +82,7 @@ class AntiLoopController:
             f"(count={self._class_retries[task_id][failure_class]}, hash={p_hash[:8]})"
         )
 
-    def get_retry_count(self, task_id: str, failure_class: Optional[FailureClass] = None) -> int:
+    def get_retry_count(self, task_id: str, failure_class: FailureClass | None = None) -> int:
         """Get retry count for a specific class or all classes."""
         if task_id not in self._class_retries:
             return 0

@@ -3,10 +3,10 @@ Delivery Packager & Completion Report Generator for Project FORGE.
 Generates comprehensive JSON & Markdown delivery manifests and creates tagged git checkpoints.
 """
 
-from datetime import datetime, timezone
 import json
-from pathlib import Path
-from typing import Any, Dict, List, Optional
+from datetime import UTC, datetime
+from typing import Any
+
 from pydantic import BaseModel, Field
 
 from app.core.logging import get_logger
@@ -20,17 +20,17 @@ class CompletionReportData(BaseModel):
     """Complete deliverable manifest adhering to FORGE Section 23/24 spec."""
     task_id: str
     objective: str
-    requirements: List[str] = Field(default_factory=list)
+    requirements: list[str] = Field(default_factory=list)
     stack: str = "Python"
-    implementation_summary: Dict[str, Any] = Field(default_factory=dict)
-    test_build_status: Dict[str, Any] = Field(default_factory=dict)
-    browser_verification_evidence: List[str] = Field(default_factory=list)
+    implementation_summary: dict[str, Any] = Field(default_factory=dict)
+    test_build_status: dict[str, Any] = Field(default_factory=dict)
+    browser_verification_evidence: list[str] = Field(default_factory=list)
     major_diffs: str = ""
-    known_limitations: List[str] = Field(default_factory=list)
-    models_used: List[str] = Field(default_factory=lambda: ["direct-model"])
-    audit_run_ids: Dict[str, str] = Field(default_factory=dict)
+    known_limitations: list[str] = Field(default_factory=list)
+    models_used: list[str] = Field(default_factory=lambda: ["direct-model"])
+    audit_run_ids: dict[str, str] = Field(default_factory=dict)
     release_tag: str = "v1.0-forge-delivery"
-    generated_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    generated_at: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
 
 
 class DeliveryPackager:
@@ -38,8 +38,8 @@ class DeliveryPackager:
 
     def __init__(
         self,
-        engine: Optional[ExecutionEngine] = None,
-        wm: Optional[WorkspaceManager] = None,
+        engine: ExecutionEngine | None = None,
+        wm: WorkspaceManager | None = None,
     ):
         self.engine = engine or execution_engine
         self.wm = wm or workspace_manager
@@ -48,10 +48,10 @@ class DeliveryPackager:
         self,
         task_id: str,
         goal: str,
-        requirements: Optional[List[str]] = None,
+        requirements: list[str] | None = None,
         stack: str = "Python",
-        known_limitations: Optional[List[str]] = None,
-        models_used: Optional[List[str]] = None,
+        known_limitations: list[str] | None = None,
+        models_used: list[str] | None = None,
         tag_name: str = "v1.0-forge-delivery",
     ) -> CompletionReportData:
         """

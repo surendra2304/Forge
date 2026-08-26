@@ -3,16 +3,16 @@ Unit tests for strict objective verification, fallback stub detection, and FAILE
 """
 
 from pathlib import Path
-from uuid import uuid4
-import pytest
 from unittest.mock import AsyncMock, patch
+from uuid import uuid4
+
+import pytest
 
 from app.agents.roles import DeveloperRole
 from app.core.config import Settings
 from app.core.orchestrator import OrchestratorCore
 from app.core.workspace import WorkspaceManager
 from app.execution.engine import ExecutionEngine
-from app.integrations.ai_universe_client import AIUniverseResponse
 from app.memory.db import DatabaseManager
 from app.memory.models import TaskEntity, TaskState
 from app.memory.state_store import StateStore

@@ -17,7 +17,6 @@ from app.api.schemas import (
 )
 
 __all__ = [
-    "router",
     "ArtifactResponse",
     "AuditEventResponse",
     "EngineCapabilitiesResponse",
@@ -28,4 +27,5 @@ __all__ = [
     "TaskCreateRequest",
     "TaskDetailResponse",
     "TaskResponse",
+    "router",
 ]

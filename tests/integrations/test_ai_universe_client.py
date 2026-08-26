@@ -2,10 +2,10 @@
 Unit tests for AI Universe REST Client and Peer Reasoning Integration.
 """
 
-from typing import Any, Dict
-import pytest
 from unittest.mock import AsyncMock, patch
+
 import httpx
+import pytest
 
 from app.integrations.ai_universe_client import (
     AIUniverseClient,

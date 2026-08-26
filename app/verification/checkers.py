@@ -3,15 +3,12 @@ Objective Verification Checkers for Project FORGE.
 Implements Build, Lint, TypeCheck, Test, and Runtime smoke checkers.
 """
 
-from abc import ABC, abstractmethod
 import ast
-from pathlib import Path
 import time
-from typing import List, Optional
+from abc import ABC, abstractmethod
 
 from app.core.logging import get_logger
-from app.core.workspace import WorkspaceManager, workspace_manager
-from app.execution.engine import ExecutionEngine, execution_engine
+from app.execution.engine import ExecutionEngine
 from app.verification.evidence import CheckCategory, VerificationEvidence
 
 logger = get_logger("verification.checkers")
@@ -402,7 +399,7 @@ class TestChecker(BaseChecker):
 class RuntimeChecker(BaseChecker):
     """Performs smoke testing across Python, Node.js/TypeScript, and Go entry points."""
 
-    def __init__(self, entrypoint_cmd: Optional[str] = None):
+    def __init__(self, entrypoint_cmd: str | None = None):
         super().__init__(name="Runtime CLI / Service Smoke Check", category=CheckCategory.RUNTIME)
         self.entrypoint_cmd = entrypoint_cmd
 
@@ -477,7 +474,7 @@ class BrowserChecker(BaseChecker):
     network failures (4xx/5xx), missing assets, DOM interaction, and captures screenshot evidence.
     """
 
-    def __init__(self, start_server_cmd: Optional[str] = None, port: Optional[int] = None):
+    def __init__(self, start_server_cmd: str | None = None, port: int | None = None):
         super().__init__(name="Playwright / Headless Browser Verification", category=CheckCategory.RUNTIME)
         self.start_server_cmd = start_server_cmd
         self.port = port
@@ -490,9 +487,8 @@ class BrowserChecker(BaseChecker):
 
     async def run_check(self, task_id: str, engine: ExecutionEngine) -> VerificationEvidence:
         import asyncio
-        import socket
         import time
-        from pathlib import Path
+
         import httpx
 
         start_time = time.perf_counter()
@@ -889,7 +885,7 @@ class FeaturePresenceChecker(BaseChecker):
         passed = len(issues) == 0
 
         stdout = f"Verified {len(artifacts_inspected)} project files. All requested features, libraries, and objective elements are present and implemented." if passed else ""
-        stderr = f"Feature presence verification failed:\n" + "\n".join(f"- {issue.get('error', issue)}" for issue in issues) if not passed else ""
+        stderr = "Feature presence verification failed:\n" + "\n".join(f"- {issue.get('error', issue)}" for issue in issues) if not passed else ""
 
         return VerificationEvidence(
             check_name=self.name,

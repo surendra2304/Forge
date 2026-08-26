@@ -3,9 +3,9 @@ API Routes for Project FORGE.
 Implements endpoints for Tasks, Workspaces, Lifecycle Actions, Runs/Audit Events, Artifacts, Agents, and Capabilities.
 """
 
-from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 from uuid import uuid4
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
@@ -26,20 +26,17 @@ from app.api.schemas import (
 )
 from app.core.config import Settings, get_settings
 from app.core.logging import get_logger
-from app.core.orchestrator import OrchestratorCore, orchestrator
+from app.core.orchestrator import OrchestratorCore
 from app.core.workspace import WorkspaceManager, workspace_manager
-from app.execution.delivery import DeliveryPackager, delivery_packager
 from app.memory.db import db_manager
 from app.memory.models import (
-    ArtifactRecord,
     ProjectWorkspace,
-    TaskEntity,
     TaskMode,
     TaskState,
 )
 from app.memory.state_store import StateStore
 from app.memory.task_lifecycle import InvalidStateTransitionError, TaskStateMachine
-from app.providers import BaseModelProvider, ProviderCapabilities, ProviderHealthStatus, get_provider
+from app.providers import BaseModelProvider, get_provider
 
 logger = get_logger("api.routes")
 router = APIRouter()
@@ -77,11 +74,10 @@ async def health_check(
     """Check database connectivity and provider health status."""
     db_connected = False
     try:
-        async with db_manager.connection() as conn:
-            async with conn.execute("SELECT 1") as cursor:
-                row = await cursor.fetchone()
-                if row and row[0] == 1:
-                    db_connected = True
+        async with db_manager.connection() as conn, conn.execute("SELECT 1") as cursor:
+            row = await cursor.fetchone()
+            if row and row[0] == 1:
+                db_connected = True
     except Exception as e:
         logger.error(f"Database health check failed: {e}")
         db_connected = False
@@ -122,8 +118,8 @@ async def get_capabilities(
     )
 
 
-@router.get("/agents", response_model=List[AgentCapability], summary="List Engineering Agent Capabilities")
-async def list_agents() -> List[AgentCapability]:
+@router.get("/agents", response_model=list[AgentCapability], summary="List Engineering Agent Capabilities")
+async def list_agents() -> list[AgentCapability]:
     """Return available engineering agent personas and their tool/task specializations."""
     return agent_registry.list_all()
 
@@ -207,7 +203,7 @@ async def get_task(
 @router.post("/tasks/{task_id}/pause", response_model=TaskActionResponse, summary="Pause Running Task")
 async def pause_task(
     task_id: str,
-    action: Optional[TaskActionRequest] = None,
+    action: TaskActionRequest | None = None,
     lifecycle: TaskStateMachine = Depends(get_task_lifecycle),
     store: StateStore = Depends(get_state_store),
 ) -> TaskActionResponse:
@@ -235,7 +231,7 @@ async def pause_task(
 @router.post("/tasks/{task_id}/resume", response_model=TaskActionResponse, summary="Resume Paused Task")
 async def resume_task(
     task_id: str,
-    action: Optional[TaskActionRequest] = None,
+    action: TaskActionRequest | None = None,
     lifecycle: TaskStateMachine = Depends(get_task_lifecycle),
     store: StateStore = Depends(get_state_store),
 ) -> TaskActionResponse:
@@ -263,7 +259,7 @@ async def resume_task(
 @router.post("/tasks/{task_id}/cancel", response_model=TaskActionResponse, summary="Cancel Task")
 async def cancel_task(
     task_id: str,
-    action: Optional[TaskActionRequest] = None,
+    action: TaskActionRequest | None = None,
     lifecycle: TaskStateMachine = Depends(get_task_lifecycle),
     store: StateStore = Depends(get_state_store),
 ) -> TaskActionResponse:
@@ -326,7 +322,7 @@ async def get_task_timeline(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Task '{task_id}' not found")
 
     events = await store.get_audit_trail(task_id)
-    timeline_events: List[TimelineEvent] = []
+    timeline_events: list[TimelineEvent] = []
     stages_covered = set()
 
     for e in events:
@@ -387,8 +383,8 @@ async def get_artifact(
 
 class ProjectCreateRequest(BaseModel):
     name: str = Field(..., description="Project name", min_length=1, max_length=100)
-    description: Optional[str] = Field(default=None, description="Project goal or context")
-    config: Dict[str, Any] = Field(default_factory=dict, description="Custom project configurations")
+    description: str | None = Field(default=None, description="Project goal or context")
+    config: dict[str, Any] = Field(default_factory=dict, description="Custom project configurations")
 
 
 @router.post(
@@ -420,8 +416,8 @@ async def create_project(
     return await store.create_project(project)
 
 
-@router.get("/projects", response_model=List[ProjectWorkspace], summary="List All Projects")
-async def list_projects(store: StateStore = Depends(get_state_store)) -> List[ProjectWorkspace]:
+@router.get("/projects", response_model=list[ProjectWorkspace], summary="List All Projects")
+async def list_projects(store: StateStore = Depends(get_state_store)) -> list[ProjectWorkspace]:
     return await store.list_projects()
 
 

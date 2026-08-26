@@ -2,48 +2,48 @@
 Pydantic Request and Response Schemas for the FORGE REST API.
 """
 
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from datetime import datetime
+from typing import Any
+
 from pydantic import BaseModel, Field
 
 from app.memory.models import TaskMode, TaskState
 from app.providers.base import ProviderCapabilities, ProviderHealthStatus
 
-
 # --- Task Schemas ---
 
 class TaskCreateRequest(BaseModel):
     goal: str = Field(..., description="High-level engineering objective", min_length=3)
-    requirements: List[str] = Field(default_factory=list, description="Explicit constraints or requirements")
+    requirements: list[str] = Field(default_factory=list, description="Explicit constraints or requirements")
     mode: TaskMode = Field(default=TaskMode.AUTONOMOUS, description="Execution mode")
-    workspace: Optional[str] = Field(default=None, description="Optional custom workspace path or identifier")
-    repo_url: Optional[str] = Field(default=None, description="Optional remote Git repository URL to clone")
-    local_path: Optional[str] = Field(default=None, description="Optional local directory path to copy into project sandbox")
+    workspace: str | None = Field(default=None, description="Optional custom workspace path or identifier")
+    repo_url: str | None = Field(default=None, description="Optional remote Git repository URL to clone")
+    local_path: str | None = Field(default=None, description="Optional local directory path to copy into project sandbox")
     max_budget: float = Field(default=10.0, ge=0.1, description="Maximum allowed budget in USD")
 
 
 class TaskActionRequest(BaseModel):
-    reason: Optional[str] = Field(default=None, description="Optional explanation for the action")
+    reason: str | None = Field(default=None, description="Optional explanation for the action")
 
 
 class TaskResponse(BaseModel):
     id: str
     goal: str
-    requirements: List[str]
+    requirements: list[str]
     mode: TaskMode
     workspace_path: str
     max_budget: float
     budget_consumed: float
     state: TaskState
     progress_percentage: int
-    error_message: Optional[str] = None
+    error_message: str | None = None
     created_at: datetime
     updated_at: datetime
 
 
 class TaskDetailResponse(TaskResponse):
-    workspace_dirs: Dict[str, str]
-    latest_checkpoint_id: Optional[str] = None
+    workspace_dirs: dict[str, str]
+    latest_checkpoint_id: str | None = None
     checkpoints_count: int = 0
 
 
@@ -52,7 +52,7 @@ class TaskActionResponse(BaseModel):
     previous_state: TaskState
     current_state: TaskState
     message: str
-    checkpoint_id: Optional[str] = None
+    checkpoint_id: str | None = None
 
 
 # --- Run / Audit Event Schemas ---
@@ -61,14 +61,14 @@ class AuditEventResponse(BaseModel):
     id: str
     task_id: str
     event_type: str
-    payload: Dict[str, Any]
+    payload: dict[str, Any]
     timestamp: datetime
 
 
 class RunAuditResponse(BaseModel):
     task_id: str
     total_events: int
-    events: List[AuditEventResponse]
+    events: list[AuditEventResponse]
 
 
 # --- Artifact Schemas ---
@@ -80,7 +80,7 @@ class ArtifactResponse(BaseModel):
     path: str
     file_type: str
     size_bytes: int
-    checksum: Optional[str] = None
+    checksum: str | None = None
     created_at: datetime
 
 
@@ -89,9 +89,9 @@ class ArtifactResponse(BaseModel):
 class EngineCapabilitiesResponse(BaseModel):
     engine_name: str = "FORGE Autonomous Software Engineering Engine"
     version: str
-    supported_modes: List[str]
-    lifecycle_states: List[str]
-    features: Dict[str, bool]
+    supported_modes: list[str]
+    lifecycle_states: list[str]
+    features: dict[str, bool]
     provider: ProviderCapabilities
 
 
@@ -112,15 +112,15 @@ class TimelineEvent(BaseModel):
     agent_id: str
     provider_model: str
     action: str
-    inputs: Dict[str, Any] = Field(default_factory=dict)
-    result: Optional[Dict[str, Any]] = None
+    inputs: dict[str, Any] = Field(default_factory=dict)
+    result: dict[str, Any] | None = None
     duration_ms: float = 0.0
-    checkpoint_id: Optional[str] = None
+    checkpoint_id: str | None = None
     timestamp: datetime
 
 
 class TimelineResponse(BaseModel):
     task_id: str
     total_events: int
-    stages_covered: List[str]
-    timeline: List[TimelineEvent]
+    stages_covered: list[str]
+    timeline: list[TimelineEvent]

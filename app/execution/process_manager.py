@@ -4,10 +4,9 @@ Manages long-running background processes (dev servers, test monitors) inside ta
 """
 
 import asyncio
-from datetime import datetime, timezone
 import os
-from pathlib import Path
-from typing import Dict, List, Optional
+from datetime import UTC, datetime
+
 from pydantic import BaseModel, Field
 
 from app.core.logging import get_logger
@@ -25,11 +24,11 @@ class ProcessInfo(BaseModel):
     process_id: str
     task_id: str
     command: str
-    pid: Optional[int] = None
+    pid: int | None = None
     is_running: bool = False
-    started_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    stopped_at: Optional[datetime] = None
-    exit_code: Optional[int] = None
+    started_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    stopped_at: datetime | None = None
+    exit_code: int | None = None
 
 
 class ProcessManagerTool:
@@ -37,14 +36,14 @@ class ProcessManagerTool:
 
     def __init__(
         self,
-        wm: Optional[WorkspaceManager] = None,
-        pm: Optional[PermissionManager] = None,
+        wm: WorkspaceManager | None = None,
+        pm: PermissionManager | None = None,
     ):
         self.wm = wm or workspace_manager
         self.pm = pm or permission_manager
         # In-memory lookup: (task_id, process_id) -> (asyncio.subprocess.Process, ProcessInfo)
-        self._processes: Dict[str, asyncio.subprocess.Process] = {}
-        self._info: Dict[str, ProcessInfo] = {}
+        self._processes: dict[str, asyncio.subprocess.Process] = {}
+        self._info: dict[str, ProcessInfo] = {}
 
     def _key(self, task_id: str, process_id: str) -> str:
         return f"{task_id}:{process_id}"
@@ -54,7 +53,7 @@ class ProcessManagerTool:
         task_id: str,
         process_id: str,
         command: str,
-        env_vars: Optional[Dict[str, str]] = None,
+        env_vars: dict[str, str] | None = None,
         role: str = "developer",
     ) -> ProcessInfo:
         """Spawn a background process inside the task workspace."""
@@ -95,7 +94,7 @@ class ProcessManagerTool:
         logger.info(f"Started background process '{process_id}' (pid={proc.pid}) in task '{task_id}'")
         return info
 
-    def inspect_process(self, task_id: str, process_id: str, role: str = "developer") -> Optional[ProcessInfo]:
+    def inspect_process(self, task_id: str, process_id: str, role: str = "developer") -> ProcessInfo | None:
         """Inspect current state and PID of a background process."""
         self.pm.check_permission(role, ToolPermission.FS_READ)
         key = self._key(task_id, process_id)
@@ -111,7 +110,7 @@ class ProcessManagerTool:
                 info.is_running = False
                 info.exit_code = return_code
                 if not info.stopped_at:
-                    info.stopped_at = datetime.now(timezone.utc)
+                    info.stopped_at = datetime.now(UTC)
             else:
                 info.is_running = True
 
@@ -137,7 +136,7 @@ class ProcessManagerTool:
 
         if info:
             info.is_running = False
-            info.stopped_at = datetime.now(timezone.utc)
+            info.stopped_at = datetime.now(UTC)
             info.exit_code = proc.returncode
 
         logger.info(f"Stopped background process '{process_id}' in task '{task_id}'")
@@ -157,7 +156,7 @@ class ProcessManagerTool:
         await self.stop_process(task_id, process_id, role=role)
         return await self.start_process(task_id, process_id, command, role=role)
 
-    def list_processes(self, task_id: str, role: str = "developer") -> List[ProcessInfo]:
+    def list_processes(self, task_id: str, role: str = "developer") -> list[ProcessInfo]:
         """List all background processes for a given task."""
         self.pm.check_permission(role, ToolPermission.FS_READ)
         results = []

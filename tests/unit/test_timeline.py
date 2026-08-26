@@ -4,11 +4,13 @@ Unit tests for SecretRedactor, EventEmitter, and Task Timeline API Endpoint.
 
 from pathlib import Path
 from uuid import uuid4
-from httpx import AsyncClient
+
 import pytest
+from httpx import AsyncClient
+
 from app.core.events import EventEmitter, SecretRedactor
 from app.memory.db import DatabaseManager
-from app.memory.models import TaskEntity, TaskMode, TaskState
+from app.memory.models import TaskEntity
 from app.memory.state_store import StateStore
 
 

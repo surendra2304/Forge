@@ -3,8 +3,9 @@ Unit tests for Specialist Agent Roles, Model Provider Decoupling, and Permission
 """
 
 from uuid import uuid4
+
 import pytest
-from app.agents.base import BaseAgent
+
 from app.agents.registry import agent_registry
 from app.agents.roles import (
     ArchitectRole,

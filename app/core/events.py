@@ -3,10 +3,11 @@ Structured Event Emitter & Secret Redactor for Project FORGE.
 Provides standardized telemetry and audit events for FRIDAY and AI Universe dashboards.
 """
 
-from datetime import datetime, timezone
 import re
-from typing import Any, Dict, List, Optional, Union
+from datetime import UTC, datetime
+from typing import Any
 from uuid import uuid4
+
 from pydantic import BaseModel, Field
 
 from app.core.logging import get_logger
@@ -34,7 +35,7 @@ class SecretRedactor:
         re.compile(r"sk-[a-zA-Z0-9_\-]{20,}"),          # OpenAI / Anthropic-like keys
         re.compile(r"ghp_[a-zA-Z0-9]{20,}"),             # GitHub tokens
         re.compile(r"AIza[0-9A-Za-z\-_]{35}"),           # Google API keys
-        re.compile(r"Bearer\s+[a-zA-Z0-9_\-\.]+", re.I), # Bearer tokens
+        re.compile(r"Bearer\s+[a-zA-Z0-9_\-\.]+", re.IGNORECASE), # Bearer tokens
     ]
 
     @classmethod
@@ -72,17 +73,17 @@ class StructuredAuditEvent(BaseModel):
     agent_id: str = "orchestrator"
     provider_model: str = "direct-model"
     action: str
-    inputs: Dict[str, Any] = Field(default_factory=dict)
-    result: Optional[Dict[str, Any]] = None
+    inputs: dict[str, Any] = Field(default_factory=dict)
+    result: dict[str, Any] | None = None
     duration_ms: float = 0.0
-    checkpoint_id: Optional[str] = None
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    checkpoint_id: str | None = None
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 class EventEmitter:
     """Emits redacted, structured telemetry events to the SQLite StateStore."""
 
-    def __init__(self, store: Optional[StateStore] = None):
+    def __init__(self, store: StateStore | None = None):
         self.store = store
 
     async def emit(
@@ -92,11 +93,11 @@ class EventEmitter:
         stage: str = "Execution",
         agent_id: str = "orchestrator",
         provider_model: str = "direct-model",
-        inputs: Optional[Dict[str, Any]] = None,
-        result: Optional[Dict[str, Any]] = None,
+        inputs: dict[str, Any] | None = None,
+        result: dict[str, Any] | None = None,
         duration_ms: float = 0.0,
-        checkpoint_id: Optional[str] = None,
-        run_id: Optional[str] = None,
+        checkpoint_id: str | None = None,
+        run_id: str | None = None,
     ) -> StructuredAuditEvent:
         """Create, redact, log, and persist a structured audit event."""
         clean_inputs = SecretRedactor.redact(inputs or {})

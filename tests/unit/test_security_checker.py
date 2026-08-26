@@ -4,6 +4,7 @@ Unit tests for SecurityChecker (Secret Scanner, SAST, Dependency Auditing) and S
 
 from pathlib import Path
 from uuid import uuid4
+
 import pytest
 
 from app.agents.roles import SecurityReviewerRole
@@ -12,7 +13,6 @@ from app.core.workspace import WorkspaceManager
 from app.execution.engine import ExecutionEngine
 from app.providers.direct import DirectProvider
 from app.verification.checkers import SecurityChecker
-from app.verification.engine import VerificationEngine
 
 
 @pytest.mark.asyncio

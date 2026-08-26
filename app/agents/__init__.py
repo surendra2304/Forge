@@ -18,19 +18,19 @@ from app.agents.roles import (
 )
 
 __all__ = [
-    "BaseAgent",
-    "AgentState",
     "AgentCapability",
     "AgentRegistry",
-    "agent_registry",
-    "PlannerRole",
+    "AgentState",
     "ArchitectRole",
+    "BackendEngineerRole",
+    "BaseAgent",
+    "CodeReviewerRole",
+    "DebuggerRole",
     "DeveloperRole",
     "FrontendEngineerRole",
-    "BackendEngineerRole",
-    "TesterRole",
-    "DebuggerRole",
-    "SecurityReviewerRole",
-    "CodeReviewerRole",
+    "PlannerRole",
     "ReleaseEngineerRole",
+    "SecurityReviewerRole",
+    "TesterRole",
+    "agent_registry",
 ]

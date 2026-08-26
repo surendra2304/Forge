@@ -3,7 +3,6 @@ Task Analyzer for Project FORGE.
 Evaluates high-level goals and requirements to extract technical domain, language stack, and complexity.
 """
 
-from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field
 
 from app.core.logging import get_logger
@@ -17,20 +16,20 @@ class TaskAnalysisResult(BaseModel):
     detected_domain: str = "Software Engineering"
     primary_language: str = "Python"
     detected_runtime: str = "Python"
-    detected_frameworks: List[str] = Field(default_factory=list)
+    detected_frameworks: list[str] = Field(default_factory=list)
     estimated_complexity: str = "medium"  # low, medium, high, critical
     recommended_mode: str = "autonomous"
-    key_constraints: List[str] = Field(default_factory=list)
-    suggested_milestones: List[str] = Field(default_factory=list)
+    key_constraints: list[str] = Field(default_factory=list)
+    suggested_milestones: list[str] = Field(default_factory=list)
 
 
 class TaskAnalyzer:
     """Intakes goals and requirements to produce a structured TaskAnalysisResult."""
 
-    def __init__(self, provider: Optional[BaseModelProvider] = None):
+    def __init__(self, provider: BaseModelProvider | None = None):
         self.provider = provider or get_provider()
 
-    async def analyze(self, goal: str, requirements: Optional[List[str]] = None) -> TaskAnalysisResult:
+    async def analyze(self, goal: str, requirements: list[str] | None = None) -> TaskAnalysisResult:
         """Perform static and heuristic analysis on input goal and requirements."""
         req_list = requirements or []
         logger.info(f"Analyzing task goal: '{goal[:80]}...' with {len(req_list)} explicit requirements")

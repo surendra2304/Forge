@@ -6,8 +6,8 @@ Playwright/Browser headless UI verification, asset resolution, and delivery repo
 
 import shutil
 from pathlib import Path
+from unittest.mock import patch
 
-from unittest.mock import AsyncMock, patch
 import pytest
 
 from app.core.config import Settings
@@ -19,7 +19,6 @@ from app.integrations.ai_universe_client import AIUniverseResponse
 from app.memory.db import DatabaseManager
 from app.memory.models import TaskMode, TaskState
 from app.memory.state_store import StateStore
-from app.planning.graph import ExecutableTaskDAG
 from app.verification.checkers import BrowserChecker
 from app.verification.engine import VerificationEngine
 

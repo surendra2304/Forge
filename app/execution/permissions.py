@@ -5,8 +5,6 @@ Enforces strict role-based tool authorization and filesystem sandbox confinement
 
 from enum import Enum
 from pathlib import Path
-from typing import Dict, List, Optional, Set
-from pydantic import BaseModel, Field
 
 from app.core.logging import get_logger
 
@@ -27,16 +25,14 @@ class ToolPermission(str, Enum):
 
 class PermissionDeniedError(Exception):
     """Raised when an agent attempts an unauthorized tool action."""
-    pass
 
 
 class SandboxViolationError(Exception):
     """Raised when an agent attempts to access paths outside its workspace sandbox."""
-    pass
 
 
 # Default role-to-permissions allowlist mapping
-DEFAULT_ROLE_PERMISSIONS: Dict[str, Set[ToolPermission]] = {
+DEFAULT_ROLE_PERMISSIONS: dict[str, set[ToolPermission]] = {
     "planner": {
         ToolPermission.FS_READ,
         ToolPermission.GIT_READ,
@@ -118,13 +114,13 @@ DEFAULT_ROLE_PERMISSIONS: Dict[str, Set[ToolPermission]] = {
 class PermissionManager:
     """Enforces immutable permissions and sandbox boundaries for execution tools."""
 
-    def __init__(self, custom_allowlist: Optional[Dict[str, Set[ToolPermission]]] = None):
+    def __init__(self, custom_allowlist: dict[str, set[ToolPermission]] | None = None):
         # Freeze default allowlist copy so agents cannot grant themselves permissions at runtime
-        self._allowlist: Dict[str, Set[ToolPermission]] = {
+        self._allowlist: dict[str, set[ToolPermission]] = {
             role: set(perms) for role, perms in (custom_allowlist or DEFAULT_ROLE_PERMISSIONS).items()
         }
 
-    def get_role_permissions(self, role_name: str) -> Set[ToolPermission]:
+    def get_role_permissions(self, role_name: str) -> set[ToolPermission]:
         """Return the immutable set of allowed permissions for a role."""
         return set(self._allowlist.get(role_name.lower(), set()))
 

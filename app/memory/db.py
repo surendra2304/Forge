@@ -3,10 +3,12 @@ SQLite database layer for FORGE using aiosqlite.
 Manages connections, schema initialization, and transaction boundaries.
 """
 
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import AsyncGenerator, Optional
+
 import aiosqlite
+
 from app.core.config import get_settings
 from app.core.logging import get_logger
 
@@ -97,7 +99,7 @@ CREATE INDEX IF NOT EXISTS idx_checkpoints_step ON checkpoints(project_id, step_
 class DatabaseManager:
     """Manages SQLite connections and schema migrations."""
 
-    def __init__(self, db_path: Optional[Path] = None):
+    def __init__(self, db_path: Path | None = None):
         self.settings = get_settings()
         self.db_path = db_path or (self.settings.base_dir / self.settings.database_path)
 

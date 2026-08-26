@@ -4,11 +4,9 @@ Converts hierarchical trees into dependency-ordered execution graphs with parall
 """
 
 from collections import deque
-from typing import Dict, List, Optional, Set
-from pydantic import BaseModel, Field
 
 from app.memory.models import TaskEdge, TaskGraph, TaskNode, TaskState
-from app.planning.tree import HierarchicalTaskTree, TaskTreeNode
+from app.planning.tree import HierarchicalTaskTree
 
 
 class ExecutableTaskDAG:
@@ -55,12 +53,12 @@ class ExecutableTaskDAG:
 
         return cls(graph)
 
-    def get_ready_nodes(self) -> List[TaskNode]:
+    def get_ready_nodes(self) -> list[TaskNode]:
         """
         Return nodes that are PENDING and have all prerequisite dependencies COMPLETED.
         Allows parallel wave execution.
         """
-        ready: List[TaskNode] = []
+        ready: list[TaskNode] = []
         for node in self.graph.nodes.values():
             if node.status != TaskState.PENDING:
                 continue
@@ -83,7 +81,7 @@ class ExecutableTaskDAG:
             self.graph.nodes[node_id].status = TaskState.RUNNING
             self.graph.current_node_id = node_id
 
-    def mark_completed(self, node_id: str, result: Optional[Dict] = None) -> None:
+    def mark_completed(self, node_id: str, result: dict | None = None) -> None:
         if node_id in self.graph.nodes:
             self.graph.nodes[node_id].status = TaskState.COMPLETED
             self.graph.nodes[node_id].result = result
@@ -111,16 +109,16 @@ class ExecutableTaskDAG:
         completed = sum(1 for n in self.graph.nodes.values() if n.status == TaskState.COMPLETED)
         return int((completed / len(self.graph.nodes)) * 100)
 
-    def topological_sort(self) -> List[str]:
+    def topological_sort(self) -> list[str]:
         """Return topological ordering of node IDs."""
-        in_degree: Dict[str, int] = {nid: 0 for nid in self.graph.nodes}
+        in_degree: dict[str, int] = {nid: 0 for nid in self.graph.nodes}
         for node in self.graph.nodes.values():
             for dep in node.dependencies:
                 if dep in in_degree:
                     in_degree[node.id] += 1
 
         queue = deque([nid for nid, deg in in_degree.items() if deg == 0])
-        ordered: List[str] = []
+        ordered: list[str] = []
 
         while queue:
             curr = queue.popleft()

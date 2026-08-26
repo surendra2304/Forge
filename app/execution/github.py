@@ -3,8 +3,8 @@ GitHub Tool for Project FORGE.
 Enables branch creation, committing, pushing, and Pull Request automation.
 """
 
-from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
+
 import httpx
 from pydantic import BaseModel, Field
 
@@ -33,10 +33,10 @@ class GitHubTool:
 
     def __init__(
         self,
-        settings: Optional[Settings] = None,
-        wm: Optional[WorkspaceManager] = None,
-        pm: Optional[PermissionManager] = None,
-        git: Optional[GitTool] = None,
+        settings: Settings | None = None,
+        wm: WorkspaceManager | None = None,
+        pm: PermissionManager | None = None,
+        git: GitTool | None = None,
     ):
         self.settings = settings or get_settings()
         self.wm = wm or workspace_manager
@@ -44,10 +44,10 @@ class GitHubTool:
         self.git = git or git_tool
         self.terminal = TerminalTool(wm=self.wm, pm=self.pm)
 
-    def _get_token(self, token_override: Optional[str] = None) -> Optional[str]:
+    def _get_token(self, token_override: str | None = None) -> str | None:
         return token_override or self.settings.github_token
 
-    def _get_repo(self, repo_override: Optional[str] = None) -> Optional[str]:
+    def _get_repo(self, repo_override: str | None = None) -> str | None:
         return repo_override or self.settings.github_repo
 
     async def create_branch(
@@ -56,7 +56,7 @@ class GitHubTool:
         branch_name: str,
         base_branch: str = "main",
         role: str = "release_engineer",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Create or checkout a local Git branch for the task."""
         self.pm.check_permission(role, ToolPermission.GIT_WRITE)
         paths = self.wm.get_workspace_paths(task_id) or self.wm.create_workspace(task_id)
@@ -83,7 +83,7 @@ class GitHubTool:
         task_id: str,
         commit_message: str,
         role: str = "release_engineer",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Stage and commit all files in the task's project directory."""
         self.pm.check_permission(role, ToolPermission.GIT_WRITE)
         commit_hash = await self.git.commit(
@@ -101,10 +101,10 @@ class GitHubTool:
         self,
         task_id: str,
         branch_name: str,
-        repo: Optional[str] = None,
-        token: Optional[str] = None,
+        repo: str | None = None,
+        token: str | None = None,
         role: str = "release_engineer",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Push the branch to the remote GitHub repository."""
         self.pm.check_permission(role, ToolPermission.GIT_WRITE)
         gh_token = self._get_token(token)
@@ -142,12 +142,12 @@ class GitHubTool:
 
     async def create_pull_request(
         self,
-        repo: Optional[str],
+        repo: str | None,
         title: str,
         body: str,
         head_branch: str,
         base_branch: str = "main",
-        token: Optional[str] = None,
+        token: str | None = None,
     ) -> PullRequestResult:
         """Create a Pull Request on GitHub using the REST API."""
         gh_token = self._get_token(token)

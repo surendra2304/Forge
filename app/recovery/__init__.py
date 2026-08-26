@@ -13,15 +13,15 @@ from app.recovery.loop_guard import AntiLoopController, anti_loop_controller
 from app.recovery.repair import PatchApplicator, RepairPatch, patch_applicator
 
 __all__ = [
-    "FailureClass",
-    "FailureDiagnosis",
-    "FailureClassifier",
-    "failure_classifier",
     "AntiLoopController",
-    "anti_loop_controller",
-    "RepairPatch",
+    "FailureClass",
+    "FailureClassifier",
+    "FailureDiagnosis",
     "PatchApplicator",
-    "patch_applicator",
     "RecoveryEngine",
+    "RepairPatch",
+    "anti_loop_controller",
+    "failure_classifier",
+    "patch_applicator",
     "recovery_engine",
 ]

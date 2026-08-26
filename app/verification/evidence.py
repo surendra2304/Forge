@@ -3,9 +3,10 @@ Verification Evidence and Report Models for Project FORGE.
 Enforces the core principle: 'Evidence over model confidence'.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
+
 from pydantic import BaseModel, Field
 
 
@@ -23,15 +24,15 @@ class VerificationEvidence(BaseModel):
     """Objective, verifiable artifact of a single verification check."""
     check_name: str = Field(..., description="Identifier for this check")
     category: CheckCategory = Field(..., description="Check category")
-    command: Optional[str] = Field(default=None, description="Command executed if applicable")
+    command: str | None = Field(default=None, description="Command executed if applicable")
     exit_code: int = Field(default=0, description="Process exit code")
     passed: bool = Field(default=True, description="Whether the check passed objectively")
     duration_ms: float = Field(default=0.0, description="Execution duration in milliseconds")
     stdout: str = Field(default="", description="Captured stdout")
     stderr: str = Field(default="", description="Captured stderr")
-    artifacts_inspected: List[str] = Field(default_factory=list, description="Files verified")
-    issues: List[Dict[str, Any]] = Field(default_factory=list, description="Extracted error items or warnings")
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    artifacts_inspected: list[str] = Field(default_factory=list, description="Files verified")
+    issues: list[dict[str, Any]] = Field(default_factory=list, description="Extracted error items or warnings")
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 class VerificationReport(BaseModel):
@@ -41,12 +42,12 @@ class VerificationReport(BaseModel):
     total_checks: int
     passed_checks: int
     failed_checks: int
-    evidence: List[VerificationEvidence] = Field(default_factory=list)
-    baseline_comparison: Optional[Dict[str, Any]] = Field(default=None, description="Pre/post baseline regression comparison")
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    evidence: list[VerificationEvidence] = Field(default_factory=list)
+    baseline_comparison: dict[str, Any] | None = Field(default=None, description="Pre/post baseline regression comparison")
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     @property
-    def failure_reasons(self) -> List[str]:
+    def failure_reasons(self) -> list[str]:
         """Extract high-level summaries of failed checks."""
         reasons = []
         for ev in self.evidence:

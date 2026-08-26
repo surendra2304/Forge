@@ -3,8 +3,9 @@ Unit tests for TaskAnalyzer and OrchestratorCore.
 """
 
 from pathlib import Path
-from uuid import uuid4
+
 import pytest
+
 from app.core.analyzer import TaskAnalyzer
 from app.core.config import Settings
 from app.core.orchestrator import OrchestratorCore
@@ -13,7 +14,6 @@ from app.execution.engine import ExecutionEngine
 from app.memory.db import DatabaseManager
 from app.memory.models import TaskMode, TaskState
 from app.memory.state_store import StateStore
-from app.planning.planner import PlannerEngine
 
 
 @pytest.mark.asyncio
@@ -56,6 +56,7 @@ async def test_orchestrator_intake_and_execution_loop(temp_dir: Path):
     assert task.state == TaskState.READY
     assert len(graph.nodes) >= 6
     from unittest.mock import AsyncMock, patch
+
     from app.integrations.ai_universe_client import AIUniverseResponse
 
     # 2. Run full autonomous loop

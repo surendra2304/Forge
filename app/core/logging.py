@@ -3,7 +3,7 @@ Structured and colored logging configuration for FORGE.
 """
 
 import logging
-import sys
+
 from rich.logging import RichHandler
 
 

@@ -3,12 +3,10 @@ Patch Synthesizer & Applicator for Project FORGE Recovery Subsystem.
 Formulates and applies minimal surgical patches to failing workspace code.
 """
 
-from typing import Any, Dict, List, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from app.core.logging import get_logger
 from app.execution.engine import ExecutionEngine, execution_engine
-from app.recovery.classifier import FailureDiagnosis
 
 logger = get_logger("recovery.repair")
 
@@ -16,7 +14,7 @@ logger = get_logger("recovery.repair")
 class RepairPatch(BaseModel):
     """A surgical repair patch to fix a diagnosed failure."""
     target_file: str
-    original_snippet: Optional[str] = None
+    original_snippet: str | None = None
     replacement_snippet: str
     explanation: str
     patch_type: str = "edit"  # edit, rewrite, create
@@ -25,7 +23,7 @@ class RepairPatch(BaseModel):
 class PatchApplicator:
     """Applies surgical patches to the workspace sandbox via the ExecutionEngine."""
 
-    def __init__(self, engine: Optional[ExecutionEngine] = None):
+    def __init__(self, engine: ExecutionEngine | None = None):
         self.engine = engine or execution_engine
 
     def apply_patch(self, task_id: str, patch: RepairPatch, role: str = "debugger") -> bool:

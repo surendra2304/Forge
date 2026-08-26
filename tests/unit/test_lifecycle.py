@@ -3,7 +3,9 @@ Unit tests for Task State Lifecycle State Machine & Checkpointing.
 """
 
 from uuid import uuid4
+
 import pytest
+
 from app.memory.models import TaskEntity, TaskMode, TaskState
 from app.memory.state_store import StateStore
 from app.memory.task_lifecycle import InvalidStateTransitionError, TaskStateMachine

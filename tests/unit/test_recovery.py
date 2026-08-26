@@ -3,8 +3,9 @@ Unit tests for Debugger & Recovery Subsystem: Classifier, AntiLoopController, Pa
 """
 
 from pathlib import Path
-from uuid import uuid4
+
 import pytest
+
 from app.core.config import Settings
 from app.core.workspace import WorkspaceManager
 from app.execution.engine import ExecutionEngine
@@ -13,7 +14,6 @@ from app.memory.state_store import StateStore
 from app.recovery.classifier import FailureClass, FailureClassifier
 from app.recovery.engine import RecoveryEngine
 from app.recovery.loop_guard import AntiLoopController
-from app.recovery.repair import PatchApplicator, RepairPatch
 from app.verification.engine import VerificationEngine
 from app.verification.evidence import CheckCategory, VerificationEvidence
 

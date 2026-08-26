@@ -152,9 +152,7 @@ class ArchitectRole(BaseAgent):
                 manifest_files = ["main.py", "test_main.py", "index.html", "style.css", "app.js", "requirements.txt", "README.md"]
             elif any(k in goal_lower for k in ["website", "landing page", "web page", "html", "portfolio", "css", "calculator website", "static"]):
                 manifest_files = ["index.html", "style.css", "app.js"]
-            elif any(k in goal_lower for k in ["fastapi", "rest api", "backend", "database", "sqlite", "service"]):
-                manifest_files = ["main.py", "test_main.py", "README.md"]
-            elif any(k in goal_lower for k in ["cli", "python tool", "command-line", "script"]):
+            elif any(k in goal_lower for k in ["fastapi", "rest api", "backend", "database", "sqlite", "service"]) or any(k in goal_lower for k in ["cli", "python tool", "command-line", "script"]):
                 manifest_files = ["main.py", "test_main.py", "README.md"]
             else:
                 manifest_files = ["main.py", "README.md"]

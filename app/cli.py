@@ -5,18 +5,14 @@ Provides commands: build, status, logs, pause, resume, cancel, inspect.
 
 import argparse
 import asyncio
-from datetime import datetime
-from pathlib import Path
 import sys
-from typing import Optional
+
 from rich.console import Console
 from rich.panel import Panel
 from rich.progress import BarColumn, Progress, SpinnerColumn, TextColumn
 from rich.table import Table
 
-from app.core.config import get_settings
-from app.core.logging import setup_logging
-from app.core.orchestrator import OrchestratorCore, orchestrator
+from app.core.orchestrator import orchestrator
 from app.core.workspace import workspace_manager
 from app.memory.db import db_manager
 from app.memory.models import TaskMode, TaskState
@@ -41,7 +37,7 @@ async def handle_build(
     requirements: list[str],
     max_budget: float,
     push_to_github: bool = False,
-    github_repo: Optional[str] = None,
+    github_repo: str | None = None,
 ):
     """Executes full autonomous software engineering loop."""
     console.print(Panel.fit(f"[bold cyan]FORGE Engine[/bold cyan] -- Autonomous Software Synthesis\n[bold yellow]Goal:[/bold yellow] {goal}", title="Project FORGE"))

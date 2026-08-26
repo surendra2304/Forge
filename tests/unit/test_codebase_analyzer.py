@@ -4,6 +4,7 @@ Unit tests for CodebaseAnalyzerRole (existing codebase onboarding and architectu
 
 from pathlib import Path
 from uuid import uuid4
+
 import pytest
 
 from app.agents.roles import CodebaseAnalyzerRole

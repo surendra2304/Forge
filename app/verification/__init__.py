@@ -18,15 +18,15 @@ from app.verification.evidence import (
 )
 
 __all__ = [
+    "BaseChecker",
+    "BrowserChecker",
+    "BuildChecker",
     "CheckCategory",
+    "LintChecker",
+    "RuntimeChecker",
+    "TestChecker",
+    "VerificationEngine",
     "VerificationEvidence",
     "VerificationReport",
-    "BaseChecker",
-    "BuildChecker",
-    "LintChecker",
-    "TestChecker",
-    "RuntimeChecker",
-    "BrowserChecker",
-    "VerificationEngine",
     "verification_engine",
 ]

@@ -3,7 +3,9 @@ Unit tests for BrowserChecker and Web UI Verification.
 """
 
 from pathlib import Path
+
 import pytest
+
 from app.core.config import Settings
 from app.core.workspace import WorkspaceManager
 from app.execution.engine import ExecutionEngine

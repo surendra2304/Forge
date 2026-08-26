@@ -4,6 +4,7 @@ Unit tests for GitHubTool and ReleaseEngineerRole GitHub Pull Request automation
 
 from pathlib import Path
 from uuid import uuid4
+
 import pytest
 
 from app.agents.roles import ReleaseEngineerRole

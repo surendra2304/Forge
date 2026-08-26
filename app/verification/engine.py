@@ -4,7 +4,7 @@ Orchestrates batteries of objective verification checks and compiles verifiable 
 """
 
 import json
-from typing import List, Optional
+
 from app.core.logging import get_logger
 from app.core.workspace import WorkspaceManager, workspace_manager
 from app.execution.engine import ExecutionEngine, execution_engine
@@ -27,13 +27,13 @@ class VerificationEngine:
 
     def __init__(
         self,
-        engine: Optional[ExecutionEngine] = None,
-        wm: Optional[WorkspaceManager] = None,
-        custom_checkers: Optional[List[BaseChecker]] = None,
+        engine: ExecutionEngine | None = None,
+        wm: WorkspaceManager | None = None,
+        custom_checkers: list[BaseChecker] | None = None,
     ):
         self.engine = engine or execution_engine
         self.wm = wm or workspace_manager
-        self.checkers: List[BaseChecker] = custom_checkers or [
+        self.checkers: list[BaseChecker] = custom_checkers or [
             BuildChecker(),
             LintChecker(),
             TestChecker(),
@@ -48,7 +48,7 @@ class VerificationEngine:
         Saves baseline_report.json to the task artifacts directory.
         """
         logger.info(f"Capturing baseline verification metrics for task '{task_id}'...")
-        evidence_list: List[VerificationEvidence] = []
+        evidence_list: list[VerificationEvidence] = []
 
         for checker in self.checkers:
             try:
@@ -85,14 +85,14 @@ class VerificationEngine:
     async def verify_task(
         self,
         task_id: str,
-        baseline_report: Optional[VerificationReport] = None,
+        baseline_report: VerificationReport | None = None,
     ) -> VerificationReport:
         """
         Run the complete battery of verification checks for a task workspace.
         Enforces regression awareness if a baseline report exists.
         """
         logger.info(f"Initiating verification battery for task '{task_id}' with {len(self.checkers)} checkers")
-        evidence_list: List[VerificationEvidence] = []
+        evidence_list: list[VerificationEvidence] = []
 
         # Load baseline report from artifacts if not explicitly passed
         if baseline_report is None:

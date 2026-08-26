@@ -3,7 +3,9 @@ Unit tests for SQLite StateStore, Task Graphs, Checkpoints, Tasks, Audit Events,
 """
 
 from uuid import uuid4
+
 import pytest
+
 from app.memory.models import (
     ArtifactRecord,
     Checkpoint,

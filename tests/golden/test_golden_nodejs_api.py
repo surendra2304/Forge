@@ -11,17 +11,16 @@ Validates:
 
 from pathlib import Path
 from uuid import uuid4
+
 import pytest
 
 from app.agents.registry import agent_registry
 from app.core.analyzer import TaskAnalyzer
 from app.core.config import Settings
-from app.core.orchestrator import OrchestratorCore
 from app.core.workspace import WorkspaceManager
 from app.execution.delivery import DeliveryPackager
 from app.execution.engine import ExecutionEngine
 from app.memory.db import DatabaseManager
-from app.memory.models import TaskMode, TaskState
 from app.memory.state_store import StateStore
 from app.providers.direct import DirectProvider
 from app.verification.engine import VerificationEngine
@@ -199,6 +198,7 @@ test('TaskService delete task', (t) => {
 """
 
         from unittest.mock import AsyncMock, patch
+
         from app.integrations.ai_universe_client import AIUniverseResponse
 
         provider = DirectProvider(mock_response=mock_developer_code)

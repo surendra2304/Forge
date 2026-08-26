@@ -3,15 +3,14 @@ Unit tests for Verification Engine & Objective Checkers.
 """
 
 from pathlib import Path
-from uuid import uuid4
+
 import pytest
+
 from app.core.config import Settings
 from app.core.workspace import WorkspaceManager
 from app.execution.engine import ExecutionEngine
 from app.verification.checkers import (
     BuildChecker,
-    LintChecker,
-    RuntimeChecker,
     TestChecker,
 )
 from app.verification.engine import VerificationEngine

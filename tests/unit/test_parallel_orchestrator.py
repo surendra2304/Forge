@@ -4,13 +4,15 @@ Unit tests for Asynchronous Parallel DAG Wave Execution in OrchestratorCore.
 
 from pathlib import Path
 from uuid import uuid4
+
 import pytest
+
 from app.core.config import Settings
 from app.core.orchestrator import OrchestratorCore
 from app.core.workspace import WorkspaceManager
 from app.execution.engine import ExecutionEngine
 from app.memory.db import DatabaseManager
-from app.memory.models import TaskEdge, TaskEntity, TaskGraph, TaskMode, TaskNode, TaskState
+from app.memory.models import TaskEdge, TaskEntity, TaskGraph, TaskNode, TaskState
 from app.memory.state_store import StateStore
 from app.planning.graph import ExecutableTaskDAG
 
@@ -84,6 +86,7 @@ async def test_parallel_wave_dependency_scheduling(temp_dir: Path):
     assert nid_integ not in ready_ids  # Node C must wait for both
 
     from unittest.mock import AsyncMock, patch
+
     from app.integrations.ai_universe_client import AIUniverseResponse
 
     with patch("app.integrations.ai_universe_client.AIUniverseClient.ask", new_callable=AsyncMock) as mock_ask:

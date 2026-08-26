@@ -5,10 +5,9 @@ Executes sandboxed shell commands with timeout enforcement, output streaming, an
 
 import asyncio
 import os
-from pathlib import Path
 import time
-from typing import Dict, Optional
-from pydantic import BaseModel, Field
+
+from pydantic import BaseModel
 
 from app.core.logging import get_logger
 from app.core.workspace import WorkspaceManager, workspace_manager
@@ -36,8 +35,8 @@ class TerminalTool:
 
     def __init__(
         self,
-        wm: Optional[WorkspaceManager] = None,
-        pm: Optional[PermissionManager] = None,
+        wm: WorkspaceManager | None = None,
+        pm: PermissionManager | None = None,
     ):
         self.wm = wm or workspace_manager
         self.pm = pm or permission_manager
@@ -47,7 +46,7 @@ class TerminalTool:
         task_id: str,
         command: str,
         timeout_seconds: int = 60,
-        env_vars: Optional[Dict[str, str]] = None,
+        env_vars: dict[str, str] | None = None,
         role: str = "developer",
     ) -> CommandResult:
         """
@@ -84,7 +83,7 @@ class TerminalTool:
                 exit_code = process.returncode if process.returncode is not None else 0
                 stdout_text = stdout_bytes.decode("utf-8", errors="replace")
                 stderr_text = stderr_bytes.decode("utf-8", errors="replace")
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 timed_out = True
                 try:
                     process.kill()

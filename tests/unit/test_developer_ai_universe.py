@@ -3,9 +3,10 @@ Unit tests for DeveloperRole using AI Universe as the primary code generation re
 """
 
 from pathlib import Path
-from uuid import uuid4
-import pytest
 from unittest.mock import AsyncMock, patch
+from uuid import uuid4
+
+import pytest
 
 from app.agents.roles import DeveloperRole
 from app.core.config import Settings

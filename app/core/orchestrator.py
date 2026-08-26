@@ -5,18 +5,16 @@ Owns the end-to-end task lifecycle, coordinating Task Analyzer, Planner, Agent R
 
 import asyncio
 from pathlib import Path
-from typing import Any, Dict, List, Optional
-from uuid import uuid4
+from typing import Any
 
 from app.agents.registry import AgentRegistry, agent_registry
-from app.core.analyzer import TaskAnalysisResult, TaskAnalyzer, task_analyzer
+from app.core.analyzer import TaskAnalyzer, task_analyzer
 from app.core.context import ContextManager, context_manager
 from app.core.logging import get_logger
 from app.core.workspace import WorkspaceManager, workspace_manager
 from app.execution.engine import ExecutionEngine, execution_engine
 from app.memory.db import db_manager
 from app.memory.models import (
-    Checkpoint,
     TaskEntity,
     TaskGraph,
     TaskMode,
@@ -38,13 +36,13 @@ class OrchestratorCore:
 
     def __init__(
         self,
-        store: Optional[StateStore] = None,
-        wm: Optional[WorkspaceManager] = None,
-        analyzer: Optional[TaskAnalyzer] = None,
-        planner: Optional[PlannerEngine] = None,
-        registry: Optional[AgentRegistry] = None,
-        engine: Optional[ExecutionEngine] = None,
-        ctx_manager: Optional[ContextManager] = None,
+        store: StateStore | None = None,
+        wm: WorkspaceManager | None = None,
+        analyzer: TaskAnalyzer | None = None,
+        planner: PlannerEngine | None = None,
+        registry: AgentRegistry | None = None,
+        engine: ExecutionEngine | None = None,
+        ctx_manager: ContextManager | None = None,
     ):
         self.store = store or StateStore(db_manager)
         self.wm = wm or workspace_manager
@@ -58,12 +56,12 @@ class OrchestratorCore:
     async def intake_and_plan(
         self,
         goal: str,
-        requirements: Optional[List[str]] = None,
+        requirements: list[str] | None = None,
         mode: TaskMode = TaskMode.AUTONOMOUS,
         max_budget: float = 10.0,
-        custom_workspace: Optional[str] = None,
-        repo_url: Optional[str] = None,
-        local_path: Optional[str | Path] = None,
+        custom_workspace: str | None = None,
+        repo_url: str | None = None,
+        local_path: str | Path | None = None,
     ) -> tuple[TaskEntity, TaskGraph]:
         """
         Intake a user request, create isolated workspace (with optional git clone or local copy),
@@ -155,7 +153,7 @@ class OrchestratorCore:
 
         return ready_task, saved_graph
 
-    async def step_task(self, task_id: str) -> tuple[TaskEntity, List[str]]:
+    async def step_task(self, task_id: str) -> tuple[TaskEntity, list[str]]:
         """
         Execute the next available batch of ready nodes in the DAG.
         """
@@ -176,7 +174,7 @@ class OrchestratorCore:
 
         dag = ExecutableTaskDAG(graph)
         ready_nodes = dag.get_ready_nodes()
-        executed_nodes: List[str] = []
+        executed_nodes: list[str] = []
 
         if not ready_nodes:
             if dag.is_completed():
@@ -214,7 +212,7 @@ class OrchestratorCore:
             return task, []
 
         # Execute all ready nodes concurrently in parallel wave
-        async def _execute_single_node(node) -> tuple[str, bool, Optional[Dict[str, Any]], Optional[str], str]:
+        async def _execute_single_node(node) -> tuple[str, bool, dict[str, Any] | None, str | None, str]:
             role_name = node.assigned_agent or "developer"
             agent = self.registry.create_agent(role_name)
             dag.mark_running(node.id)

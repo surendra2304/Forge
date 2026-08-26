@@ -3,10 +3,10 @@ Workspace Manager for Project FORGE.
 Handles isolated workspace provisioning, directory hierarchies, path resolution, and artifact management.
 """
 
-from pathlib import Path
 import shutil
-from typing import Any, Dict, List, Optional
-from pydantic import BaseModel, Field
+from pathlib import Path
+
+from pydantic import BaseModel
 
 from app.core.config import Settings, get_settings
 from app.core.logging import get_logger
@@ -25,7 +25,7 @@ class WorkspacePaths(BaseModel):
 
     model_config = {"arbitrary_types_allowed": True}
 
-    def to_dict(self) -> Dict[str, str]:
+    def to_dict(self) -> dict[str, str]:
         return {
             "root": str(self.root.resolve()),
             "project": str(self.project.resolve()),
@@ -39,7 +39,7 @@ class WorkspacePaths(BaseModel):
 class WorkspaceManager:
     """Manages creation, resolution, and lifecycle of task-specific filesystem sandboxes."""
 
-    def __init__(self, settings: Optional[Settings] = None):
+    def __init__(self, settings: Settings | None = None):
         self.settings = settings or get_settings()
 
     def get_task_workspace_dir(self, task_id: str) -> Path:
@@ -52,9 +52,9 @@ class WorkspaceManager:
     def create_workspace(
         self,
         task_id: str,
-        custom_base: Optional[Path] = None,
-        repo_url: Optional[str] = None,
-        local_path: Optional[str | Path] = None,
+        custom_base: Path | None = None,
+        repo_url: str | None = None,
+        local_path: str | Path | None = None,
     ) -> WorkspacePaths:
         """
         Create isolated directory hierarchy for task under workspaces/task_<id>/:
@@ -134,7 +134,7 @@ class WorkspaceManager:
         logger.info(f"Initialized isolated task workspace at {root_dir}")
         return paths
 
-    def get_workspace_paths(self, task_id: str) -> Optional[WorkspacePaths]:
+    def get_workspace_paths(self, task_id: str) -> WorkspacePaths | None:
         """Resolve workspace paths for an existing task."""
         root_dir = self.get_task_workspace_dir(task_id)
         if not root_dir.exists():
@@ -162,7 +162,7 @@ class WorkspaceManager:
         target.write_text(content, encoding="utf-8")
         return target
 
-    def read_project_file(self, task_id: str, relative_path: str) -> Optional[str]:
+    def read_project_file(self, task_id: str, relative_path: str) -> str | None:
         """Safely read a file from the task's project directory."""
         paths = self.get_workspace_paths(task_id)
         if not paths:

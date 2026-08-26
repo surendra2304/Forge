@@ -4,7 +4,8 @@ Unit tests for BaseModelProvider and DirectProvider.
 
 import pytest
 from pydantic import BaseModel, Field
-from app.providers.base import BaseModelProvider, ProviderCapabilities, ProviderHealthStatus
+
+from app.providers.base import ProviderCapabilities, ProviderHealthStatus
 from app.providers.direct import DirectProvider
 
 

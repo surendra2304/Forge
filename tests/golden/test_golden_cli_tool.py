@@ -5,8 +5,8 @@ Validates end-to-end autonomous synthesis, execution, verification, and delivery
 
 import json
 from pathlib import Path
+from unittest.mock import patch
 
-from unittest.mock import AsyncMock, patch
 import pytest
 
 from app.core.config import Settings

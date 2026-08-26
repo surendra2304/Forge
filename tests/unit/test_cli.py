@@ -4,7 +4,9 @@ Unit tests for FORGE Standalone CLI MVP.
 
 from pathlib import Path
 from uuid import uuid4
+
 import pytest
+
 from app.cli import (
     handle_build,
     handle_cancel,
@@ -14,10 +16,8 @@ from app.cli import (
     handle_resume,
     handle_status,
 )
-from app.core.config import Settings
-from app.core.workspace import WorkspaceManager, workspace_manager
 from app.memory.db import db_manager
-from app.memory.models import TaskMode, TaskState
+from app.memory.models import TaskState
 from app.memory.state_store import StateStore
 
 

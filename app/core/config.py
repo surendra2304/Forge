@@ -4,7 +4,7 @@ FORGE Application Configuration using Pydantic Settings.
 
 from functools import lru_cache
 from pathlib import Path
-from typing import Optional
+
 from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -45,7 +45,7 @@ class Settings(BaseSettings):
     )
 
     # API Keys (Optional)
-    openai_api_key: Optional[str] = Field(
+    openai_api_key: str | None = Field(
         default=None,
         validation_alias=AliasChoices("OPENAI_API_KEY", "openai_api_key"),
         description="OpenAI API Key",
@@ -55,7 +55,7 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("OPENAI_DEFAULT_MODEL", "openai_default_model"),
         description="Default OpenAI model",
     )
-    anthropic_api_key: Optional[str] = Field(
+    anthropic_api_key: str | None = Field(
         default=None,
         validation_alias=AliasChoices("ANTHROPIC_API_KEY", "anthropic_api_key"),
         description="Anthropic API Key",
@@ -65,17 +65,17 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("ANTHROPIC_DEFAULT_MODEL", "anthropic_default_model"),
         description="Default Anthropic model",
     )
-    gemini_api_key: Optional[str] = Field(
+    gemini_api_key: str | None = Field(
         default=None,
         validation_alias=AliasChoices("GEMINI_API_KEY", "gemini_api_key"),
         description="Gemini API Key",
     )
-    github_token: Optional[str] = Field(
+    github_token: str | None = Field(
         default=None,
         validation_alias=AliasChoices("GITHUB_TOKEN", "github_token"),
         description="GitHub Personal Access Token or App Token for pushing and PR creation",
     )
-    github_repo: Optional[str] = Field(
+    github_repo: str | None = Field(
         default=None,
         validation_alias=AliasChoices("GITHUB_REPO", "github_repo"),
         description="Default GitHub repository (e.g. owner/repo)",
@@ -85,7 +85,7 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("AI_UNIVERSE_URL", "ai_universe_url"),
         description="Base URL for external AI Universe reasoning engine",
     )
-    ai_universe_api_key: Optional[str] = Field(
+    ai_universe_api_key: str | None = Field(
         default=None,
         validation_alias=AliasChoices("AI_UNIVERSE_API_KEY", "ai_universe_api_key"),
         description="API Key for AI Universe REST API authentication",
@@ -105,7 +105,7 @@ class Settings(BaseSettings):
             abs_path.mkdir(parents=True, exist_ok=True)
 
 
-@lru_cache()
+@lru_cache
 def get_settings() -> Settings:
     """Return a cached instance of application settings."""
     settings = Settings()

@@ -5,7 +5,7 @@ Manages version control, commits, diffs, branches, checkpoints, and rollbacks in
 
 import asyncio
 from pathlib import Path
-from typing import Dict, List, Optional
+
 from pydantic import BaseModel, Field
 
 from app.core.logging import get_logger
@@ -22,9 +22,9 @@ logger = get_logger("execution.git")
 class GitStatusResult(BaseModel):
     clean: bool
     current_branch: str
-    staged_files: List[str] = Field(default_factory=list)
-    unstaged_files: List[str] = Field(default_factory=list)
-    untracked_files: List[str] = Field(default_factory=list)
+    staged_files: list[str] = Field(default_factory=list)
+    unstaged_files: list[str] = Field(default_factory=list)
+    untracked_files: list[str] = Field(default_factory=list)
     raw_status: str = ""
 
 
@@ -33,8 +33,8 @@ class GitTool:
 
     def __init__(
         self,
-        wm: Optional[WorkspaceManager] = None,
-        pm: Optional[PermissionManager] = None,
+        wm: WorkspaceManager | None = None,
+        pm: PermissionManager | None = None,
     ):
         self.wm = wm or workspace_manager
         self.pm = pm or permission_manager
@@ -43,7 +43,7 @@ class GitTool:
         paths = self.wm.get_workspace_paths(task_id) or self.wm.create_workspace(task_id)
         return paths.project
 
-    async def _run_git(self, task_id: str, args: List[str]) -> tuple[int, str, str]:
+    async def _run_git(self, task_id: str, args: list[str]) -> tuple[int, str, str]:
         root = self._get_project_root(task_id)
         proc = await asyncio.create_subprocess_exec(
             "git",

@@ -3,10 +3,11 @@ Pytest fixtures and configuration for FORGE test suite.
 """
 
 import asyncio
-from pathlib import Path
 import shutil
 import tempfile
-from typing import AsyncGenerator
+from collections.abc import AsyncGenerator
+from pathlib import Path
+
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
@@ -60,8 +61,8 @@ def direct_provider() -> DirectProvider:
 @pytest_asyncio.fixture
 async def async_client(test_db_manager: DatabaseManager, temp_dir: Path) -> AsyncGenerator[AsyncClient, None]:
     """Provide an AsyncClient configured with overridden database and workspace paths."""
-    from app.memory import db as db_module
     from app.api import routes as routes_module
+    from app.memory import db as db_module
 
     app = create_app()
 

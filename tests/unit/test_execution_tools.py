@@ -3,16 +3,16 @@ Unit tests for Execution Engine Tools: FilesystemTool, TerminalTool, ProcessMana
 """
 
 from pathlib import Path
+
 import pytest
+
 from app.core.config import Settings
 from app.core.workspace import WorkspaceManager
 from app.execution.filesystem import FilesystemTool
 from app.execution.git_tool import GitTool
 from app.execution.permissions import (
-    PermissionDeniedError,
     PermissionManager,
     SandboxViolationError,
-    ToolPermission,
 )
 from app.execution.process_manager import ProcessManagerTool
 from app.execution.terminal import TerminalTool

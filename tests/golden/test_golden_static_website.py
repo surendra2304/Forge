@@ -4,8 +4,8 @@ Validates end-to-end autonomous synthesis of frontend web projects with BrowserC
 """
 
 from pathlib import Path
-import json
-from unittest.mock import AsyncMock, patch
+from unittest.mock import patch
+
 import pytest
 
 from app.core.config import Settings
@@ -18,7 +18,6 @@ from app.memory.db import DatabaseManager
 from app.memory.models import TaskMode, TaskState
 from app.memory.state_store import StateStore
 from app.verification.checkers import BrowserChecker
-from app.verification.engine import VerificationEngine
 
 
 @pytest.mark.asyncio

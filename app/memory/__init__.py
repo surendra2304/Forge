@@ -2,6 +2,7 @@
 Memory and State Persistence module for FORGE.
 """
 
+from app.memory.db import DatabaseManager, db_manager, get_db
 from app.memory.models import (
     ArtifactRecord,
     AuditEvent,
@@ -15,7 +16,6 @@ from app.memory.models import (
     TaskState,
     TaskStatus,
 )
-from app.memory.db import DatabaseManager, db_manager, get_db
 from app.memory.state_store import StateStore
 from app.memory.task_lifecycle import InvalidStateTransitionError, TaskStateMachine
 
@@ -23,18 +23,18 @@ __all__ = [
     "ArtifactRecord",
     "AuditEvent",
     "Checkpoint",
+    "DatabaseManager",
+    "InvalidStateTransitionError",
     "ProjectWorkspace",
+    "StateStore",
     "TaskEdge",
     "TaskEntity",
     "TaskGraph",
     "TaskMode",
     "TaskNode",
     "TaskState",
+    "TaskStateMachine",
     "TaskStatus",
-    "DatabaseManager",
     "db_manager",
     "get_db",
-    "StateStore",
-    "TaskStateMachine",
-    "InvalidStateTransitionError",
 ]

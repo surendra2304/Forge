@@ -4,6 +4,7 @@ Unit tests for Repository & Local Codebase Intake in WorkspaceManager and Orches
 
 from pathlib import Path
 from uuid import uuid4
+
 import pytest
 
 from app.core.config import Settings
@@ -11,7 +12,7 @@ from app.core.orchestrator import OrchestratorCore
 from app.core.workspace import WorkspaceManager
 from app.execution.engine import ExecutionEngine
 from app.memory.db import DatabaseManager
-from app.memory.models import TaskMode, TaskState
+from app.memory.models import TaskState
 from app.memory.state_store import StateStore
 
 
