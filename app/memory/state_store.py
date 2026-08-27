@@ -99,8 +99,8 @@ class StateStore:
         async with self.db.connection() as conn:
             await conn.execute(
                 """
-                INSERT INTO tasks (id, goal, requirements, mode, workspace_path, max_budget, budget_consumed, state, progress_percentage, error_message, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO tasks (id, goal, requirements, mode, workspace_path, max_budget, budget_consumed, state, progress_percentage, error_message, metadata, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     task.id,
@@ -113,6 +113,7 @@ class StateStore:
                     task.state.value,
                     task.progress_percentage,
                     task.error_message,
+                    json.dumps(task.metadata),
                     task.created_at.isoformat(),
                     task.updated_at.isoformat(),
                 ),
@@ -130,6 +131,12 @@ class StateStore:
             row = await cursor.fetchone()
             if not row:
                 return None
+            metadata = {}
+            if "metadata" in row.keys() and row["metadata"]:
+                try:
+                    metadata = json.loads(row["metadata"])
+                except Exception:
+                    metadata = {}
             return TaskEntity(
                 id=row["id"],
                 goal=row["goal"],
@@ -141,6 +148,7 @@ class StateStore:
                 state=TaskState(row["state"]),
                 progress_percentage=row["progress_percentage"],
                 error_message=row["error_message"],
+                metadata=metadata,
                 created_at=datetime.fromisoformat(row["created_at"]),
                 updated_at=datetime.fromisoformat(row["updated_at"]),
             )
@@ -176,29 +184,98 @@ class StateStore:
 
         return await self.get_task(task_id)
 
-    async def list_tasks(self, limit: int = 50) -> list[TaskEntity]:
-        """List tasks ordered by created_at DESC."""
-        async with self.db.connection() as conn, conn.execute(
-            "SELECT * FROM tasks ORDER BY created_at DESC LIMIT ?", (limit,)
-        ) as cursor:
-            rows = await cursor.fetchall()
-            return [
-                TaskEntity(
-                    id=row["id"],
-                    goal=row["goal"],
-                    requirements=json.loads(row["requirements"]),
-                    mode=TaskMode(row["mode"]),
-                    workspace_path=row["workspace_path"],
-                    max_budget=row["max_budget"],
-                    budget_consumed=row["budget_consumed"],
-                    state=TaskState(row["state"]),
-                    progress_percentage=row["progress_percentage"],
-                    error_message=row["error_message"],
-                    created_at=datetime.fromisoformat(row["created_at"]),
-                    updated_at=datetime.fromisoformat(row["updated_at"]),
+    async def save_task(self, task: TaskEntity) -> TaskEntity:
+        """Upsert a task entity."""
+        now = datetime.now(UTC).isoformat()
+        async with self.db.connection() as conn:
+            async with conn.execute("SELECT id FROM tasks WHERE id = ?", (task.id,)) as cursor:
+                row = await cursor.fetchone()
+            if row:
+                await conn.execute(
+                    """
+                    UPDATE tasks
+                    SET goal = ?, requirements = ?, mode = ?, workspace_path = ?, max_budget = ?,
+                        budget_consumed = ?, state = ?, progress_percentage = ?, error_message = ?, metadata = ?, updated_at = ?
+                    WHERE id = ?
+                    """,
+                    (
+                        task.goal,
+                        json.dumps(task.requirements),
+                        task.mode.value,
+                        task.workspace_path,
+                        task.max_budget,
+                        task.budget_consumed,
+                        task.state.value,
+                        task.progress_percentage,
+                        task.error_message,
+                        json.dumps(task.metadata),
+                        now,
+                        task.id,
+                    ),
                 )
-                for row in rows
-            ]
+            else:
+                await conn.execute(
+                    """
+                    INSERT INTO tasks (id, goal, requirements, mode, workspace_path, max_budget, budget_consumed, state, progress_percentage, error_message, metadata, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        task.id,
+                        task.goal,
+                        json.dumps(task.requirements),
+                        task.mode.value,
+                        task.workspace_path,
+                        task.max_budget,
+                        task.budget_consumed,
+                        task.state.value,
+                        task.progress_percentage,
+                        task.error_message,
+                        json.dumps(task.metadata),
+                        task.created_at.isoformat(),
+                        now,
+                    ),
+                )
+            await conn.commit()
+        return task
+
+    async def list_tasks(self, state: TaskState | None = None, limit: int = 50) -> list[TaskEntity]:
+        """List tasks ordered by created_at DESC with optional state filter."""
+        query = "SELECT * FROM tasks"
+        params: list[Any] = []
+        if state is not None:
+            query += " WHERE state = ?"
+            params.append(state.value)
+        query += " ORDER BY created_at DESC LIMIT ?"
+        params.append(limit)
+
+        async with self.db.connection() as conn, conn.execute(query, tuple(params)) as cursor:
+            rows = await cursor.fetchall()
+            results = []
+            for row in rows:
+                metadata = {}
+                if "metadata" in row.keys() and row["metadata"]:
+                    try:
+                        metadata = json.loads(row["metadata"])
+                    except Exception:
+                        metadata = {}
+                results.append(
+                    TaskEntity(
+                        id=row["id"],
+                        goal=row["goal"],
+                        requirements=json.loads(row["requirements"]),
+                        mode=TaskMode(row["mode"]),
+                        workspace_path=row["workspace_path"],
+                        max_budget=row["max_budget"],
+                        budget_consumed=row["budget_consumed"],
+                        state=TaskState(row["state"]),
+                        progress_percentage=row["progress_percentage"],
+                        error_message=row["error_message"],
+                        metadata=metadata,
+                        created_at=datetime.fromisoformat(row["created_at"]),
+                        updated_at=datetime.fromisoformat(row["updated_at"]),
+                    )
+                )
+            return results
 
     # --- Audit Events ---
 

@@ -1,5 +1,5 @@
 """
-Pydantic Request and Response Schemas for the FORGE REST API.
+Pydantic Request and Response Schemas for the FORGE REST & FRIDAY Management API.
 """
 
 from datetime import datetime
@@ -10,7 +10,15 @@ from pydantic import BaseModel, Field
 from app.memory.models import TaskMode, TaskState
 from app.providers.base import ProviderCapabilities, ProviderHealthStatus
 
-# --- Task Schemas ---
+# --- Task Metadata & Requests ---
+
+class TaskMetadata(BaseModel):
+    source: str = Field(default="friday", description="Source client assigning the task")
+    priority: str = Field(default="normal", description="Task execution priority: normal | high | urgent")
+    deadline: datetime | None = Field(default=None, description="Optional target deadline")
+    tags: list[str] = Field(default_factory=list, description="Categorization or project tags")
+    archived: bool = Field(default=False, description="Soft-archive status")
+
 
 class TaskCreateRequest(BaseModel):
     goal: str = Field(..., description="High-level engineering objective", min_length=3)
@@ -20,10 +28,25 @@ class TaskCreateRequest(BaseModel):
     repo_url: str | None = Field(default=None, description="Optional remote Git repository URL to clone")
     local_path: str | None = Field(default=None, description="Optional local directory path to copy into project sandbox")
     max_budget: float = Field(default=10.0, ge=0.1, description="Maximum allowed budget in USD")
+    task_metadata: TaskMetadata | None = Field(default=None, description="FRIDAY management metadata")
 
 
 class TaskActionRequest(BaseModel):
     reason: str | None = Field(default=None, description="Optional explanation for the action")
+
+
+# --- Task Responses ---
+
+class TaskSummaryResponse(BaseModel):
+    id: str
+    goal: str
+    state: TaskState
+    progress_percentage: int
+    project_type: str = "default"
+    priority: str = "normal"
+    created_at: datetime
+    updated_at: datetime
+    archived: bool = False
 
 
 class TaskResponse(BaseModel):
@@ -37,12 +60,17 @@ class TaskResponse(BaseModel):
     state: TaskState
     progress_percentage: int
     error_message: str | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
     created_at: datetime
     updated_at: datetime
 
 
 class TaskDetailResponse(TaskResponse):
-    workspace_dirs: dict[str, str]
+    workspace_dirs: dict[str, str] = Field(default_factory=dict)
+    current_stage: str | None = None
+    estimated_remaining_seconds: float | None = None
+    estimated_completion_at: datetime | None = None
+    provenance_summary: str | None = None
     latest_checkpoint_id: str | None = None
     checkpoints_count: int = 0
 
@@ -53,6 +81,37 @@ class TaskActionResponse(BaseModel):
     current_state: TaskState
     message: str
     checkpoint_id: str | None = None
+
+
+# --- Deep Inspection & Logs ---
+
+class FileInspection(BaseModel):
+    path: str
+    size_bytes: int
+    lines_count: int
+
+
+class TaskInspectResponse(BaseModel):
+    task_id: str
+    goal: str
+    state: TaskState
+    files_created: list[FileInspection] = Field(default_factory=list)
+    verification_summary: dict[str, Any] = Field(default_factory=dict)
+    dependencies: list[str] = Field(default_factory=list)
+    artifacts: list[str] = Field(default_factory=list)
+    provenance: dict[str, Any] = Field(default_factory=dict)
+
+
+class LogEntry(BaseModel):
+    timestamp: str | None = None
+    level: str = "INFO"
+    message: str
+
+
+class TaskLogsResponse(BaseModel):
+    task_id: str
+    total_lines: int
+    logs: list[LogEntry] = Field(default_factory=list)
 
 
 # --- Run / Audit Event Schemas ---

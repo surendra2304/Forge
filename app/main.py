@@ -9,7 +9,10 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.analytics import analytics_router
 from app.api.routes import router as api_router
+from app.api.tasks import tasks_router
+from app.api.websocket import ws_router
 from app.core.config import get_settings
 from app.core.logging import get_logger, setup_logging
 from app.memory.db import db_manager
@@ -59,6 +62,11 @@ def create_app() -> FastAPI:
     # Register API routers
     app.include_router(api_router, tags=["Core API"])
     app.include_router(api_router, prefix="/api/v1", tags=["API v1"])
+    app.include_router(tasks_router, prefix="/api", tags=["FRIDAY Tasks"])
+    app.include_router(tasks_router, prefix="/api/v1", tags=["FRIDAY Tasks v1"])
+    app.include_router(analytics_router, prefix="/api", tags=["FRIDAY Analytics"])
+    app.include_router(analytics_router, prefix="/api/v1", tags=["FRIDAY Analytics v1"])
+    app.include_router(ws_router, tags=["WebSockets"])
 
     return app
 

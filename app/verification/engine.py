@@ -4,6 +4,7 @@ Orchestrates batteries of objective verification checks and compiles verifiable 
 """
 
 import json
+from typing import Any
 
 from app.core.logging import get_logger
 from app.core.workspace import WorkspaceManager, workspace_manager
@@ -18,6 +19,12 @@ from app.verification.checkers import (
     TestChecker,
 )
 from app.verification.evidence import VerificationEvidence, VerificationReport
+from app.verification.expanded_battery import (
+    AccessibilityChecker,
+    CodeQualityComplexityChecker,
+    PerformanceSanityChecker,
+    SecurityVulnerabilityChecker,
+)
 
 logger = get_logger("verification.engine")
 
@@ -33,13 +40,17 @@ class VerificationEngine:
     ):
         self.engine = engine or execution_engine
         self.wm = wm or workspace_manager
-        self.checkers: list[BaseChecker] = custom_checkers or [
+        self.checkers: list[Any] = custom_checkers or [
             BuildChecker(),
             LintChecker(),
             TestChecker(),
             RuntimeChecker(),
             SecurityChecker(),
+            SecurityVulnerabilityChecker(),
             FeaturePresenceChecker(),
+            PerformanceSanityChecker(),
+            CodeQualityComplexityChecker(),
+            AccessibilityChecker(),
         ]
 
     async def capture_baseline(self, task_id: str) -> VerificationReport:

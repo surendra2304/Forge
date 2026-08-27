@@ -39,6 +39,7 @@ CREATE TABLE IF NOT EXISTS tasks (
     state TEXT NOT NULL DEFAULT 'PENDING',
     progress_percentage INTEGER NOT NULL DEFAULT 0,
     error_message TEXT,
+    metadata TEXT NOT NULL DEFAULT '{}',
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
@@ -118,6 +119,10 @@ class DatabaseManager:
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         async with self.connection() as conn:
             await conn.executescript(SCHEMA_SQL)
+            try:
+                await conn.execute("ALTER TABLE tasks ADD COLUMN metadata TEXT NOT NULL DEFAULT '{}';")
+            except Exception:
+                pass
             await conn.commit()
         logger.info(f"Initialized SQLite database at {self.db_path}")
 
