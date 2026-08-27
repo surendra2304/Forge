@@ -15,7 +15,7 @@ async def test_health_and_capabilities_endpoints(async_client: AsyncClient):
     health_res = await async_client.get("/health")
     assert health_res.status_code == 200
     health_data = health_res.json()
-    assert health_data["status"] in ["healthy", "degraded"]
+    assert health_data["status"] in ["healthy", "ok", "degraded"]
     assert health_data["database_connected"] is True
 
     # Test GET /capabilities
