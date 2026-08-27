@@ -13,10 +13,11 @@ from app.providers.base import ProviderCapabilities, ProviderHealthStatus
 # --- Task Metadata & Requests ---
 
 class TaskMetadata(BaseModel):
-    source: str = Field(default="friday", description="Source client assigning the task")
+    source: str | None = Field(default=None, description="Optional caller identifier")
     priority: str = Field(default="normal", description="Task execution priority: normal | high | urgent")
     deadline: datetime | None = Field(default=None, description="Optional target deadline")
     tags: list[str] = Field(default_factory=list, description="Categorization or project tags")
+    webhook_url: str | None = Field(default=None, description="Optional webhook URL for progress and lifecycle notifications")
     archived: bool = Field(default=False, description="Soft-archive status")
 
 
@@ -28,7 +29,8 @@ class TaskCreateRequest(BaseModel):
     repo_url: str | None = Field(default=None, description="Optional remote Git repository URL to clone")
     local_path: str | None = Field(default=None, description="Optional local directory path to copy into project sandbox")
     max_budget: float = Field(default=10.0, ge=0.1, description="Maximum allowed budget in USD")
-    task_metadata: TaskMetadata | None = Field(default=None, description="FRIDAY management metadata")
+    task_metadata: TaskMetadata | None = Field(default=None, description="Optional caller task metadata")
+    webhook_url: str | None = Field(default=None, description="Optional webhook URL for progress events")
 
 
 class TaskActionRequest(BaseModel):

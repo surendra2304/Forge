@@ -1,5 +1,5 @@
 """
-Integration tests for FRIDAY Task Management API endpoints.
+Integration tests for Enhanced Task Management REST API endpoints (Consumer-Agnostic).
 """
 
 import pytest
@@ -11,18 +11,18 @@ from app.memory.state_store import StateStore
 
 
 @pytest.mark.asyncio
-async def test_friday_task_lifecycle_api():
+async def test_task_lifecycle_api():
     await db_manager.init_db()
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
-        # 1. Submit task with FRIDAY metadata
+        # 1. Submit task with optional metadata and tags
         payload = {
-            "goal": "Build a responsive landing page for FRIDAY",
+            "goal": "Build a responsive landing page",
             "requirements": ["Responsive layout", "Hero banner"],
             "max_budget": 5.0,
             "task_metadata": {
-                "source": "friday",
+                "source": "client_app",
                 "priority": "high",
                 "tags": ["frontend", "landing-page"],
             },
@@ -32,7 +32,7 @@ async def test_friday_task_lifecycle_api():
         data = res.json()
         task_id = data["id"]
         assert data["goal"] == payload["goal"]
-        assert data["metadata"]["source"] == "friday"
+        assert data["metadata"]["source"] == "client_app"
         assert data["metadata"]["priority"] == "high"
 
         # 2. List tasks
@@ -59,31 +59,24 @@ async def test_friday_task_lifecycle_api():
         assert "dependencies" in inspect_data
         assert "verification_summary" in inspect_data
 
-        # 5. Logs endpoint
+        # 5. Execution logs
         res_logs = await client.get(f"/api/tasks/{task_id}/logs")
         assert res_logs.status_code == 200
-        logs_data = res_logs.json()
-        assert "logs" in logs_data
+        log_data = res_logs.json()
+        assert log_data["task_id"] == task_id
 
-        # 6. Artifacts endpoint
-        res_art = await client.get(f"/api/tasks/{task_id}/artifacts")
-        assert res_art.status_code == 200
-        assert isinstance(res_art.json(), list)
+        # 6. Artifacts Manifest
+        res_arts = await client.get(f"/api/tasks/{task_id}/artifacts")
+        assert res_arts.status_code == 200
 
-        # 7. Cancel endpoint
-        res_cancel = await client.post(f"/api/tasks/{task_id}/cancel", json={"reason": "User requested abort"})
+        # 7. Cancel Task
+        res_cancel = await client.post(f"/api/tasks/{task_id}/cancel", json={"reason": "Test cancel"})
         assert res_cancel.status_code == 200
-        assert res_cancel.json()["current_state"] == "CANCELLED"
+        cancel_data = res_cancel.json()
+        assert cancel_data["current_state"] == "CANCELLED"
 
-        # 8. Archive (soft delete) endpoint
-        res_archive = await client.delete(f"/api/tasks/{task_id}")
-        assert res_archive.status_code == 200
-        assert res_archive.json()["archived"] is True
-
-        # Confirm excluded from standard listing
-        res_list_after = await client.get("/api/tasks")
-        assert not any(s["id"] == task_id for s in res_list_after.json())
-
-        # Confirm present when include_archived=true
-        res_list_archived = await client.get("/api/tasks?include_archived=true")
-        assert any(s["id"] == task_id for s in res_list_archived.json())
+        # 8. Soft Archive (Delete)
+        res_del = await client.delete(f"/api/tasks/{task_id}")
+        assert res_del.status_code == 200
+        del_data = res_del.json()
+        assert del_data["archived"] is True

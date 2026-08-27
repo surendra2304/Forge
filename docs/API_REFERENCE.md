@@ -1,13 +1,13 @@
-# FORGE — FRIDAY Management API Reference
+# Project FORGE — Consumer-Agnostic API Reference
 
-Project FORGE exposes a rich REST and real-time WebSocket API designed for automated orchestration and supervision by Project FRIDAY, as well as developer consumption.
+Project FORGE is a standalone autonomous software engineering synthesis engine. It accepts high-level software goals from any programmatic caller or human operator, orchestrates multi-agent planning and synthesis fueled by AI-Universe, executes rigorous objective verification, and delivers production-ready deliverables.
 
 ---
 
 ## Authentication
 
 All REST endpoints and WebSocket channels support API Key authentication:
-- **Header:** `X-FRIDAY-API-Key: <api_key>` or `X-API-Key: <api_key>`
+- **Header:** `X-API-Key: <api_key>` or `Authorization: Bearer <api_key>`
 - **Query Parameter (WebSockets):** `?api_key=<api_key>`
 
 ---
@@ -26,8 +26,9 @@ All REST endpoints and WebSocket channels support API Key authentication:
     "requirements": ["Responsive layout", "Hero section", "Dark mode toggle"],
     "mode": "autonomous",
     "max_budget": 10.0,
+    "webhook_url": "https://client.example.com/forge/webhook",
     "task_metadata": {
-      "source": "friday",
+      "source": "my_orchestrator",
       "priority": "high",
       "deadline": "2026-08-28T00:00:00Z",
       "tags": ["frontend", "portfolio"]
@@ -47,121 +48,122 @@ All REST endpoints and WebSocket channels support API Key authentication:
     "state": "PENDING",
     "progress_percentage": 0,
     "metadata": {
-      "source": "friday",
       "priority": "high",
-      "tags": ["frontend", "portfolio"],
-      "archived": false
-    },
-    "created_at": "2026-08-27T19:00:00Z",
-    "updated_at": "2026-08-27T19:00:00Z"
+      "webhook_url": "https://client.example.com/forge/webhook"
+    }
   }
   ```
 
 #### List Tasks
 - **Endpoint:** `GET /api/tasks`
-- **Query Parameters:**
-  - `status` (*string*, optional): Filter by `PENDING`, `READY`, `RUNNING`, `VERIFYING`, `COMPLETED`, `FAILED`, `CANCELLED`, `BLOCKED`.
-  - `limit` (*integer*, default: 50): Max tasks to return.
-  - `since_timestamp` (*string*, optional): ISO timestamp filter.
-  - `include_archived` (*boolean*, default: false): Include soft-archived tasks.
+- **Query Parameters:** `state`, `limit`, `since`, `include_archived`
 - **Response (200 OK):**
   ```json
   [
     {
       "id": "task0127082026190000",
-      "goal": "Build a responsive static personal portfolio website with dark mode",
+      "goal": "Build a responsive static personal portfolio website",
       "state": "COMPLETED",
       "progress_percentage": 100,
       "project_type": "website",
-      "priority": "high",
-      "created_at": "2026-08-27T19:00:00Z",
-      "updated_at": "2026-08-27T19:00:25Z",
-      "archived": false
+      "provenance_summary": "Generated via: AI-Universe (85.0%), Direct (15.0%)",
+      "created_at": "2026-08-27T19:00:00Z"
     }
   ]
   ```
 
-#### Get Task Details & Dynamic ETA
+#### Get Task Status & Progress
 - **Endpoint:** `GET /api/tasks/{task_id}`
 - **Response (200 OK):**
   ```json
   {
     "id": "task0127082026190000",
-    "goal": "Build a responsive static personal portfolio website with dark mode",
     "state": "RUNNING",
     "progress_percentage": 65,
-    "current_stage": "Verification",
-    "estimated_remaining_seconds": 8.5,
-    "estimated_completion_at": "2026-08-27T19:00:33Z",
+    "current_stage": "Implementation",
+    "estimated_remaining_seconds": 12.5,
+    "estimated_completion_at": "2026-08-27T19:05:12Z",
     "workspace_dirs": {
-      "root": "workspaces/task0127082026190000",
       "project": "workspaces/task0127082026190000/project",
-      "artifacts": "workspaces/task0127082026190000/artifacts",
-      "logs": "workspaces/task0127082026190000/logs",
-      "state": "workspaces/task0127082026190000/state",
-      "cache": "workspaces/task0127082026190000/cache"
-    },
-    "provenance_summary": "Generated via: AI-Universe (80.0%), Direct (20.0%), Template (0.0%)"
+      "artifacts": "artifacts/task0127082026190000"
+    }
   }
   ```
 
-#### Deep Task Inspection
+#### Stream / Filter Logs
+- **Endpoint:** `GET /api/tasks/{task_id}/logs`
+- **Query Parameters:** `level` (DEBUG|INFO|WARNING|ERROR), `tail_lines`, `since`
+
+#### Deep Workspace Inspection
 - **Endpoint:** `GET /api/tasks/{task_id}/inspect`
 - **Response (200 OK):**
   ```json
   {
     "task_id": "task0127082026190000",
-    "goal": "Build a responsive static personal portfolio website with dark mode",
-    "state": "COMPLETED",
     "files_created": [
-      {"path": "index.html", "size_bytes": 3420, "lines_count": 92},
-      {"path": "style.css", "size_bytes": 4120, "lines_count": 180},
-      {"path": "app.js", "size_bytes": 1050, "lines_count": 35}
+      {"path": "index.html", "size_bytes": 2410, "line_count": 82, "provenance": "ai-universe"},
+      {"path": "style.css", "size_bytes": 1820, "line_count": 64, "provenance": "ai-universe"}
     ],
     "verification_summary": {
-      "all_passed": true,
-      "passed_checks": 7,
-      "failed_checks": 0
+      "passed": 4,
+      "failed": 0,
+      "checks": ["syntax", "security", "performance", "accessibility"]
     },
-    "dependencies": [],
-    "artifacts": ["completion_report.json", "COMPLETION_REPORT.md", "verification_manifest.json"]
+    "dependencies": ["pydantic", "fastapi"]
   }
   ```
 
-#### Execution Logs
-- **Endpoint:** `GET /api/tasks/{task_id}/logs`
-- **Query Parameters:** `level` (`DEBUG`, `INFO`, `WARNING`, `ERROR`), `tail_lines` (default 100), `since_timestamp`.
-- **Response (200 OK):** Structured logs list with inferred log level.
+#### Deliverable Artifacts
+- **Endpoint:** `GET /api/tasks/{task_id}/artifacts` (Manifest) & `GET /api/tasks/{task_id}/artifacts/{filename}` (Raw Stream)
 
-#### Artifacts & Downloads
-- **Endpoint:** `GET /api/tasks/{task_id}/artifacts` — List available deliverables and report files.
-- **Endpoint:** `GET /api/tasks/{task_id}/artifacts/{filename}` — Direct file stream download.
+#### Cancel Task
+- **Endpoint:** `POST /api/tasks/{task_id}/cancel`
 
-#### Cancellation & Soft Archive
-- **Endpoint:** `POST /api/tasks/{task_id}/cancel` — Graceful task abort with background process termination.
-- **Endpoint:** `DELETE /api/tasks/{task_id}` — Soft-archive task while keeping sandbox files intact.
+#### Archive Task (Soft Delete)
+- **Endpoint:** `DELETE /api/tasks/{task_id}`
 
 ---
 
-### 2. Analytics & Historical Metrics (`/api/analytics`)
+## Optional Webhook Notifications
 
-- **`GET /api/analytics/summary`**: High-level execution metrics (total tasks, success rate %, average duration, budget spent).
-- **`GET /api/analytics/types`**: Performance, duration, and success rates segmented by project category (`website`, `cli`, `api`, `script`, `fullstack`).
-- **`GET /api/analytics/failures`**: Root-cause failure distribution (`fallback_stub`, `verification_failure`, `security_violation`, etc.).
+When a task is submitted with a `webhook_url`, FORGE dispatches lifecycle notifications using exponential backoff:
+
+```json
+{
+  "event": "stage_completed",
+  "timestamp": "2026-08-27T19:02:15Z",
+  "task_id": "task0127082026190000",
+  "data": {
+    "stage": "Architecture",
+    "progress": 35
+  },
+  "source": "forge"
+}
+```
+
+Events emitted:
+- `task_started`
+- `stage_completed`
+- `verification_result`
+- `task_completed`
+- `task_failed`
 
 ---
 
-## WebSocket Telemetry Streams
+## WebSockets
 
-### 1. Task-Specific Stream (`/ws/tasks/{task_id}`)
-Connect to subscribe to real-time events for a single task:
-- `stage.started`, `stage.completed`
-- `verification.evidence`
-- `task.state_changed`
-- `task.completed`, `task.failed`
+### Task Stream
+- **URL:** `ws://localhost:8000/ws/tasks/{task_id}`
+- Streams real-time progress percentages, logs, and verification evidence for a single task.
 
-### 2. Global Stream (`/ws/tasks`)
-Connect to receive broadcasts across all active engineering tasks:
-- `task.created`
-- `task.cancelled`
-- State transitions and completion notifications.
+### Global Broadcast Stream
+- **URL:** `ws://localhost:8000/ws/tasks`
+- Broadcasts lifecycle updates across all active tasks.
+
+---
+
+## Analytics Endpoints
+
+- **`GET /api/analytics/summary`**: Aggregate metrics, duration averages, and success rates.
+- **`GET /api/analytics/types`**: Category metrics (`website`, `cli`, `api`, `script`).
+- **`GET /api/analytics/failures`**: Failure root-cause distribution.

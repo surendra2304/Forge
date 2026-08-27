@@ -35,6 +35,8 @@ from app.memory.models import TaskState
 from app.memory.state_store import StateStore
 from app.memory.task_lifecycle import InvalidStateTransitionError, TaskStateMachine
 
+from app.api.webhooks import webhook_dispatcher
+
 logger = get_logger("api.tasks")
 tasks_router = APIRouter(prefix="/tasks", tags=["Tasks"])
 
@@ -62,7 +64,10 @@ async def create_task(
     if request.task_metadata:
         metadata = request.task_metadata.model_dump(mode="json")
     else:
-        metadata = {"source": "friday", "priority": "normal", "tags": [], "archived": False}
+        metadata = {"priority": "normal", "tags": [], "archived": False}
+
+    if request.webhook_url and "webhook_url" not in metadata:
+        metadata["webhook_url"] = request.webhook_url
 
     task, _ = await orchestrator.intake_and_plan(
         goal=request.goal,
@@ -73,13 +78,23 @@ async def create_task(
         max_budget=request.max_budget,
     )
 
-    # Attach FRIDAY metadata
+    # Attach task metadata
     task.metadata.update(metadata)
     await store.save_task(task)
 
     # Initialize progress tracker for task
     ptype = detect_project_type(task.goal, task.requirements).category.value
     ProgressTracker.get_or_create(task.id, project_type=ptype)
+
+    # Optional webhook dispatch
+    webhook_url = task.metadata.get("webhook_url")
+    if webhook_url:
+        await webhook_dispatcher.dispatch_event(
+            webhook_url=webhook_url,
+            task_id=task.id,
+            event="task_started",
+            data={"goal": task.goal, "state": task.state.value, "metadata": task.metadata},
+        )
 
     # Broadcast task creation via WebSocket
     await ws_manager.broadcast_global({
@@ -419,6 +434,15 @@ async def cancel_task(
             "reason": reason,
         })
 
+        webhook_url = task.metadata.get("webhook_url")
+        if webhook_url:
+            await webhook_dispatcher.dispatch_event(
+                webhook_url=webhook_url,
+                task_id=task_id,
+                event="task_failed" if reason else "task_completed",
+                data={"status": "CANCELLED", "reason": reason},
+            )
+
         return TaskActionResponse(
             task_id=task_id,
             previous_state=prev_state,
@@ -452,29 +476,4 @@ async def archive_task(
         "message": f"Task '{task_id}' has been archived and removed from active task listings.",
     }
 
-
-@tasks_router.get("/{task_id}/friday-context", summary="Get FRIDAY Context & Command Relations")
-async def get_friday_context(
-    task_id: str,
-    store: StateStore = Depends(get_state_store),
-):
-    """Retrieve metadata and command relationship specifically formatted for FRIDAY manager."""
-    task = await store.get_task(task_id)
-    if not task:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Task '{task_id}' not found.")
-
-    return {
-        "task_id": task.id,
-        "goal": task.goal,
-        "source": task.metadata.get("source", "friday"),
-        "priority": task.metadata.get("priority", "normal"),
-        "tags": task.metadata.get("tags", []),
-        "status": task.state.value,
-        "progress_percentage": task.progress_percentage,
-        "command_intent": task.metadata.get("command_intent", "software_synthesis"),
-        "correlation_id": task.metadata.get("correlation_id"),
-        "assigned_at": task.created_at.isoformat() if task.created_at else None,
-        "provenance_summary": task.metadata.get("provenance_summary"),
-        "error_message": task.error_message,
-    }
 
