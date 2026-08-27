@@ -4,9 +4,10 @@ Provides automated SQLite snapshots, metadata backups, restoration utilities, an
 """
 
 from datetime import UTC, datetime, timedelta
+import json
 from pathlib import Path
 import shutil
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 import aiosqlite
 from pydantic import BaseModel, Field
 
@@ -19,13 +20,13 @@ logger = get_logger("backup.recovery")
 
 class BackupManifest(BaseModel):
     backup_path: str
-    backup_type: str = "sqlite"
+    backup_type: str = "sqlite"  # sqlite, metadata, config
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     size_bytes: int = 0
 
 
 class BackupManager:
-    """Manages creation, restoration, and pruning of SQLite database backups."""
+    """Manages creation, restoration, and pruning of SQLite database and workspace metadata backups."""
 
     def __init__(self, settings: Optional[Settings] = None, db: Optional[DatabaseManager] = None):
         self.settings = settings or get_settings()
@@ -43,22 +44,44 @@ class BackupManager:
         target_path = self.backup_dir / f"forge_backup_{timestamp}.db"
 
         if not src_path.exists():
-            # If database doesn't exist yet, initialize it
             await self.db.init_db()
 
-        # Perform consistent SQLite backup via aiosqlite or copy
         try:
             async with aiosqlite.connect(src_path) as src_conn:
                 async with aiosqlite.connect(target_path) as dst_conn:
                     await src_conn.backup(dst_conn)
             size = target_path.stat().st_size
             logger.info(f"Database backup created: {target_path.name} ({size} bytes)")
-            return BackupManifest(backup_path=str(target_path), size_bytes=size)
+            return BackupManifest(backup_path=str(target_path), backup_type="sqlite", size_bytes=size)
         except Exception as e:
             logger.warning(f"aiosqlite backup failed ({e}), falling back to direct copy.")
             shutil.copy2(src_path, target_path)
             size = target_path.stat().st_size
-            return BackupManifest(backup_path=str(target_path), size_bytes=size)
+            return BackupManifest(backup_path=str(target_path), backup_type="sqlite", size_bytes=size)
+
+    def backup_workspace_metadata(self, task_id: str, metadata: Dict[str, Any]) -> BackupManifest:
+        """Create a JSON metadata snapshot for a workspace."""
+        timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
+        meta_dir = self.backup_dir / "workspaces"
+        meta_dir.mkdir(parents=True, exist_ok=True)
+        target_path = meta_dir / f"meta_{task_id}_{timestamp}.json"
+
+        content = json.dumps(metadata, indent=2, default=str)
+        target_path.write_text(content, encoding="utf-8")
+        size = target_path.stat().st_size
+        return BackupManifest(backup_path=str(target_path), backup_type="metadata", size_bytes=size)
+
+    def backup_configuration(self, config_dict: Dict[str, Any]) -> BackupManifest:
+        """Create a configuration snapshot backup."""
+        timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
+        cfg_dir = self.backup_dir / "config"
+        cfg_dir.mkdir(parents=True, exist_ok=True)
+        target_path = cfg_dir / f"config_backup_{timestamp}.json"
+
+        content = json.dumps(config_dict, indent=2, default=str)
+        target_path.write_text(content, encoding="utf-8")
+        size = target_path.stat().st_size
+        return BackupManifest(backup_path=str(target_path), backup_type="config", size_bytes=size)
 
     def restore_database(self, backup_file: Path) -> bool:
         """Restore SQLite database from a specified backup file."""
