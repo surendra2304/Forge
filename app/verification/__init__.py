@@ -23,6 +23,7 @@ from app.verification.evidence import (
     VerificationEvidence,
     VerificationReport,
 )
+from app.verification.language_verifiers import PolyglotLanguageVerifier
 from app.verification.performance import PerformanceVerifier
 from app.verification.quality_analyzer import CodeQualityAnalyzer
 
@@ -37,6 +38,7 @@ __all__ = [
     "CodeQualityAnalyzer",
     "LintChecker",
     "PerformanceVerifier",
+    "PolyglotLanguageVerifier",
     "RuntimeChecker",
     "TestChecker",
     "VerificationCheck",

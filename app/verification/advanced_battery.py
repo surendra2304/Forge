@@ -286,12 +286,14 @@ class AdvancedVerificationEngine:
         from app.verification.quality_analyzer import CodeQualityAnalyzer
         from app.verification.performance import PerformanceVerifier
         from app.verification.browser_interactions import BrowserInteractionVerifier
+        from app.verification.language_verifiers import PolyglotLanguageVerifier
 
         checks: List[VerificationCheck] = []
         checks.extend(AdvancedSecurityVerifier(workspace_path).run_all())
         checks.extend(CodeQualityAnalyzer(workspace_path).run_all())
         checks.extend(PerformanceVerifier(workspace_path).run_all())
         checks.extend(BrowserInteractionVerifier(workspace_path).run_all())
+        checks.extend(PolyglotLanguageVerifier(workspace_path).run_all())
 
         failed = sum(1 for c in checks if c.status == "fail")
         warned = sum(1 for c in checks if c.status == "warn")
