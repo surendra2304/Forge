@@ -10,11 +10,13 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.analytics import analytics_router
+from app.api.improvement import improvement_router
 from app.api.routes import router as api_router
 from app.api.tasks import tasks_router
 from app.api.websocket import ws_router
 from app.core.config import get_settings
 from app.core.logging import get_logger, setup_logging
+from app.dashboard.routes import dashboard_router
 from app.memory.db import db_manager
 
 logger = get_logger("main")
@@ -66,7 +68,10 @@ def create_app() -> FastAPI:
     app.include_router(tasks_router, prefix="/api/v1", tags=["FRIDAY Tasks v1"])
     app.include_router(analytics_router, prefix="/api", tags=["FRIDAY Analytics"])
     app.include_router(analytics_router, prefix="/api/v1", tags=["FRIDAY Analytics v1"])
+    app.include_router(improvement_router, prefix="/api", tags=["Self-Improvement"])
+    app.include_router(improvement_router, prefix="/api/v1", tags=["Self-Improvement v1"])
     app.include_router(ws_router, tags=["WebSockets"])
+    app.include_router(dashboard_router, tags=["Web Dashboard"])
 
     return app
 

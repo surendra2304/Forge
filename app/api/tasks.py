@@ -451,3 +451,30 @@ async def archive_task(
         "archived": True,
         "message": f"Task '{task_id}' has been archived and removed from active task listings.",
     }
+
+
+@tasks_router.get("/{task_id}/friday-context", summary="Get FRIDAY Context & Command Relations")
+async def get_friday_context(
+    task_id: str,
+    store: StateStore = Depends(get_state_store),
+):
+    """Retrieve metadata and command relationship specifically formatted for FRIDAY manager."""
+    task = await store.get_task(task_id)
+    if not task:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Task '{task_id}' not found.")
+
+    return {
+        "task_id": task.id,
+        "goal": task.goal,
+        "source": task.metadata.get("source", "friday"),
+        "priority": task.metadata.get("priority", "normal"),
+        "tags": task.metadata.get("tags", []),
+        "status": task.state.value,
+        "progress_percentage": task.progress_percentage,
+        "command_intent": task.metadata.get("command_intent", "software_synthesis"),
+        "correlation_id": task.metadata.get("correlation_id"),
+        "assigned_at": task.created_at.isoformat() if task.created_at else None,
+        "provenance_summary": task.metadata.get("provenance_summary"),
+        "error_message": task.error_message,
+    }
+
