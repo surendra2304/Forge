@@ -114,12 +114,47 @@ class ArchitectRole(BaseAgent):
         except Exception:
             pass
 
+        # Consult Futuris for build success prediction, duration forecasting, and capacity check
+        futuris_info = ""
+        try:
+            from app.integrations.futuris_client import get_futuris_client
+            from app.monitoring.production_monitor import production_monitor
+            futuris_client = get_futuris_client()
+            assessment = futuris_client.get_full_assessment(goal=goal)
+            production_monitor.record_futuris_consultation()
+            production_monitor.record_prediction_informed_selection()
+            if assessment.capacity_check.should_queue:
+                production_monitor.record_capacity_queue_decision()
+
+            futuris_info = (
+                f"\nFuturis Predictive Intelligence (Assessment: {assessment.prediction_id}):\n"
+                f"• Optimal Template: {assessment.best_template.template_name} (Predicted Success: {assessment.best_template.predicted_pass_probability * 100:.1f}%)\n"
+                f"• Expected Duration: {assessment.duration_forecast.estimated_duration_seconds}s (p50={assessment.duration_forecast.p50_seconds}s, p90={assessment.duration_forecast.p90_seconds}s)\n"
+                f"• Scheduling: {assessment.capacity_check.scheduling_tier} (Exhaustion Probability: {assessment.capacity_check.exhaustion_probability * 100:.1f}%)\n"
+            )
+
+            if hasattr(engine, "store") and engine.store:
+                await engine.store.record_event(
+                    task_id=task_id,
+                    event_type="futuris.assessed",
+                    payload={
+                        "prediction_id": assessment.prediction_id,
+                        "best_template": assessment.best_template.template_name,
+                        "predicted_pass_prob": assessment.best_template.predicted_pass_probability,
+                        "estimated_duration_seconds": assessment.duration_forecast.estimated_duration_seconds,
+                        "scheduling_tier": assessment.capacity_check.scheduling_tier,
+                    },
+                )
+        except Exception:
+            pass
+
         prompt = (
             f"Objective: {goal}\n"
             f"Stage: {node_title}\n"
             f"{workspace_summary}\n"
             f"{consensus_info}\n"
             f"{research_info}\n"
+            f"{futuris_info}\n"
             f"Please synthesize the complete Architecture Specification and File Manifest for this project. "
             f"Define system modules, interfaces, schema definitions, and file layout.\n\n"
             f"Format your output as:\n"

@@ -100,6 +100,17 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("INTELX_API_KEY", "FORGE_INTELX_API_KEY", "intelx_api_key"),
         description="API Key for IntelX Technical Research API authentication",
     )
+    futuris_url: str = Field(
+        default="http://localhost:8003",
+        validation_alias=AliasChoices("FUTURIS_URL", "FORGE_FUTURIS_URL", "futuris_url"),
+        description="Base URL for Futuris predictive capacity & success intelligence service",
+    )
+    futuris_api_key: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("FUTURIS_API_KEY", "FORGE_FUTURIS_API_KEY", "futuris_api_key"),
+        description="API Key for Futuris API authentication",
+    )
+
 
 
     model_config = SettingsConfigDict(

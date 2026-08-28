@@ -39,6 +39,9 @@ class ProductionMonitor:
         self.security_findings_total = 0
         self.intelx_research_queries_total = 0
         self.research_informed_builds_total = 0
+        self.futuris_predictions_consulted_total = 0
+        self.prediction_informed_template_selections_total = 0
+        self.capacity_aware_queuing_decisions_total = 0
         self.start_time = time.time()
 
     def record_request(self, endpoint: str, is_error: bool = False):
@@ -74,6 +77,15 @@ class ProductionMonitor:
 
     def record_research_informed_build(self):
         self.research_informed_builds_total += 1
+
+    def record_futuris_consultation(self):
+        self.futuris_predictions_consulted_total += 1
+
+    def record_prediction_informed_selection(self):
+        self.prediction_informed_template_selections_total += 1
+
+    def record_capacity_queue_decision(self):
+        self.capacity_aware_queuing_decisions_total += 1
 
     def get_system_metrics(self) -> Dict[str, Any]:
         """Collect current host CPU, RAM, and workspace disk metrics."""
@@ -167,6 +179,18 @@ class ProductionMonitor:
             "# HELP forge_research_informed_builds_total Total builds guided by IntelX technical research.",
             "# TYPE forge_research_informed_builds_total counter",
             f"forge_research_informed_builds_total {self.research_informed_builds_total}",
+            "",
+            "# HELP forge_futuris_predictions_consulted_total Total Futuris predictions consulted before build.",
+            "# TYPE forge_futuris_predictions_consulted_total counter",
+            f"forge_futuris_predictions_consulted_total {self.futuris_predictions_consulted_total}",
+            "",
+            "# HELP forge_prediction_informed_template_selections_total Total template selections optimized by Futuris success predictions.",
+            "# TYPE forge_prediction_informed_template_selections_total counter",
+            f"forge_prediction_informed_template_selections_total {self.prediction_informed_template_selections_total}",
+            "",
+            "# HELP forge_capacity_aware_queuing_decisions_total Total task queueing decisions based on Futuris capacity exhaustion forecasts.",
+            "# TYPE forge_capacity_aware_queuing_decisions_total counter",
+            f"forge_capacity_aware_queuing_decisions_total {self.capacity_aware_queuing_decisions_total}",
             "",
             "# HELP forge_system_cpu_percent Host CPU utilization percentage.",
             "# TYPE forge_system_cpu_percent gauge",
