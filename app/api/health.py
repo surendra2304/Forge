@@ -34,9 +34,11 @@ class DiagnosticResponse(BaseModel):
     environment: str = "development"
     database: Dict[str, Any]
     ai_universe: Dict[str, Any]
+    intelx: Dict[str, Any] = Field(default_factory=dict)
     system_metrics: Dict[str, Any]
     security_scanner: Dict[str, Any] = Field(default_factory=dict)
     alerts: AlertStatus
+
 
 
 
@@ -139,6 +141,11 @@ async def health_detailed():
         ai_universe={
             "healthy": aiu_ok,
             "url": settings.ai_universe_url,
+        },
+        intelx={
+            "url": getattr(settings, "intelx_url", "http://localhost:8002"),
+            "research_queries_total": production_monitor.intelx_research_queries_total,
+            "research_informed_builds_total": production_monitor.research_informed_builds_total,
         },
         system_metrics=sys_m,
         security_scanner={

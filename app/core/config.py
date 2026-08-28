@@ -90,6 +90,17 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("AI_UNIVERSE_API_KEY", "ai_universe_api_key"),
         description="API Key for AI Universe REST API authentication",
     )
+    intelx_url: str = Field(
+        default="http://localhost:8002",
+        validation_alias=AliasChoices("INTELX_URL", "FORGE_INTELX_URL", "intelx_url"),
+        description="Base URL for IntelX technical research intelligence service",
+    )
+    intelx_api_key: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("INTELX_API_KEY", "FORGE_INTELX_API_KEY", "intelx_api_key"),
+        description="API Key for IntelX Technical Research API authentication",
+    )
+
 
     model_config = SettingsConfigDict(
         env_file=".env",

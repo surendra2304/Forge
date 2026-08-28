@@ -37,6 +37,8 @@ class ProductionMonitor:
         self.security_scans_passed = 0
         self.security_scans_blocked = 0
         self.security_findings_total = 0
+        self.intelx_research_queries_total = 0
+        self.research_informed_builds_total = 0
         self.start_time = time.time()
 
     def record_request(self, endpoint: str, is_error: bool = False):
@@ -66,6 +68,12 @@ class ProductionMonitor:
             self.security_scans_passed += 1
         if blocked:
             self.security_scans_blocked += 1
+
+    def record_intelx_query(self):
+        self.intelx_research_queries_total += 1
+
+    def record_research_informed_build(self):
+        self.research_informed_builds_total += 1
 
     def get_system_metrics(self) -> Dict[str, Any]:
         """Collect current host CPU, RAM, and workspace disk metrics."""
@@ -151,6 +159,14 @@ class ProductionMonitor:
             "# HELP forge_security_findings_total Total security vulnerabilities identified across scans.",
             "# TYPE forge_security_findings_total counter",
             f"forge_security_findings_total {self.security_findings_total}",
+            "",
+            "# HELP forge_intelx_research_queries_total Total IntelX technical research queries performed.",
+            "# TYPE forge_intelx_research_queries_total counter",
+            f"forge_intelx_research_queries_total {self.intelx_research_queries_total}",
+            "",
+            "# HELP forge_research_informed_builds_total Total builds guided by IntelX technical research.",
+            "# TYPE forge_research_informed_builds_total counter",
+            f"forge_research_informed_builds_total {self.research_informed_builds_total}",
             "",
             "# HELP forge_system_cpu_percent Host CPU utilization percentage.",
             "# TYPE forge_system_cpu_percent gauge",

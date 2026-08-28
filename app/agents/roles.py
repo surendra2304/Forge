@@ -90,11 +90,36 @@ class ArchitectRole(BaseAgent):
         except Exception:
             pass
 
+        # Query IntelX for technical research on unfamiliar or complex architectures
+        research_info = ""
+        try:
+            from app.integrations.intelx_client import get_intelx_client
+            from app.monitoring.production_monitor import production_monitor
+            intelx_client = get_intelx_client()
+            unfamiliar = intelx_client.detect_unfamiliar_technologies(goal)
+            if unfamiliar:
+                research_res = []
+                for tech in unfamiliar:
+                    res = await intelx_client.research_technology(tech, goal_context=goal)
+                    research_res.append(res)
+                    production_monitor.record_intelx_query()
+                production_monitor.record_research_informed_build()
+                research_info = "\n" + intelx_client.format_research_context_for_prompt(research_res) + "\n"
+                if hasattr(engine, "store") and engine.store:
+                    await engine.store.record_event(
+                        task_id=task_id,
+                        event_type="intelx.research_applied",
+                        payload={"technologies": unfamiliar, "stage": "architect"},
+                    )
+        except Exception:
+            pass
+
         prompt = (
             f"Objective: {goal}\n"
             f"Stage: {node_title}\n"
             f"{workspace_summary}\n"
             f"{consensus_info}\n"
+            f"{research_info}\n"
             f"Please synthesize the complete Architecture Specification and File Manifest for this project. "
             f"Define system modules, interfaces, schema definitions, and file layout.\n\n"
             f"Format your output as:\n"
@@ -230,6 +255,24 @@ class DeveloperRole(BaseAgent):
         fallback_files: list[str] = []
         last_run_id = None
 
+        # Fetch IntelX technical research for unfamiliar technologies
+        research_context_str = ""
+        try:
+            from app.integrations.intelx_client import get_intelx_client
+            from app.monitoring.production_monitor import production_monitor
+            intelx_client = get_intelx_client()
+            unfamiliar = intelx_client.detect_unfamiliar_technologies(goal or node_title)
+            if unfamiliar:
+                res_list = []
+                for tech in unfamiliar:
+                    res = await intelx_client.research_technology(tech, goal_context=goal or node_title)
+                    res_list.append(res)
+                    production_monitor.record_intelx_query()
+                production_monitor.record_research_informed_build()
+                research_context_str = intelx_client.format_research_context_for_prompt(res_list)
+        except Exception:
+            pass
+
         # 2. Iterate through each file in File Manifest and synthesize code
         for filename in file_manifest:
             if not filename or not isinstance(filename, str):
@@ -241,6 +284,7 @@ class DeveloperRole(BaseAgent):
                 ai_client = get_ai_universe_client()
                 ask_prompt = (
                     f"Write the complete code for {filename} based on the overall architecture: {goal or node_title}.\n"
+                    f"{research_context_str}\n\n"
                     f"Security requirements: Input validation on all user inputs, parameterized SQL (never string concatenation), "
                     f"clean error handling without stack trace leaks, secure default configurations, authentication checks on protected endpoints, "
                     f"and CSRF / secure headers where applicable. Return ONLY the raw code."
