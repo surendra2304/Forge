@@ -283,12 +283,48 @@ class AdvancedVerificationEngine:
 
     @classmethod
     def run_full_battery(cls, workspace_path: Path) -> VerificationManifest:
-        from app.verification.quality_analyzer import CodeQualityAnalyzer
-        from app.verification.performance import PerformanceVerifier
         from app.verification.browser_interactions import BrowserInteractionVerifier
         from app.verification.language_verifiers import PolyglotLanguageVerifier
+        from app.verification.performance import PerformanceVerifier
+        from app.verification.quality_analyzer import CodeQualityAnalyzer
+        from app.verification.security_scanner import OutputSecurityScanner, SecuritySeverity
+
+        # 1. Run Pre-Verification Output Security Scanner
+        sec_scanner = OutputSecurityScanner(workspace_path)
+        sec_report = sec_scanner.scan_all()
 
         checks: List[VerificationCheck] = []
+
+        # Convert detailed scanner findings into VerificationChecks
+        if sec_report.findings:
+            for finding in sec_report.findings:
+                status = "fail" if finding.severity in [SecuritySeverity.CRITICAL, SecuritySeverity.HIGH] else "warn"
+                checks.append(
+                    VerificationCheck(
+                        name=f"[{finding.severity.value}] {finding.check_name}",
+                        category="security",
+                        status=status,
+                        evidence={
+                            "file": finding.file_path,
+                            "line": finding.line_number,
+                            "snippet": finding.snippet,
+                            "description": finding.description,
+                            "cve_id": finding.cve_id,
+                        },
+                        fix_suggestions=[finding.fix_suggestion],
+                    )
+                )
+        else:
+            checks.append(
+                VerificationCheck(
+                    name="Pre-Verification Output Security Scanner",
+                    category="security",
+                    status="pass",
+                    evidence={"scanned_files": sec_report.scanned_files_count, "vulnerabilities_found": 0},
+                )
+            )
+
+        # 2. Run remaining multi-vector batteries
         checks.extend(AdvancedSecurityVerifier(workspace_path).run_all())
         checks.extend(CodeQualityAnalyzer(workspace_path).run_all())
         checks.extend(PerformanceVerifier(workspace_path).run_all())

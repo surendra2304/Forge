@@ -239,7 +239,12 @@ class DeveloperRole(BaseAgent):
             try:
                 from app.integrations.ai_universe_client import get_ai_universe_client
                 ai_client = get_ai_universe_client()
-                ask_prompt = f"Write the complete code for {filename} based on the overall architecture: {goal or node_title}. Return ONLY the raw code."
+                ask_prompt = (
+                    f"Write the complete code for {filename} based on the overall architecture: {goal or node_title}.\n"
+                    f"Security requirements: Input validation on all user inputs, parameterized SQL (never string concatenation), "
+                    f"clean error handling without stack trace leaks, secure default configurations, authentication checks on protected endpoints, "
+                    f"and CSRF / secure headers where applicable. Return ONLY the raw code."
+                )
                 ai_res = await ai_client.ask(question=ask_prompt, mode="auto")
 
                 if ai_res and ai_res.confidence >= 0.70 and ai_res.answer and ai_res.answer.strip():

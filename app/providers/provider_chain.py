@@ -52,8 +52,10 @@ class ProviderChain:
         # --- Tier 1: AI Universe ---
         try:
             prompt = (
-                f"Write the complete code for {filename} based on the overall architecture: {goal}. "
-                f"Return ONLY the raw code."
+                f"Write the complete code for {filename} based on the overall architecture: {goal}.\n"
+                f"Security requirements: Input validation on user inputs, parameterized SQL (never string concatenation), "
+                f"clean error handling without stack trace leaks, secure default configurations, authentication checks on protected endpoints, "
+                f"and CSRF / secure headers where applicable. Return ONLY the raw code."
             )
             ai_res = await self.primary_client.ask(question=prompt, mode="auto")
             if ai_res and ai_res.confidence >= 0.70 and ai_res.answer and ai_res.answer.strip():

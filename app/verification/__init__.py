@@ -26,6 +26,13 @@ from app.verification.evidence import (
 from app.verification.language_verifiers import PolyglotLanguageVerifier
 from app.verification.performance import PerformanceVerifier
 from app.verification.quality_analyzer import CodeQualityAnalyzer
+from app.verification.security_scanner import (
+    CVE_VULNERABILITY_DB,
+    OutputSecurityScanner,
+    SecurityFinding,
+    SecurityScanReport,
+    SecuritySeverity,
+)
 
 __all__ = [
     "AdvancedSecurityVerifier",
@@ -34,12 +41,17 @@ __all__ = [
     "BrowserChecker",
     "BrowserInteractionVerifier",
     "BuildChecker",
+    "CVE_VULNERABILITY_DB",
     "CheckCategory",
     "CodeQualityAnalyzer",
     "LintChecker",
+    "OutputSecurityScanner",
     "PerformanceVerifier",
     "PolyglotLanguageVerifier",
     "RuntimeChecker",
+    "SecurityFinding",
+    "SecurityScanReport",
+    "SecuritySeverity",
     "TestChecker",
     "VerificationCheck",
     "VerificationEngine",

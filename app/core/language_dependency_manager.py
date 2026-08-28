@@ -104,6 +104,12 @@ class LanguageDependencyManager:
                 warnings=[f"Malformed package.json: {e}"],
             )
 
+    def remediate_vulnerabilities(self) -> List[str]:
+        """Scan and automatically upgrade vulnerable dependencies to safe patched versions."""
+        from app.verification.security_scanner import OutputSecurityScanner
+        scanner = OutputSecurityScanner(self.workspace_path)
+        return scanner.remediate_vulnerable_dependencies()
+
     def generate_lockfile(self, language: str) -> Optional[Path]:
         """Generate simulated deterministic lockfile for dependency reproducibility."""
         if language == "python":
@@ -132,3 +138,4 @@ class LanguageDependencyManager:
             return lock_path
 
         return None
+

@@ -88,7 +88,7 @@ class LanguagePromptRouter:
         filename: str,
         purpose: str,
     ) -> str:
-        """Construct specialized prompt with framework idioms and conventions."""
+        """Construct specialized prompt with framework idioms and mandatory security-first instructions."""
         lang_name = language.value.capitalize()
         framework_name = framework.value.capitalize()
 
@@ -97,6 +97,13 @@ class LanguagePromptRouter:
             f"following modern {framework_name} best practices and design patterns.\n"
             f"Purpose: {purpose}\n"
             f"Language: {lang_name}\n"
-            f"Framework: {framework_name}\n"
+            f"Framework: {framework_name}\n\n"
+            f"MANDATORY SECURITY REQUIREMENTS:\n"
+            f"1. Input Validation: Validate and sanitize all user-facing inputs and parameters (e.g. Pydantic schemas, regex, type constraints).\n"
+            f"2. Injection Defense: Strictly use parameterized queries or ORM bindings for any database access (NEVER string concatenation or f-strings in SQL).\n"
+            f"3. Error Handling: Catch exceptions cleanly without leaking internal stack traces or database schema details to end users.\n"
+            f"4. Secure Defaults: Enforce least privilege, secure CORS configuration, and no hardcoded plaintext passwords, keys, or tokens.\n"
+            f"5. Authentication & Authorization: Include security dependencies / guards on all state-changing or protected routes.\n"
+            f"6. CSRF & Secure Headers: Apply CSRF protections on state-changing endpoints and set secure HTTP headers (X-Content-Type-Options, X-Frame-Options, CSP basics) where applicable.\n"
             f"Ensure strict syntax adherence, robust error handling, type definitions, and modular structure."
         )
