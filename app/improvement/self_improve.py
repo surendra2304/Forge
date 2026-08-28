@@ -98,6 +98,21 @@ class SelfImprovementEngine:
             self.proposals[prop.id] = prop
             new_proposals.append(prop)
 
+        # Formulate proposal for security scanner violations if failures detected
+        if len(clusters.get("security_violations", [])) >= 1:
+            t_ids = [t.id for t in clusters["security_violations"]]
+            prop = ImprovementProposal(
+                title="Update API & Starter Templates with Input Validation & Parameterized Queries",
+                description=f"{len(t_ids)} tasks failed output security scans due to missing input validation or unparameterized queries. Update starter templates with validation boilerplate.",
+                root_cause_cluster="security_violations",
+                affected_component="templates",
+                proposed_remediation="Inject Pydantic schema validation and parameterized database bindings into all base project templates.",
+                evidence_task_ids=t_ids,
+            )
+            self.proposals[prop.id] = prop
+            new_proposals.append(prop)
+
+
         return SelfImprovementReport(
             analysis_period_days=days,
             total_tasks_analyzed=len(recent_tasks),

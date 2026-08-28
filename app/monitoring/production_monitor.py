@@ -33,6 +33,10 @@ class ProductionMonitor:
         self.task_failures = 0
         self.verification_passes = 0
         self.verification_fails = 0
+        self.security_scans_total = 0
+        self.security_scans_passed = 0
+        self.security_scans_blocked = 0
+        self.security_findings_total = 0
         self.start_time = time.time()
 
     def record_request(self, endpoint: str, is_error: bool = False):
@@ -54,6 +58,14 @@ class ProductionMonitor:
             self.verification_passes += 1
         else:
             self.verification_fails += 1
+
+    def record_security_scan(self, passed: bool, blocked: bool, findings_count: int = 0):
+        self.security_scans_total += 1
+        self.security_findings_total += findings_count
+        if passed and not blocked:
+            self.security_scans_passed += 1
+        if blocked:
+            self.security_scans_blocked += 1
 
     def get_system_metrics(self) -> Dict[str, Any]:
         """Collect current host CPU, RAM, and workspace disk metrics."""
@@ -130,6 +142,15 @@ class ProductionMonitor:
             "# TYPE forge_verifications_total counter",
             f'forge_verifications_total{{result="passed"}} {self.verification_passes}',
             f'forge_verifications_total{{result="failed"}} {self.verification_fails}',
+            "",
+            "# HELP forge_security_scans_total Total pre-verification output security scans.",
+            "# TYPE forge_security_scans_total counter",
+            f'forge_security_scans_total{{result="passed"}} {self.security_scans_passed}',
+            f'forge_security_scans_total{{result="blocked"}} {self.security_scans_blocked}',
+            "",
+            "# HELP forge_security_findings_total Total security vulnerabilities identified across scans.",
+            "# TYPE forge_security_findings_total counter",
+            f"forge_security_findings_total {self.security_findings_total}",
             "",
             "# HELP forge_system_cpu_percent Host CPU utilization percentage.",
             "# TYPE forge_system_cpu_percent gauge",

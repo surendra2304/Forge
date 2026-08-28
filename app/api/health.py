@@ -35,7 +35,9 @@ class DiagnosticResponse(BaseModel):
     database: Dict[str, Any]
     ai_universe: Dict[str, Any]
     system_metrics: Dict[str, Any]
+    security_scanner: Dict[str, Any] = Field(default_factory=dict)
     alerts: AlertStatus
+
 
 
 @health_router.get("/health", response_model=LivenessResponse, summary="Liveness Probe")
@@ -123,6 +125,8 @@ async def health_detailed():
     if not db_ok:
         overall_status = "unhealthy"
 
+    from app.verification.security_scanner import CVE_VULNERABILITY_DB
+
     return DiagnosticResponse(
         status=overall_status,
         version=settings.app_version,
@@ -137,8 +141,17 @@ async def health_detailed():
             "url": settings.ai_universe_url,
         },
         system_metrics=sys_m,
+        security_scanner={
+            "active": True,
+            "cve_database_entries": len(CVE_VULNERABILITY_DB),
+            "scans_total": production_monitor.security_scans_total,
+            "scans_passed": production_monitor.security_scans_passed,
+            "scans_blocked": production_monitor.security_scans_blocked,
+            "findings_detected_total": production_monitor.security_findings_total,
+        },
         alerts=alerts,
     )
+
 
 
 @health_router.get("/metrics", summary="Prometheus Metrics Exporter")
