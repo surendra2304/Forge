@@ -38,6 +38,8 @@ async def handle_build(
     max_budget: float,
     push_to_github: bool = False,
     github_repo: str | None = None,
+    serve: bool = False,
+    port: int = 5000,
 ):
     """Executes full autonomous software engineering loop."""
     console.print(Panel.fit(f"[bold cyan]FORGE Engine[/bold cyan] -- Autonomous Software Synthesis\n[bold yellow]Goal:[/bold yellow] {goal}", title="Project FORGE"))
@@ -158,8 +160,76 @@ async def handle_build(
     table.add_row("Workspace Root", task.workspace_path)
     checks_color = "red" if not report.all_passed else "green"
     table.add_row("Checks Passed", f"[{checks_color}]{report.passed_checks}/{report.total_checks}[/{checks_color}]")
-
     console.print(table)
+
+    if serve:
+        await handle_serve(task_id=task_id, port=port, open_browser=True)
+
+
+async def handle_serve(task_id: str, port: int = 5000, open_browser: bool = True):
+    """Serve a project workspace on localhost with auto-discovery of entrypoint."""
+    import http.server
+    import os
+    import socketserver
+    import webbrowser
+
+    await db_manager.init_db()
+    if task_id == "latest":
+        store = StateStore(db_manager)
+        tasks = await store.list_tasks(limit=1)
+        if not tasks:
+            console.print("[red]Error:[/red] No tasks found in database.")
+            return
+        task_id = tasks[0].id
+
+    paths = workspace_manager.get_workspace_paths(task_id)
+    if not paths or not paths.project.exists():
+        console.print(f"[red]Error:[/red] Workspace project directory for '{task_id}' not found.")
+        return
+
+    project_dir = str(paths.project)
+    has_html = (paths.project / "index.html").exists() or list(paths.project.glob("**/*.html"))
+    has_fastapi = (paths.project / "main.py").exists() and "fastapi" in (paths.project / "main.py").read_text(encoding="utf-8", errors="ignore").lower()
+
+    console.print()
+    console.print(Panel.fit(
+        f"[bold green]Starting Localhost Server for Task:[/bold green] [cyan]{task_id}[/cyan]\n"
+        f"[bold yellow]Directory:[/bold yellow] {project_dir}\n"
+        f"[bold magenta]URL:[/bold magenta] [underline blue]http://localhost:{port}[/underline blue]\n\n"
+        f"[dim]Press Ctrl+C to stop the server[/dim]",
+        title="FORGE Local Deployment"
+    ))
+
+    if open_browser:
+        try:
+            webbrowser.open(f"http://localhost:{port}")
+        except Exception:
+            pass
+
+    if has_fastapi:
+        # Launch Uvicorn server for FastAPI backend
+        import uvicorn
+        import sys
+        sys.path.insert(0, project_dir)
+        os.chdir(project_dir)
+        try:
+            uvicorn.run("main:app", host="127.0.0.1", port=port, log_level="info")
+        except Exception as e:
+            console.print(f"[yellow]FastAPI uvicorn startup failed ({e}). Falling back to static HTTP server...[/yellow]")
+            has_fastapi = False
+
+    if not has_fastapi:
+        # Standard HTTP static web server
+        os.chdir(project_dir)
+        handler = http.server.SimpleHTTPRequestHandler
+        try:
+            with socketserver.TCPServer(("", port), handler) as httpd:
+                console.print(f"[bold green][OK] Serving live on http://localhost:{port}[/bold green]")
+                httpd.serve_forever()
+        except KeyboardInterrupt:
+            console.print("\n[yellow]Server stopped by user.[/yellow]")
+        except Exception as e:
+            console.print(f"[red]Error starting server on port {port}:[/red] {e}")
 
 
 async def handle_status(task_id: str):
@@ -293,6 +363,14 @@ def main():
     build_parser.add_argument("--budget", "-b", type=float, default=10.0, help="Max budget in USD")
     build_parser.add_argument("--push-to-github", "-p", action="store_true", default=False, help="Push delivery branch to GitHub and open a Pull Request")
     build_parser.add_argument("--github-repo", "--repo", type=str, default=None, help="Target GitHub repository (e.g. owner/repo)")
+    build_parser.add_argument("--serve", "-s", action="store_true", default=False, help="Automatically serve the generated project on localhost after build")
+    build_parser.add_argument("--port", type=int, default=5000, help="Localhost port to serve on (default: 5000)")
+
+    # forge serve
+    serve_parser = subparsers.add_parser("serve", help="Serve a built project workspace on localhost")
+    serve_parser.add_argument("task_id", type=str, help="Task ID or latest")
+    serve_parser.add_argument("--port", type=int, default=5000, help="Port to bind server (default: 5000)")
+    serve_parser.add_argument("--open-browser", "-o", action="store_true", default=True, help="Automatically open browser")
 
     # forge status
     status_parser = subparsers.add_parser("status", help="Inspect task status and progress")
@@ -336,8 +414,12 @@ def main():
                 max_budget=args.budget,
                 push_to_github=args.push_to_github,
                 github_repo=args.github_repo,
+                serve=args.serve,
+                port=args.port,
             )
         )
+    elif args.command == "serve":
+        asyncio.run(handle_serve(args.task_id, args.port, args.open_browser))
     elif args.command == "status":
         asyncio.run(handle_status(args.task_id))
     elif args.command == "logs":
@@ -354,3 +436,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

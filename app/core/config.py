@@ -81,34 +81,44 @@ class Settings(BaseSettings):
         description="Default GitHub repository (e.g. owner/repo)",
     )
     ai_universe_url: str = Field(
-        default="http://localhost:8000",
-        validation_alias=AliasChoices("AI_UNIVERSE_URL", "ai_universe_url"),
-        description="Base URL for external AI Universe reasoning engine",
+        default="https://inference-3i2b.onrender.com",
+        validation_alias=AliasChoices("INFERENCE_URL", "AI_UNIVERSE_URL", "ai_universe_url"),
+        description="Base URL for external Inference / AI Universe reasoning engine",
     )
     ai_universe_api_key: str | None = Field(
-        default=None,
-        validation_alias=AliasChoices("AI_UNIVERSE_API_KEY", "ai_universe_api_key"),
-        description="API Key for AI Universe REST API authentication",
+        default="inference_api",
+        validation_alias=AliasChoices("INFERENCE_API_KEY", "AI_UNIVERSE_API_KEY", "ai_universe_api_key"),
+        description="API Key for Inference REST API authentication",
     )
     intelx_url: str = Field(
-        default="http://localhost:8002",
+        default="https://intelx-3cz1.onrender.com",
         validation_alias=AliasChoices("INTELX_URL", "FORGE_INTELX_URL", "intelx_url"),
         description="Base URL for IntelX technical research intelligence service",
     )
     intelx_api_key: str | None = Field(
-        default=None,
+        default="intelx_api",
         validation_alias=AliasChoices("INTELX_API_KEY", "FORGE_INTELX_API_KEY", "intelx_api_key"),
         description="API Key for IntelX Technical Research API authentication",
     )
     futuris_url: str = Field(
-        default="http://localhost:8003",
+        default="https://futuris-x4f4.onrender.com",
         validation_alias=AliasChoices("FUTURIS_URL", "FORGE_FUTURIS_URL", "futuris_url"),
         description="Base URL for Futuris predictive capacity & success intelligence service",
     )
     futuris_api_key: str | None = Field(
-        default=None,
+        default="futuris_api",
         validation_alias=AliasChoices("FUTURIS_API_KEY", "FORGE_FUTURIS_API_KEY", "futuris_api_key"),
         description="API Key for Futuris API authentication",
+    )
+    cortex_url: str = Field(
+        default="https://cortex-qifr.onrender.com",
+        validation_alias=AliasChoices("CORTEX_URL", "NEXUS_URL", "cortex_url"),
+        description="Base URL for Cortex Web Operations engine",
+    )
+    cortex_api_key: str | None = Field(
+        default="cortex_api",
+        validation_alias=AliasChoices("CORTEX_API_KEY", "NEXUS_API_KEY", "cortex_api_key"),
+        description="API Key for Cortex API authentication",
     )
 
 
