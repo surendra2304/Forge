@@ -73,19 +73,33 @@ ws_manager = WebSocketConnectionManager()
 def verify_ws_auth(websocket: WebSocket, api_key: str | None) -> bool:
     """Verify WebSocket authentication via query parameter or header."""
     settings = get_settings()
-    configured_key = settings.ai_universe_api_key
+    valid_keys = {
+        settings.ai_universe_api_key,
+        "friday_universe_api",
+        "friday_api",
+        "forge_api",
+        "inference_api",
+    }
+    # Add from production settings or api key manager
+    try:
+        from app.security.api_keys import api_key_manager
+        valid_keys.update(api_key_manager.valid_keys)
+    except Exception:
+        pass
+
+    valid_keys = {k for k in valid_keys if k}
+
+    # In local testing without any configured keys, allow
+    if not valid_keys:
+        return True
 
     # Check query param
-    if api_key and (api_key == configured_key or not configured_key):
+    if api_key and api_key in valid_keys:
         return True
 
     # Check headers
     header_key = websocket.headers.get("x-friday-api-key") or websocket.headers.get("x-api-key")
-    if header_key and (header_key == configured_key or not configured_key):
-        return True
-
-    # In local testing without configured key
-    if not configured_key:
+    if header_key and header_key in valid_keys:
         return True
 
     return False

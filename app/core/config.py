@@ -12,9 +12,9 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     # App Information
     app_name: str = Field(default="Project FORGE", description="Application display name")
-    app_version: str = Field(default="0.1.0", description="Application semantic version")
+    app_version: str = Field(default="2.0.0", description="Application semantic version")
     debug: bool = Field(default=True, description="Enable debug mode")
-    env: str = Field(default="development", description="Environment stage")
+    env: str = Field(default="production", description="Environment stage")
 
     # Network & Server
     host: str = Field(default="0.0.0.0", description="Server bind host")
