@@ -345,6 +345,14 @@ class DeveloperRole(BaseAgent):
                         if std not in enriched_requirements:
                             enriched_requirements.append(std)
 
+                # Collect previously written files in this build so HTML, CSS, and JS align 100%
+                sibling_files: dict[str, str] = {}
+                for w_file in written:
+                    try:
+                        sibling_files[w_file] = engine.fs.read_file(task_id, w_file, role=self.role_name)[:2500]
+                    except Exception:
+                        pass
+
                 try:
                     ai_res = await ai_client.generate_code(
                         filename=filename,
@@ -355,6 +363,7 @@ class DeveloperRole(BaseAgent):
                             "project_goal": goal,
                             "research_context": research_context_str,
                             "architecture_spec": "Modern, highly interactive single-page web app with style.css and app.js linked in index.html.",
+                            "related_files": sibling_files,
                         },
                     )
                 except Exception as e_gen:
