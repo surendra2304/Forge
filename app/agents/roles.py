@@ -331,22 +331,39 @@ class DeveloperRole(BaseAgent):
                 elif ext in ["md", "markdown"]:
                     file_type = "markdown"
 
+                # Enrich requirements for web assets to ensure world-class, dynamic, and interactive UI
+                enriched_requirements = list(context.get("requirements", []))
+                if file_type in ["html", "css", "js"]:
+                    web_standards = [
+                        "World-class, modern aesthetic with glassmorphism, micro-interactions, and vibrant gradients",
+                        "Fully dynamic interactivity: live category filter, interactive project modal preview, animated typing/particle hero, active scroll spy navigation",
+                        "Smooth CSS transitions, keyframe animations, responsive mobile drawer menu, and persistent dark/light theme switch",
+                        "Zero broken external asset dependencies (include embedded inline SVG icons and embedded mock project data in JS)",
+                        "Clean, linked CSS and JS files with matching selectors and IDs (index.html loads style.css and app.js)"
+                    ]
+                    for std in web_standards:
+                        if std not in enriched_requirements:
+                            enriched_requirements.append(std)
+
                 try:
                     ai_res = await ai_client.generate_code(
                         filename=filename,
                         goal=goal or node_title,
                         file_type=file_type,
-                        requirements=context.get("requirements", []),
-                        context={"project_goal": goal, "research_context": research_context_str},
+                        requirements=enriched_requirements,
+                        context={
+                            "project_goal": goal,
+                            "research_context": research_context_str,
+                            "architecture_spec": "Modern, highly interactive single-page web app with style.css and app.js linked in index.html.",
+                        },
                     )
                 except Exception as e_gen:
                     logger.debug(f"Direct generate-code endpoint failed ({e_gen}), trying ask endpoint...")
                     ask_prompt = (
-                        f"Write the complete code for {filename} based on the overall architecture: {goal or node_title}.\n"
+                        f"Write complete, production-grade, highly interactive code for {filename} for: {goal or node_title}.\n"
+                        f"Requirements:\n" + "\n".join([f"- {r}" for r in enriched_requirements]) + "\n\n"
                         f"{research_context_str}\n\n"
-                        f"Security requirements: Input validation on all user inputs, parameterized SQL (never string concatenation), "
-                        f"clean error handling without stack trace leaks, secure default configurations, authentication checks on protected endpoints, "
-                        f"and CSRF / secure headers where applicable. Return ONLY the raw code."
+                        f"Design requirements: Modern polished UI, CSS variables, glassmorphic card effects, smooth animations, interactive elements, no placeholder images or broken links. Return ONLY the raw code."
                     )
                     ai_res = await ai_client.ask(question=ask_prompt, mode="auto")
 
