@@ -2,11 +2,11 @@
 Production Monitoring, System Telemetry, Alerting, and Prometheus Metrics Exporter for Project FORGE.
 """
 
-from collections import defaultdict
-import os
 import shutil
 import time
-from typing import Any, Dict, List
+from collections import defaultdict
+from typing import Any
+
 import psutil
 from pydantic import BaseModel, Field
 
@@ -18,7 +18,7 @@ logger = get_logger("monitoring.production")
 
 class AlertStatus(BaseModel):
     has_active_alerts: bool = False
-    alerts: List[str] = Field(default_factory=list)
+    alerts: list[str] = Field(default_factory=list)
 
 
 class ProductionMonitor:
@@ -27,7 +27,7 @@ class ProductionMonitor:
     def __init__(self):
         self.total_requests = 0
         self.total_errors = 0
-        self.endpoint_requests: Dict[str, int] = defaultdict(int)
+        self.endpoint_requests: dict[str, int] = defaultdict(int)
         self.task_submissions = 0
         self.task_completions = 0
         self.task_failures = 0
@@ -87,7 +87,7 @@ class ProductionMonitor:
     def record_capacity_queue_decision(self):
         self.capacity_aware_queuing_decisions_total += 1
 
-    def get_system_metrics(self) -> Dict[str, Any]:
+    def get_system_metrics(self) -> dict[str, Any]:
         """Collect current host CPU, RAM, and workspace disk metrics."""
         settings = get_settings()
         cpu_pct = psutil.cpu_percent(interval=None)

@@ -2,7 +2,6 @@
 Unit tests for Continuous Template Evolution Engine.
 """
 
-import pytest
 from app.improvement.template_evolution import TemplateEvolutionEngine
 
 

@@ -74,7 +74,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
         .badge-running { background: rgba(59, 130, 246, 0.2); color: var(--primary); }
         .badge-failed { background: rgba(239, 68, 68, 0.2); color: var(--danger); }
         .badge-pending { background: rgba(245, 158, 11, 0.2); color: var(--warning); }
-        
+
         .timeline { display: flex; gap: 0.5rem; margin-bottom: 1rem; overflow-x: auto; padding-bottom: 0.5rem; }
         .stage-box {
             padding: 0.5rem 0.75rem;
@@ -87,7 +87,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
         }
         .stage-completed { border-color: var(--success); color: var(--success); }
         .stage-running { border-color: var(--primary); color: var(--primary); }
-        
+
         .log-box {
             background: #000;
             color: #10b981;

@@ -3,11 +3,12 @@ Unit tests for Pipeline Optimizer, Cache, and Parallel File Synthesis.
 """
 
 import asyncio
+
 import pytest
+
 from app.core.pipeline_optimizer import (
     PipelineOptimizer,
     SynthesisCache,
-    pipeline_optimizer,
 )
 
 

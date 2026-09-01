@@ -4,9 +4,9 @@ Captures compliance and security events for sensitive operations with key redact
 """
 
 from datetime import UTC, datetime
-import json
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
+
 from pydantic import BaseModel, Field
 
 from app.core.config import get_settings
@@ -19,10 +19,10 @@ class AuditEvent(BaseModel):
     """Structured audit log entry for critical system events."""
     event_type: str  # task_submitted, task_cancelled, proposal_applied, backup_created
     timestamp: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
-    task_id: Optional[str] = None
-    client_key_id: Optional[str] = None
-    details: Dict[str, Any] = Field(default_factory=dict)
-    ip_address: Optional[str] = None
+    task_id: str | None = None
+    client_key_id: str | None = None
+    details: dict[str, Any] = Field(default_factory=dict)
+    ip_address: str | None = None
 
 
 class AuditLogger:
@@ -40,10 +40,10 @@ class AuditLogger:
     def record_event(
         self,
         event_type: str,
-        task_id: Optional[str] = None,
-        raw_key: Optional[str] = None,
-        details: Optional[Dict[str, Any]] = None,
-        ip_address: Optional[str] = None,
+        task_id: str | None = None,
+        raw_key: str | None = None,
+        details: dict[str, Any] | None = None,
+        ip_address: str | None = None,
     ) -> AuditEvent:
         """Record an audit event to disk with API key identifier redaction."""
         key_id = None

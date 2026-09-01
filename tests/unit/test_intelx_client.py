@@ -5,13 +5,12 @@ Unit Tests for IntelX Technical Research Integration and Research-Backed Templat
 import pytest
 
 from app.improvement.research_templates import ResearchBackedTemplatesManager
-from app.improvement.self_improve import ImprovementProposal, ProposalStatus
+from app.improvement.self_improve import ProposalStatus
 from app.improvement.template_evolution import TemplateEvolutionEngine
 from app.integrations.intelx_client import (
     IntelXResearchFinding,
     IntelXResearchResult,
     IntelXTechClient,
-    get_intelx_client,
 )
 from app.monitoring.production_monitor import ProductionMonitor
 

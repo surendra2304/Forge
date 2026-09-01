@@ -3,18 +3,14 @@ Multi-Project Concurrency, Priority Queuing, and Workspace Retention Manager for
 Supports priority task queuing, preemption, concurrency gating, and workspace lifecycle retention.
 """
 
-import asyncio
-from datetime import UTC, datetime, timedelta
 import heapq
-from pathlib import Path
 import shutil
-from typing import Any, Dict, List, Optional
+from datetime import UTC, datetime, timedelta
+
 from pydantic import BaseModel, Field
 
-from app.core.config import Settings, get_settings
 from app.core.logging import get_logger
 from app.core.workspace import WorkspaceManager, workspace_manager
-from app.memory.models import TaskEntity, TaskState
 
 logger = get_logger("core.multi_project")
 
@@ -53,7 +49,7 @@ class MultiProjectManager:
         task_timeout_seconds: float = 1800.0,
         retention_days_completed: int = 7,
         retention_hours_failed: int = 24,
-        wm: Optional[WorkspaceManager] = None,
+        wm: WorkspaceManager | None = None,
     ):
         self.max_concurrent_tasks = max_concurrent_tasks
         self.task_timeout_seconds = task_timeout_seconds
@@ -61,8 +57,8 @@ class MultiProjectManager:
         self.retention_hours_failed = retention_hours_failed
         self.wm = wm or workspace_manager
 
-        self.queue: List[QueuedTask] = []
-        self.active_task_ids: Set[str] = set()
+        self.queue: list[QueuedTask] = []
+        self.active_task_ids: set[str] = set()
 
     def enqueue_task(self, task_id: str, priority: str = "normal") -> QueuedTask:
         """Add task to priority queue."""
@@ -71,7 +67,7 @@ class MultiProjectManager:
         logger.info(f"Task '{task_id}' enqueued with priority: {priority} (Queue depth: {len(self.queue)})")
         return item
 
-    def get_next_task(self) -> Optional[QueuedTask]:
+    def get_next_task(self) -> QueuedTask | None:
         """Pop the highest priority task ready for execution if concurrency limit allows."""
         if len(self.active_task_ids) >= self.max_concurrent_tasks:
             logger.debug(f"Concurrency limit reached ({len(self.active_task_ids)}/{self.max_concurrent_tasks}). Waiting for tasks to complete.")
@@ -95,7 +91,7 @@ class MultiProjectManager:
         incoming_weight = PRIORITY_WEIGHTS.get(incoming_priority.lower(), 1)
         return incoming_weight >= PRIORITY_WEIGHTS["urgent"]
 
-    async def prune_workspaces(self) -> Dict[str, int]:
+    async def prune_workspaces(self) -> dict[str, int]:
         """
         Prune and archive old completed/failed workspaces according to retention policies.
         - Completed: Retained for retention_days_completed (default 7 days)

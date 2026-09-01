@@ -5,7 +5,8 @@ Implements PythonBuilder, JavaScriptBuilder, TypeScriptBuilder, and FullStackBui
 
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any
+
 from pydantic import BaseModel, Field
 
 from app.core.logging import get_logger
@@ -34,9 +35,9 @@ logger = get_logger("agents.language_builders")
 
 
 class BuilderManifest(BaseModel):
-    files_to_generate: List[str]
-    verification_checks: List[str]
-    template_hints: Dict[str, Any] = Field(default_factory=dict)
+    files_to_generate: list[str]
+    verification_checks: list[str]
+    template_hints: dict[str, Any] = Field(default_factory=dict)
 
 
 class BaseLanguageBuilder(ABC):
@@ -47,7 +48,7 @@ class BaseLanguageBuilder(ABC):
         pass
 
     @abstractmethod
-    def scaffold_project(self, goal: str, workspace_path: Path) -> List[Path]:
+    def scaffold_project(self, goal: str, workspace_path: Path) -> list[Path]:
         pass
 
 
@@ -70,7 +71,7 @@ class PythonBuilder(BaseLanguageBuilder):
             template_hints={"framework": "FastAPI", "test_runner": "pytest"},
         )
 
-    def scaffold_project(self, goal: str, workspace_path: Path) -> List[Path]:
+    def scaffold_project(self, goal: str, workspace_path: Path) -> list[Path]:
         workspace_path.mkdir(parents=True, exist_ok=True)
         created_files = []
 
@@ -112,7 +113,7 @@ class JavaScriptBuilder(BaseLanguageBuilder):
             template_hints={"framework": "Express.js", "runtime": "Node.js 18+"},
         )
 
-    def scaffold_project(self, goal: str, workspace_path: Path) -> List[Path]:
+    def scaffold_project(self, goal: str, workspace_path: Path) -> list[Path]:
         workspace_path.mkdir(parents=True, exist_ok=True)
         created_files = []
 
@@ -153,7 +154,7 @@ class TypeScriptBuilder(BaseLanguageBuilder):
             template_hints={"framework": "Next.js App Router", "type_safety": "strict"},
         )
 
-    def scaffold_project(self, goal: str, workspace_path: Path) -> List[Path]:
+    def scaffold_project(self, goal: str, workspace_path: Path) -> list[Path]:
         workspace_path.mkdir(parents=True, exist_ok=True)
         created_files = []
 
@@ -193,7 +194,7 @@ class FullStackBuilder(BaseLanguageBuilder):
             template_hints={"frontend": "React", "backend": "FastAPI", "contract": "OpenAPI/JSON"},
         )
 
-    def scaffold_project(self, goal: str, workspace_path: Path) -> List[Path]:
+    def scaffold_project(self, goal: str, workspace_path: Path) -> list[Path]:
         workspace_path.mkdir(parents=True, exist_ok=True)
         created_files = []
 

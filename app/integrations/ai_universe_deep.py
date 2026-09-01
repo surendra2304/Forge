@@ -4,10 +4,10 @@ Implements agent-specific routing, multi-agent debate code review, token/cost ac
 and dynamic provider health awareness with automatic recovery.
 """
 
+import re
 from collections import defaultdict
 from enum import Enum
-import re
-from typing import Any, Dict, List, Optional
+
 from pydantic import BaseModel, Field
 
 from app.core.logging import get_logger
@@ -31,11 +31,11 @@ class SpecializedAgentRole(str, Enum):
 class CodeReviewResult(BaseModel):
     """Result from multi-agent debate code review."""
     original_code: str
-    refined_code: Optional[str] = None
+    refined_code: str | None = None
     applied_auto_fix: bool = False
     confidence: float = 0.0
-    suggestions: List[str] = Field(default_factory=list)
-    review_run_id: Optional[str] = None
+    suggestions: list[str] = Field(default_factory=list)
+    review_run_id: str | None = None
 
 
 class AIUniverseUsageStats(BaseModel):
@@ -54,9 +54,9 @@ class AIUniverseUsageStats(BaseModel):
 class DeepAIUniverseIntegration:
     """Enhanced AI Universe integration managing specialized agent routing and debate reviews."""
 
-    def __init__(self, client: Optional[AIUniverseClient] = None):
+    def __init__(self, client: AIUniverseClient | None = None):
         self.client = client or get_ai_universe_client()
-        self.usage_records: Dict[str, AIUniverseUsageStats] = defaultdict(
+        self.usage_records: dict[str, AIUniverseUsageStats] = defaultdict(
             lambda: AIUniverseUsageStats(task_id="default")
         )
         self._is_healthy = True
@@ -82,7 +82,7 @@ class DeepAIUniverseIntegration:
         task_id: str,
         question: str,
         role: SpecializedAgentRole = SpecializedAgentRole.CODER,
-    ) -> Optional[AIUniverseResponse]:
+    ) -> AIUniverseResponse | None:
         """Route reasoning prompt specifically targetted to specialist AI Universe agents."""
         prompt = f"[Target Role: {role.value}]\n{question}"
         try:

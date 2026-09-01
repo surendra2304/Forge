@@ -3,7 +3,9 @@ Unit tests for Deep AI Universe Multi-Agent Integration and Debate Code Review.
 """
 
 from unittest.mock import AsyncMock, MagicMock
+
 import pytest
+
 from app.integrations.ai_universe_client import AIUniverseResponse
 from app.integrations.ai_universe_deep import (
     DeepAIUniverseIntegration,

@@ -2,8 +2,8 @@
 API Marketplace Endpoints, Template Instantiation, and Quality Gate Validation for Project FORGE.
 """
 
-from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
+
 from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import BaseModel, Field
 
@@ -14,7 +14,6 @@ from app.marketplace.models import (
     TemplateCategory,
     TemplateManifest,
     TemplateSubmission,
-    TemplateVariable,
 )
 from app.marketplace.registry import template_registry
 
@@ -25,29 +24,29 @@ task_template_router = APIRouter(prefix="/api/tasks", tags=["Tasks"])
 
 
 class BuildFromTemplateRequest(BaseModel):
-    variables: Dict[str, str] = Field(default_factory=dict)
-    task_metadata: Dict[str, Any] = Field(default_factory=dict)
+    variables: dict[str, str] = Field(default_factory=dict)
+    task_metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 class BuildFromTemplateResponse(BaseModel):
     task_id: str
     template_id: str
     workspace_path: str
-    files_created: List[str]
+    files_created: list[str]
     message: str
 
 
 class ReviewSubmission(BaseModel):
     rating: float = Field(ge=1.0, le=5.0)
-    review: Optional[str] = None
+    review: str | None = None
 
 
-@marketplace_router.get("/templates", response_model=List[TemplateManifest])
+@marketplace_router.get("/templates", response_model=list[TemplateManifest])
 async def list_marketplace_templates(
-    category: Optional[TemplateCategory] = None,
-    language: Optional[str] = None,
-    framework: Optional[str] = None,
-    query: Optional[str] = None,
+    category: TemplateCategory | None = None,
+    language: str | None = None,
+    framework: str | None = None,
+    query: str | None = None,
     sort_by: str = Query("rating", enum=["rating", "downloads", "name"]),
 ):
     """Browse and filter curated marketplace templates."""

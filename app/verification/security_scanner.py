@@ -10,12 +10,13 @@ Executes multi-vector static security scanning BEFORE standard verification:
 """
 
 import ast
+import json
+import re
 from datetime import UTC, datetime
 from enum import Enum
-import json
 from pathlib import Path
-import re
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
+
 from pydantic import BaseModel, Field
 
 from app.core.logging import get_logger
@@ -35,11 +36,11 @@ class SecurityFinding(BaseModel):
     check_name: str
     severity: SecuritySeverity
     file_path: str
-    line_number: Optional[int] = None
+    line_number: int | None = None
     snippet: str = ""
     description: str
     fix_suggestion: str
-    cve_id: Optional[str] = None
+    cve_id: str | None = None
 
 
 class SecurityScanReport(BaseModel):
@@ -47,7 +48,7 @@ class SecurityScanReport(BaseModel):
     workspace_path: str
     timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
     scanned_files_count: int = 0
-    findings: List[SecurityFinding] = Field(default_factory=list)
+    findings: list[SecurityFinding] = Field(default_factory=list)
     critical_count: int = 0
     high_count: int = 0
     medium_count: int = 0
@@ -57,7 +58,7 @@ class SecurityScanReport(BaseModel):
 
 
 # Local CVE and Vulnerability Knowledge Base with Safe Versions
-CVE_VULNERABILITY_DB: Dict[str, Dict[str, Any]] = {
+CVE_VULNERABILITY_DB: dict[str, dict[str, Any]] = {
     # Python Packages
     "urllib3": {
         "language": "python",
@@ -180,7 +181,7 @@ class OutputSecurityScanner:
 
     def scan_all(self) -> SecurityScanReport:
         """Run all static security checks across the workspace."""
-        findings: List[SecurityFinding] = []
+        findings: list[SecurityFinding] = []
         scanned_files = 0
 
         # 1. File content scans
@@ -235,7 +236,7 @@ class OutputSecurityScanner:
             blocks_delivery=blocks,
         )
 
-    def _scan_secrets_in_file(self, rel_path: str, content: str) -> List[SecurityFinding]:
+    def _scan_secrets_in_file(self, rel_path: str, content: str) -> list[SecurityFinding]:
         """Scan file text for hardcoded API keys, tokens, and credentials."""
         findings = []
         for line_num, line in enumerate(content.splitlines(), start=1):
@@ -257,7 +258,7 @@ class OutputSecurityScanner:
                     )
         return findings
 
-    def _scan_python_dangerous_ast(self, path: Path, rel_path: str, content: str) -> List[SecurityFinding]:
+    def _scan_python_dangerous_ast(self, path: Path, rel_path: str, content: str) -> list[SecurityFinding]:
         """Inspect Python AST for dangerous functions: eval, exec, os.system, shell=True, pickle.loads."""
         findings = []
         try:
@@ -355,7 +356,7 @@ class OutputSecurityScanner:
                         )
         return findings
 
-    def _scan_python_injections(self, path: Path, rel_path: str, content: str) -> List[SecurityFinding]:
+    def _scan_python_injections(self, path: Path, rel_path: str, content: str) -> list[SecurityFinding]:
         """Detect SQL injection string concatenations and format strings in database queries."""
         findings = []
         lines = content.splitlines()
@@ -408,7 +409,7 @@ class OutputSecurityScanner:
                     )
         return findings
 
-    def _scan_python_auth_and_errors(self, path: Path, rel_path: str, content: str) -> List[SecurityFinding]:
+    def _scan_python_auth_and_errors(self, path: Path, rel_path: str, content: str) -> list[SecurityFinding]:
         """Detect missing authentication on sensitive routes and leaked internal stack traces."""
         findings = []
         lines = content.splitlines()
@@ -448,7 +449,7 @@ class OutputSecurityScanner:
                         )
         return findings
 
-    def _scan_js_dangerous_patterns(self, rel_path: str, content: str) -> List[SecurityFinding]:
+    def _scan_js_dangerous_patterns(self, rel_path: str, content: str) -> list[SecurityFinding]:
         """Detect dangerous JavaScript / Node.js function calls."""
         findings = []
         lines = content.splitlines()
@@ -481,7 +482,7 @@ class OutputSecurityScanner:
                     )
         return findings
 
-    def _scan_js_injections(self, rel_path: str, content: str) -> List[SecurityFinding]:
+    def _scan_js_injections(self, rel_path: str, content: str) -> list[SecurityFinding]:
         """Detect Cross-Site Scripting (XSS) via unescaped innerHTML or dangerouslySetInnerHTML."""
         findings = []
         lines = content.splitlines()
@@ -515,7 +516,7 @@ class OutputSecurityScanner:
                 )
         return findings
 
-    def scan_dependencies(self) -> List[SecurityFinding]:
+    def scan_dependencies(self) -> list[SecurityFinding]:
         """Verify dependencies in requirements.txt and package.json against known CVE database."""
         findings = []
 
@@ -583,7 +584,7 @@ class OutputSecurityScanner:
 
         return findings
 
-    def remediate_vulnerable_dependencies(self) -> List[str]:
+    def remediate_vulnerable_dependencies(self) -> list[str]:
         """
         Automatically patch vulnerable dependencies in requirements.txt and package.json
         to secure patched versions and generate verified lockfiles.
@@ -620,7 +621,7 @@ class OutputSecurityScanner:
                 req_file.write_text("\n".join(new_lines) + "\n", encoding="utf-8")
                 # Generate updated requirements.lock
                 lock_file = self.workspace_path / "requirements.lock"
-                lock_lines = [f"{l.split('>=')[0]}=={l.split('>=')[1]}" if ">=" in l else l for l in new_lines if l.strip()]
+                lock_lines = [f"{req_line.split('>=')[0]}=={req_line.split('>=')[1]}" if ">=" in req_line else req_line for req_line in new_lines if req_line.strip()]
                 lock_file.write_text("\n".join(lock_lines) + "\n", encoding="utf-8")
 
         # 2. Remediate Node package.json

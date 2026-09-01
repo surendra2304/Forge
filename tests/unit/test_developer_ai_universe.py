@@ -32,7 +32,7 @@ async def test_developer_role_calls_ai_universe_ask_and_writes_raw_code(temp_eng
     """
     engine, wm = temp_engine
     task_id = str(uuid4())
-    paths = wm.create_workspace(task_id)
+    wm.create_workspace(task_id)
 
     developer = DeveloperRole()
 

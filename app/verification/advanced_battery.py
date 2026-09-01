@@ -4,10 +4,11 @@ Performs secrets scanning, dangerous function AST detection, CVE dependency chec
 """
 
 import ast
+import re
 from datetime import UTC, datetime
 from pathlib import Path
-import re
-from typing import Any, Dict, List
+from typing import Any
+
 from pydantic import BaseModel, Field
 
 from app.core.logging import get_logger
@@ -20,12 +21,12 @@ class VerificationCheck(BaseModel):
     name: str
     category: str  # security, quality, performance, browser
     status: str = "pass"  # pass, fail, warn
-    evidence: Dict[str, Any] = Field(default_factory=dict)
-    fix_suggestions: List[str] = Field(default_factory=list)
+    evidence: dict[str, Any] = Field(default_factory=dict)
+    fix_suggestions: list[str] = Field(default_factory=list)
 
 
 # Known Vulnerable Packages & CVE database simulation
-KNOWN_VULNERABLE_PACKAGES: Dict[str, Dict[str, str]] = {
+KNOWN_VULNERABLE_PACKAGES: dict[str, dict[str, str]] = {
     "urllib3": {"max_vulnerable_version": "1.26.4", "cve": "CVE-2021-33503", "severity": "HIGH"},
     "requests": {"max_vulnerable_version": "2.19.1", "cve": "CVE-2018-18074", "severity": "MEDIUM"},
     "flask": {"max_vulnerable_version": "0.12.2", "cve": "CVE-2018-1000656", "severity": "HIGH"},
@@ -52,7 +53,7 @@ class AdvancedSecurityVerifier:
 
     def scan_secrets(self) -> VerificationCheck:
         """Scan all codebase files for exposed API keys, private keys, and hardcoded credentials."""
-        found_secrets: List[Dict[str, Any]] = []
+        found_secrets: list[dict[str, Any]] = []
 
         for p in self.workspace_path.rglob("*"):
             if not p.is_file() or p.name.startswith(".") or "node_modules" in str(p) or ".git" in str(p):
@@ -96,7 +97,7 @@ class AdvancedSecurityVerifier:
 
     def scan_dangerous_functions(self) -> VerificationCheck:
         """Inspect Python AST for dangerous functions (eval, exec, os.system, shell=True)."""
-        violations: List[Dict[str, Any]] = []
+        violations: list[dict[str, Any]] = []
 
         for py_file in self.workspace_path.rglob("*.py"):
             try:
@@ -156,7 +157,7 @@ class AdvancedSecurityVerifier:
 
     def scan_dependency_vulnerabilities(self) -> VerificationCheck:
         """Cross-reference requirements.txt and package.json against known CVE database."""
-        vulnerabilities: List[Dict[str, Any]] = []
+        vulnerabilities: list[dict[str, Any]] = []
         req_file = self.workspace_path / "requirements.txt"
 
         if req_file.exists():
@@ -250,7 +251,7 @@ class AdvancedSecurityVerifier:
             },
         )
 
-    def run_all(self) -> List[VerificationCheck]:
+    def run_all(self) -> list[VerificationCheck]:
         """Execute complete security battery."""
         return [
             self.scan_secrets(),
@@ -268,7 +269,7 @@ class VerificationManifest(BaseModel):
     passed_checks: int
     failed_checks: int
     warned_checks: int
-    checks: List[VerificationCheck] = Field(default_factory=list)
+    checks: list[VerificationCheck] = Field(default_factory=list)
     timestamp: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
 
     def save_to_workspace(self, workspace_path: Path) -> Path:
@@ -293,7 +294,7 @@ class AdvancedVerificationEngine:
         sec_scanner = OutputSecurityScanner(workspace_path)
         sec_report = sec_scanner.scan_all()
 
-        checks: List[VerificationCheck] = []
+        checks: list[VerificationCheck] = []
 
         # Convert detailed scanner findings into VerificationChecks
         if sec_report.findings:

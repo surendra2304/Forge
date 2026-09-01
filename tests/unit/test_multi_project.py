@@ -2,11 +2,12 @@
 Unit tests for Multi-Project Priority Queue and Concurrency Governor.
 """
 
-from datetime import UTC, datetime, timedelta
 from pathlib import Path
+
 import pytest
+
 from app.core.config import Settings
-from app.core.multi_project import MultiProjectManager, QueuedTask
+from app.core.multi_project import MultiProjectManager
 from app.core.workspace import WorkspaceManager
 
 

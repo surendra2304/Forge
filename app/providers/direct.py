@@ -165,11 +165,7 @@ class DirectProvider(BaseModelProvider):
         Generate structured output matching a Pydantic model.
         In mock or direct mode, synthesizes or extracts valid JSON conforming to the schema.
         """
-        schema_json = json.dumps(response_model.model_json_schema(), indent=2)
-        augmented_prompt = (
-            f"{prompt}\n\n"
-            f"You MUST reply with a valid JSON object strictly matching this schema:\n{schema_json}"
-        )
+        json.dumps(response_model.model_json_schema(), indent=2)
 
         if self.mock_response is not None:
             raw_text = self.mock_response

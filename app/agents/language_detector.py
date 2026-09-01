@@ -3,8 +3,6 @@ Language and Framework Classifier and AI-Universe Prompt Router for Project FORG
 """
 
 from enum import Enum
-import re
-from typing import List, Optional, Tuple
 
 
 class TargetLanguage(str, Enum):
@@ -30,7 +28,7 @@ class LanguageDetector:
     """Classifies software requirements and goals into target language and framework."""
 
     @classmethod
-    def detect(cls, goal: str, requirements: Optional[List[str]] = None) -> Tuple[TargetLanguage, TargetFramework]:
+    def detect(cls, goal: str, requirements: list[str] | None = None) -> tuple[TargetLanguage, TargetFramework]:
         combined_text = f"{goal} {' '.join(requirements or [])}".lower()
 
         # Check for full-stack composite indicators

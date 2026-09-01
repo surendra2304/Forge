@@ -5,11 +5,13 @@ and pre-synthesis cost estimation.
 """
 
 import asyncio
-from collections import OrderedDict
 import hashlib
 import time
-from typing import Any, Callable, Coroutine, Dict, List, Optional, Set
-from pydantic import BaseModel, Field
+from collections import OrderedDict
+from collections.abc import Callable, Coroutine
+from typing import Any
+
+from pydantic import BaseModel
 
 from app.core.logging import get_logger
 
@@ -24,7 +26,7 @@ class CostEstimate(BaseModel):
     estimated_tokens: int
     estimated_cost_usd: float
     exceeds_threshold: bool = False
-    warning_message: Optional[str] = None
+    warning_message: str | None = None
 
 
 class SynthesisCache:
@@ -38,7 +40,7 @@ class SynthesisCache:
     def _hash_key(self, prompt: str) -> str:
         return hashlib.sha256(prompt.strip().encode("utf-8")).hexdigest()
 
-    def get(self, prompt: str) -> Optional[str]:
+    def get(self, prompt: str) -> str | None:
         key = self._hash_key(prompt)
         if key not in self._cache:
             return None
@@ -67,7 +69,7 @@ class PipelineOptimizer:
     def estimate_cost(
         self,
         goal: str,
-        file_manifest: List[str],
+        file_manifest: list[str],
         max_budget_usd: float = 10.0,
     ) -> CostEstimate:
         """Estimate token and call expenditure prior to launching synthesis."""
@@ -96,10 +98,10 @@ class PipelineOptimizer:
 
     async def execute_parallel_synthesis(
         self,
-        files: List[str],
+        files: list[str],
         synthesis_func: Callable[[str], Coroutine[Any, Any, Any]],
         concurrency_limit: int = 4,
-    ) -> List[Any]:
+    ) -> list[Any]:
         """Synthesize independent files concurrently with semaphore throttling."""
         semaphore = asyncio.Semaphore(concurrency_limit)
 
@@ -114,10 +116,10 @@ class PipelineOptimizer:
 
     def compute_incremental_diff(
         self,
-        current_manifest: List[str],
-        previous_files: Dict[str, str],
-        new_files: Dict[str, str],
-    ) -> Set[str]:
+        current_manifest: list[str],
+        previous_files: dict[str, str],
+        new_files: dict[str, str],
+    ) -> set[str]:
         """Identify files that have changed and require regeneration."""
         changed = set()
         for f in current_manifest:

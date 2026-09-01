@@ -138,10 +138,10 @@ class DeliveryPackager:
 
         return f"""# Project Delivery & Completion Report
 
-**Task ID:** `{data.task_id}`  
-**Release Tag:** `{data.release_tag}`  
-**Generated At:** `{data.generated_at}`  
-**Primary Stack:** `{data.stack}`  
+**Task ID:** `{data.task_id}`
+**Release Tag:** `{data.release_tag}`
+**Generated At:** `{data.generated_at}`
+**Primary Stack:** `{data.stack}`
 
 ---
 

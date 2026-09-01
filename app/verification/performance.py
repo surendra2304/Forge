@@ -3,12 +3,10 @@ Performance and Latency Verifier for Project FORGE.
 Measures API endpoint latencies, detects N+1 database queries, assesses web asset payloads, and identifies render-blocking resources.
 """
 
-from pathlib import Path
 import re
-import time
-from typing import Any, Dict, List, Optional
+from pathlib import Path
+
 from bs4 import BeautifulSoup
-from pydantic import BaseModel, Field
 
 from app.core.logging import get_logger
 from app.verification.advanced_battery import VerificationCheck
@@ -22,7 +20,7 @@ class PerformanceVerifier:
     def __init__(self, workspace_path: Path):
         self.workspace_path = workspace_path
 
-    def verify_api_endpoint_latency(self, test_latencies_ms: Optional[List[float]] = None) -> VerificationCheck:
+    def verify_api_endpoint_latency(self, test_latencies_ms: list[float] | None = None) -> VerificationCheck:
         """Verify API response times (simple endpoints must be <500ms)."""
         # If real execution metrics provided, use them; otherwise evaluate static endpoint structure
         latencies = test_latencies_ms or [45.2, 78.1, 110.5]
@@ -165,7 +163,7 @@ class PerformanceVerifier:
             fix_suggestions=fix_suggestions,
         )
 
-    def run_all(self) -> List[VerificationCheck]:
+    def run_all(self) -> list[VerificationCheck]:
         """Execute all performance verification checks."""
         return [
             self.verify_api_endpoint_latency(),

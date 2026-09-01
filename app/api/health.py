@@ -3,7 +3,8 @@ Health, Readiness, Diagnostics, and Prometheus Metrics Endpoints for Project FOR
 """
 
 import time
-from typing import Any, Dict
+from typing import Any
+
 from fastapi import APIRouter, HTTPException, Response, status
 from pydantic import BaseModel, Field
 
@@ -32,11 +33,11 @@ class DiagnosticResponse(BaseModel):
     status: str = "healthy"
     version: str = "0.1.0"
     environment: str = "development"
-    database: Dict[str, Any]
-    ai_universe: Dict[str, Any]
-    intelx: Dict[str, Any] = Field(default_factory=dict)
-    system_metrics: Dict[str, Any]
-    security_scanner: Dict[str, Any] = Field(default_factory=dict)
+    database: dict[str, Any]
+    ai_universe: dict[str, Any]
+    intelx: dict[str, Any] = Field(default_factory=dict)
+    system_metrics: dict[str, Any]
+    security_scanner: dict[str, Any] = Field(default_factory=dict)
     alerts: AlertStatus
 
 

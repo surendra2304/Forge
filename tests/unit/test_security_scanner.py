@@ -2,16 +2,13 @@
 Unit Tests for Output Security Scanner and Security-First Verification in Project FORGE.
 """
 
-from pathlib import Path
 import tempfile
+from pathlib import Path
+
 import pytest
 
 from app.verification.security_scanner import (
-    CVE_VULNERABILITY_DB,
     OutputSecurityScanner,
-    SecurityFinding,
-    SecurityScanReport,
-    SecuritySeverity,
 )
 
 

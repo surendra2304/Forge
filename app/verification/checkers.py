@@ -795,13 +795,11 @@ class FeaturePresenceChecker(BaseChecker):
 
         # 1. Retrieve Task Goal & Requirements from store if available
         goal = ""
-        requirements = []
         if hasattr(engine, "store") and engine.store:
             try:
                 task = await engine.store.get_task(task_id)
                 if task:
                     goal = task.goal or ""
-                    requirements = task.requirements or []
             except Exception:
                 pass
 

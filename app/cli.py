@@ -165,6 +165,8 @@ async def handle_build(
     if serve:
         await handle_serve(task_id=task_id, port=port, open_browser=True)
 
+    return task
+
 
 async def handle_serve(task_id: str, port: int = 5000, open_browser: bool = True):
     """Serve a project workspace on localhost with auto-discovery of entrypoint."""
@@ -188,7 +190,7 @@ async def handle_serve(task_id: str, port: int = 5000, open_browser: bool = True
         return
 
     project_dir = str(paths.project)
-    has_html = (paths.project / "index.html").exists() or list(paths.project.glob("**/*.html"))
+    (paths.project / "index.html").exists() or list(paths.project.glob("**/*.html"))
     has_fastapi = (paths.project / "main.py").exists() and "fastapi" in (paths.project / "main.py").read_text(encoding="utf-8", errors="ignore").lower()
 
     console.print()
@@ -208,8 +210,9 @@ async def handle_serve(task_id: str, port: int = 5000, open_browser: bool = True
 
     if has_fastapi:
         # Launch Uvicorn server for FastAPI backend
-        import uvicorn
         import sys
+
+        import uvicorn
         sys.path.insert(0, project_dir)
         os.chdir(project_dir)
         try:
@@ -305,7 +308,7 @@ async def handle_cancel(task_id: str, reason: str):
     store = StateStore(db_manager)
     lifecycle = TaskStateMachine(store)
     try:
-        updated = await lifecycle.cancel(task_id=task_id, reason=reason)
+        await lifecycle.cancel(task_id=task_id, reason=reason)
         console.print(f"[yellow][!] Task '{task_id}' cancelled successfully.[/yellow]")
     except Exception as e:
         console.print(f"[red]Error cancelling task:[/red] {e}")

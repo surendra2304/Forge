@@ -35,13 +35,13 @@ from app.verification.security_scanner import (
 )
 
 __all__ = [
+    "CVE_VULNERABILITY_DB",
     "AdvancedSecurityVerifier",
     "AdvancedVerificationEngine",
     "BaseChecker",
     "BrowserChecker",
     "BrowserInteractionVerifier",
     "BuildChecker",
-    "CVE_VULNERABILITY_DB",
     "CheckCategory",
     "CodeQualityAnalyzer",
     "LintChecker",

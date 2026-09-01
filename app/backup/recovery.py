@@ -3,11 +3,12 @@ Backup and Disaster Recovery Manager for Project FORGE.
 Provides automated SQLite snapshots, metadata backups, restoration utilities, and retention pruning.
 """
 
-from datetime import UTC, datetime, timedelta
 import json
-from pathlib import Path
 import shutil
-from typing import Any, Dict, List, Optional
+from datetime import UTC, datetime, timedelta
+from pathlib import Path
+from typing import Any
+
 import aiosqlite
 from pydantic import BaseModel, Field
 
@@ -28,7 +29,7 @@ class BackupManifest(BaseModel):
 class BackupManager:
     """Manages creation, restoration, and pruning of SQLite database and workspace metadata backups."""
 
-    def __init__(self, settings: Optional[Settings] = None, db: Optional[DatabaseManager] = None):
+    def __init__(self, settings: Settings | None = None, db: DatabaseManager | None = None):
         self.settings = settings or get_settings()
         self.db = db or db_manager
         self.backup_dir = self.settings.data_dir / "backups"
@@ -59,7 +60,7 @@ class BackupManager:
             size = target_path.stat().st_size
             return BackupManifest(backup_path=str(target_path), backup_type="sqlite", size_bytes=size)
 
-    def backup_workspace_metadata(self, task_id: str, metadata: Dict[str, Any]) -> BackupManifest:
+    def backup_workspace_metadata(self, task_id: str, metadata: dict[str, Any]) -> BackupManifest:
         """Create a JSON metadata snapshot for a workspace."""
         timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
         meta_dir = self.backup_dir / "workspaces"
@@ -71,7 +72,7 @@ class BackupManager:
         size = target_path.stat().st_size
         return BackupManifest(backup_path=str(target_path), backup_type="metadata", size_bytes=size)
 
-    def backup_configuration(self, config_dict: Dict[str, Any]) -> BackupManifest:
+    def backup_configuration(self, config_dict: dict[str, Any]) -> BackupManifest:
         """Create a configuration snapshot backup."""
         timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
         cfg_dir = self.backup_dir / "config"
@@ -101,7 +102,7 @@ class BackupManager:
             logger.error(f"Failed to restore database from {backup_file.name}: {e}")
             return False
 
-    def list_backups(self) -> List[Path]:
+    def list_backups(self) -> list[Path]:
         """List all available database backup files sorted newest first."""
         if not self.backup_dir.exists():
             return []

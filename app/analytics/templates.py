@@ -3,7 +3,7 @@ Template Analytics and Historical Recommendation Engine for Project FORGE.
 """
 
 from collections import defaultdict
-from typing import Any, Dict, List, Optional
+
 from pydantic import BaseModel, Field
 
 
@@ -13,9 +13,9 @@ class TemplateStats(BaseModel):
     success_count: int = 0
     failure_count: int = 0
     total_duration_seconds: float = 0.0
-    ratings: List[float] = Field(default_factory=lambda: [5.0])
-    reviews: List[str] = Field(default_factory=list)
-    failure_patterns: List[str] = Field(default_factory=list)
+    ratings: list[float] = Field(default_factory=lambda: [5.0])
+    reviews: list[str] = Field(default_factory=list)
+    failure_patterns: list[str] = Field(default_factory=list)
 
     @property
     def success_rate(self) -> float:
@@ -40,7 +40,7 @@ class TemplateAnalytics:
     """Tracks per-template utilization, pass rates, latency, and recommendations."""
 
     def __init__(self):
-        self._stats: Dict[str, TemplateStats] = defaultdict(lambda: TemplateStats(template_id="unknown"))
+        self._stats: dict[str, TemplateStats] = defaultdict(lambda: TemplateStats(template_id="unknown"))
         self._seed_default_analytics()
 
     def _seed_default_analytics(self):
@@ -69,7 +69,7 @@ class TemplateAnalytics:
         template_id: str,
         success: bool,
         duration_seconds: float = 15.0,
-        error_reason: Optional[str] = None,
+        error_reason: str | None = None,
     ):
         """Record the outcome of a task built from a template."""
         stats = self._stats[template_id]
@@ -84,7 +84,7 @@ class TemplateAnalytics:
             if error_reason:
                 stats.failure_patterns.append(error_reason)
 
-    def add_review(self, template_id: str, rating: float, review_text: Optional[str] = None):
+    def add_review(self, template_id: str, rating: float, review_text: str | None = None):
         """Add user rating and feedback review."""
         stats = self._stats[template_id]
         stats.template_id = template_id

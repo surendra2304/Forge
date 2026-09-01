@@ -15,7 +15,7 @@ from app.improvement.self_improve import (
 __all__ = [
     "ImprovementProposal",
     "ProposalStatus",
-    "SelfImprovementReport",
     "SelfImprovementEngine",
+    "SelfImprovementReport",
     "self_improvement_engine",
 ]

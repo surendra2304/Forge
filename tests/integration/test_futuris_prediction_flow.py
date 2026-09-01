@@ -2,14 +2,12 @@
 Integration Test: Futuris Prediction-Informed Builds & Capacity-Aware Queueing Flow.
 """
 
-from pathlib import Path
 import tempfile
+from pathlib import Path
+
 import pytest
 
 from app.integrations.futuris_client import (
-    CapacityForecast,
-    DurationForecast,
-    FuturisBuildAssessment,
     get_futuris_client,
 )
 from app.monitoring.production_monitor import production_monitor

@@ -4,11 +4,12 @@ Submits deep technical research queries before code generation and planning
 when unfamiliar frameworks, architectures, or integrations are detected.
 """
 
-from datetime import UTC, datetime
-from functools import lru_cache
 import os
 import re
-from typing import Any, Dict, List, Optional, Set
+from datetime import UTC, datetime
+from functools import lru_cache
+from typing import Any
+
 import httpx
 from pydantic import BaseModel, Field
 
@@ -25,7 +26,7 @@ class IntelXResearchFinding(BaseModel):
     category: str  # best_practices, common_pitfalls, recommended_patterns, performance_considerations, security_considerations
     title: str
     detail: str
-    code_snippet: Optional[str] = None
+    code_snippet: str | None = None
     recommendation: str
     source: str = "IntelX Tech Intelligence"
 
@@ -34,25 +35,25 @@ class IntelXResearchResult(BaseModel):
     """Consolidated technical research report for a technology."""
     query: str
     technology: str
-    findings: List[IntelXResearchFinding] = Field(default_factory=list)
-    best_practices: List[str] = Field(default_factory=list)
-    pitfalls_to_avoid: List[str] = Field(default_factory=list)
-    recommended_patterns: List[str] = Field(default_factory=list)
-    performance_considerations: List[str] = Field(default_factory=list)
-    verification_requirements: List[str] = Field(default_factory=list)
+    findings: list[IntelXResearchFinding] = Field(default_factory=list)
+    best_practices: list[str] = Field(default_factory=list)
+    pitfalls_to_avoid: list[str] = Field(default_factory=list)
+    recommended_patterns: list[str] = Field(default_factory=list)
+    performance_considerations: list[str] = Field(default_factory=list)
+    verification_requirements: list[str] = Field(default_factory=list)
     raw_summary: str = ""
     confidence: float = 0.90
     timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 # Default known technologies in starter templates library
-STANDARD_TEMPLATE_TECHNOLOGIES: Set[str] = {
+STANDARD_TEMPLATE_TECHNOLOGIES: set[str] = {
     "python", "fastapi", "flask", "sqlite", "pytest", "html", "css", "javascript",
     "vanilla js", "cli", "argparse", "click", "rest api", "json", "markdown"
 }
 
 # Rich IntelX Built-in Research Intelligence for Unfamiliar & Complex Technologies
-BUILTIN_TECH_RESEARCH_DB: Dict[str, Dict[str, Any]] = {
+BUILTIN_TECH_RESEARCH_DB: dict[str, dict[str, Any]] = {
     "graphql": {
         "best_practices": [
             "Implement query complexity and depth limiting to prevent nested query DOS attacks [S:101]",
@@ -217,8 +218,8 @@ class IntelXTechClient:
 
     def __init__(
         self,
-        base_url: Optional[str] = None,
-        api_key: Optional[str] = None,
+        base_url: str | None = None,
+        api_key: str | None = None,
         timeout: float = 8.0,
     ):
         settings = get_settings()
@@ -238,13 +239,12 @@ class IntelXTechClient:
     def detect_unfamiliar_technologies(
         self,
         goal: str,
-        custom_known_tech: Optional[Set[str]] = None,
-    ) -> List[str]:
+        custom_known_tech: set[str] | None = None,
+    ) -> list[str]:
         """
         Inspect user goal for technologies, architectures, or frameworks
         not covered by standard starter templates.
         """
-        known = (custom_known_tech or STANDARD_TEMPLATE_TECHNOLOGIES)
         detected = []
         normalized_goal = goal.lower()
 
@@ -267,7 +267,7 @@ class IntelXTechClient:
     async def research_technology(
         self,
         technology: str,
-        goal_context: Optional[str] = None,
+        goal_context: str | None = None,
     ) -> IntelXResearchResult:
         """
         Execute deep technical research query for a given technology.
@@ -377,7 +377,7 @@ class IntelXTechClient:
                 technology=technology,
                 category="common_pitfalls",
                 title=f"Unbounded Resource Leak in {technology.title()}",
-                detail=f"Failing to close connection handles and sockets upon application shutdown.",
+                detail="Failing to close connection handles and sockets upon application shutdown.",
                 recommendation=f"Implement explicit teardown and lifecycle context managers for {technology}.",
             ),
         ]
@@ -397,7 +397,7 @@ class IntelXTechClient:
 
     def format_research_context_for_prompt(
         self,
-        research_results: List[IntelXResearchResult],
+        research_results: list[IntelXResearchResult],
     ) -> str:
         """
         Construct a concise, high-impact prompt injection block containing

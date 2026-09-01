@@ -99,12 +99,12 @@ def complete_todo(todo_id):
 def main():
     parser = argparse.ArgumentParser(description="CLI Todo Manager")
     subparsers = parser.add_subparsers(dest="command")
-    
+
     add_p = subparsers.add_parser("add")
     add_p.add_argument("title", type=str)
-    
+
     subparsers.add_parser("list")
-    
+
     comp_p = subparsers.add_parser("complete")
     comp_p.add_argument("id", type=int)
 

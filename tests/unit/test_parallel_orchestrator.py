@@ -107,6 +107,6 @@ async def test_parallel_wave_dependency_scheduling(temp_dir: Path):
         assert executed_wave_2[0] == nid_integ
 
         # 5. Step 3: All nodes complete -> Task transitions to COMPLETED
-        updated_task, executed_wave_3 = await orchestrator.step_task(task_id)
+        updated_task, _executed_wave_3 = await orchestrator.step_task(task_id)
         assert updated_task.state == TaskState.COMPLETED
         assert updated_task.progress_percentage == 100

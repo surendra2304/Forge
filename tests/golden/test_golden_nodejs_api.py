@@ -39,7 +39,7 @@ async def test_golden_benchmark_nodejs_typescript_api(temp_dir: Path):
     engine = ExecutionEngine(wm=wm)
     db_mgr = DatabaseManager(db_path=temp_dir / "test_nodejs_golden.db")
     await db_mgr.init_db()
-    store = StateStore(db_mgr)
+    StateStore(db_mgr)
     analyzer = TaskAnalyzer()
     verifier = VerificationEngine(engine=engine, wm=wm)
     packager = DeliveryPackager(engine=engine, wm=wm)
@@ -67,20 +67,6 @@ async def test_golden_benchmark_nodejs_typescript_api(temp_dir: Path):
         assert ws_paths.project.exists()
 
         # 3. Dynamic Specialist Generation via Routed Model Provider
-        mock_architect_spec = """
-### File: docs/ARCHITECTURE.md
-```markdown
-# Express.js TypeScript Architecture
-- Package Manager: npm
-- Runtime: Node.js (v18+)
-- Language: TypeScript
-- Endpoints:
-  - GET /health
-  - GET /tasks
-  - POST /tasks
-  - DELETE /tasks/:id
-```
-"""
         mock_developer_code = """
 ### File: package.json
 ```json

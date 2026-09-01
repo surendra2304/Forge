@@ -5,8 +5,7 @@ Provides syntax, package integrity, tsconfig, and API contract verification for 
 
 import json
 from pathlib import Path
-import re
-from typing import Any, Dict, List
+
 from app.core.logging import get_logger
 from app.verification.advanced_battery import VerificationCheck
 
@@ -149,7 +148,7 @@ class PolyglotLanguageVerifier:
             evidence={"contracts_verified": len(contract_files)},
         )
 
-    def run_all(self) -> List[VerificationCheck]:
+    def run_all(self) -> list[VerificationCheck]:
         """Run all multi-language verifications."""
         return [
             self.verify_node_syntax_and_imports(),

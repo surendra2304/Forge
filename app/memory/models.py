@@ -36,7 +36,7 @@ class TaskMode(str, Enum):
 
 def generate_task_id(sequence_num: int = 1) -> str:
     """Generate a human-readable task identifier formatted as: task<task_num><DDMMYYYY><HHMMSS>."""
-    now = datetime.now()
+    now = datetime.now(UTC)
     return f"task{sequence_num:02d}{now.strftime('%d%m%Y%H%M%S')}"
 
 

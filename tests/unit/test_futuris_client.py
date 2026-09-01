@@ -5,12 +5,7 @@ Unit Tests for Futuris Capacity and Success Prediction Integration in Project FO
 import pytest
 
 from app.integrations.futuris_client import (
-    CapacityForecast,
-    DurationForecast,
-    FuturisBuildAssessment,
     FuturisBuildClient,
-    SuccessPrediction,
-    get_futuris_client,
 )
 from app.monitoring.production_monitor import ProductionMonitor
 

@@ -2,13 +2,13 @@
 Integration Test: Security Scanner Blocks Insecure Deliverables and Formats Re-Generation Feedback.
 """
 
-from pathlib import Path
 import tempfile
+from pathlib import Path
+
 import pytest
 
 from app.verification.security_scanner import (
     OutputSecurityScanner,
-    SecuritySeverity,
 )
 
 

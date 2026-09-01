@@ -4,9 +4,9 @@ Tracks template efficacy, computes success scores from verification outcomes,
 and evaluates template variants via A/B testing.
 """
 
-from collections import defaultdict
-from typing import Any, Dict, List, Optional
-from pydantic import BaseModel, Field
+from typing import Any
+
+from pydantic import BaseModel
 
 from app.core.logging import get_logger
 
@@ -48,7 +48,7 @@ class TemplateEvolutionEngine:
     """Manages template success tracking, pattern scoring, and variant promotion."""
 
     def __init__(self):
-        self.variants: Dict[str, TemplateVariant] = {}
+        self.variants: dict[str, TemplateVariant] = {}
         self._initialize_default_variants()
 
     def _initialize_default_variants(self):
@@ -107,7 +107,7 @@ class TemplateEvolutionEngine:
             var.security_scan_failures += 1
         logger.debug(f"Template variant '{variant_name}' security updated: {var.security_pass_rate}% security pass ({var.security_scan_passes + var.security_scan_failures} scans)")
 
-    def get_winning_variant(self, archetype: str) -> Optional[TemplateVariant]:
+    def get_winning_variant(self, archetype: str) -> TemplateVariant | None:
         """Select the highest scoring template variant for an archetype, factoring in security and function."""
         candidates = [v for v in self.variants.values() if v.archetype == archetype]
         if not candidates:
@@ -117,7 +117,7 @@ class TemplateEvolutionEngine:
             return max(evaluated, key=lambda v: (v.composite_score, v.total_evaluations))
         return candidates[0]
 
-    def evaluate_ab_variants(self, variant_a: str, variant_b: str) -> Dict[str, Any]:
+    def evaluate_ab_variants(self, variant_a: str, variant_b: str) -> dict[str, Any]:
         """Compare two template variants side-by-side."""
         va = self.variants.get(variant_a)
         vb = self.variants.get(variant_b)

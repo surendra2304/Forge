@@ -158,7 +158,7 @@ class LLMResponseParser:
             if generic_code_blocks:
                 # Filter valid code blocks
                 valid_blocks = [
-                    (l, b) for l, b in generic_code_blocks if _is_valid_file(default_filename, b)
+                    (lang, block) for lang, block in generic_code_blocks if _is_valid_file(default_filename, block)
                 ]
                 if valid_blocks:
                     largest_lang, largest_block = max(valid_blocks, key=lambda b: len(b[1]))

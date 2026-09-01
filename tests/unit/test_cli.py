@@ -29,13 +29,14 @@ async def test_cli_build_and_status(temp_dir: Path):
     requirements = ["Add items", "List items"]
 
     # Run CLI build handler
-    await handle_build(goal=goal, requirements=requirements, max_budget=10.0)
+    built_task = await handle_build(goal=goal, requirements=requirements, max_budget=10.0)
+    assert built_task is not None
+    assert built_task.goal == goal
 
     # Verify task was created and stored
     store = StateStore(db_manager)
-    tasks = await store.list_tasks(limit=1)
-    assert len(tasks) >= 1
-    task = tasks[0]
+    task = await store.get_task(built_task.id)
+    assert task is not None
     assert task.goal == goal
 
     # Test status handler

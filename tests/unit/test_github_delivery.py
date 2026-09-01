@@ -3,10 +3,11 @@ Unit tests for GitHub Delivery Integration.
 """
 
 from unittest.mock import AsyncMock, patch
-from httpx import Response
+
 import pytest
+from httpx import Response
+
 from app.integrations.github_delivery import (
-    GitHubDeliveryResult,
     GitHubDeliveryService,
 )
 

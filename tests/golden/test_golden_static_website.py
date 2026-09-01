@@ -45,7 +45,7 @@ async def test_golden_benchmark_static_web_application(temp_dir: Path):
     ]
 
     # 2. Intake and Planning
-    task, graph = await orchestrator.intake_and_plan(
+    task, _ = await orchestrator.intake_and_plan(
         goal=goal,
         requirements=requirements,
         mode=TaskMode.AUTONOMOUS,

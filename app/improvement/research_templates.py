@@ -5,13 +5,13 @@ proposes template updates via self-improvement proposals that require approval.
 """
 
 from datetime import UTC, datetime
-from typing import Any, Dict, List, Optional
+
 from pydantic import BaseModel, Field
 
 from app.core.logging import get_logger
 from app.improvement.self_improve import ImprovementProposal, ProposalStatus, SelfImprovementEngine
-from app.improvement.template_evolution import TemplateEvolutionEngine, TemplateVariant
-from app.integrations.intelx_client import IntelXResearchFinding, IntelXResearchResult
+from app.improvement.template_evolution import TemplateEvolutionEngine
+from app.integrations.intelx_client import IntelXResearchResult
 
 logger = get_logger("improvement.research_templates")
 
@@ -36,12 +36,12 @@ class ResearchBackedTemplatesManager:
 
     def __init__(
         self,
-        template_engine: Optional[TemplateEvolutionEngine] = None,
-        improvement_engine: Optional[SelfImprovementEngine] = None,
+        template_engine: TemplateEvolutionEngine | None = None,
+        improvement_engine: SelfImprovementEngine | None = None,
     ):
         self.template_engine = template_engine or TemplateEvolutionEngine()
         self.improvement_engine = improvement_engine
-        self.research_patterns: Dict[str, ResearchTemplatePattern] = {}
+        self.research_patterns: dict[str, ResearchTemplatePattern] = {}
         self._initialize_seed_patterns()
 
     def _initialize_seed_patterns(self):
@@ -129,12 +129,12 @@ class WebSocketConnectionManager:
     def propose_template_update_from_research(
         self,
         research_result: IntelXResearchResult,
-    ) -> List[ImprovementProposal]:
+    ) -> list[ImprovementProposal]:
         """
         Evaluate research findings and generate self-improvement proposals
         for new or updated template patterns requiring human approval.
         """
-        generated_proposals: List[ImprovementProposal] = []
+        generated_proposals: list[ImprovementProposal] = []
 
         for finding in research_result.findings:
             if finding.category in ["best_practices", "recommended_patterns"]:
@@ -171,7 +171,7 @@ class WebSocketConnectionManager:
         code_pattern: str,
         technology: str,
         archetype: str = "api",
-    ) -> Optional[ResearchTemplatePattern]:
+    ) -> ResearchTemplatePattern | None:
         """
         Promote an approved proposal into active research template library.
         """
@@ -192,7 +192,7 @@ class WebSocketConnectionManager:
         )
         return pattern
 
-    def get_pattern_for_technology(self, technology: str) -> Optional[ResearchTemplatePattern]:
+    def get_pattern_for_technology(self, technology: str) -> ResearchTemplatePattern | None:
         """Retrieve the active research template for a technology."""
         tech_clean = technology.lower().strip()
         for p in self.research_patterns.values():

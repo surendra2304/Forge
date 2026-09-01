@@ -3,11 +3,11 @@ Integration Test: End-to-End Research-Informed Build Flow.
 Validates: Unfamiliar Tech Goal -> IntelX Research Submission -> Context Injection -> Verification Passes.
 """
 
-from pathlib import Path
 import tempfile
+from pathlib import Path
+
 import pytest
 
-from app.agents.roles import ArchitectRole, DeveloperRole
 from app.integrations.intelx_client import get_intelx_client
 from app.monitoring.production_monitor import production_monitor
 from app.verification.advanced_battery import AdvancedVerificationEngine

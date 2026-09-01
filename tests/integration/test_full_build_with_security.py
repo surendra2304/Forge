@@ -2,11 +2,12 @@
 Integration Test: Full End-to-End Build with Security Scanner & Advanced Battery Verification.
 """
 
-from pathlib import Path
 import tempfile
+from pathlib import Path
+
 import pytest
 
-from app.verification.advanced_battery import AdvancedVerificationEngine, VerificationManifest
+from app.verification.advanced_battery import AdvancedVerificationEngine
 from app.verification.security_scanner import OutputSecurityScanner
 
 

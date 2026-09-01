@@ -4,14 +4,14 @@ Unit tests for Production Hardening, Health Probes, Metrics, Security, and Backu
 
 from pathlib import Path
 from unittest.mock import patch
-from httpx import ASGITransport, AsyncClient
+
 import pytest
+from httpx import ASGITransport, AsyncClient
+
 from app.backup.recovery import BackupManager
-from app.config.production import production_settings
 from app.main import app
 from app.memory.db import DatabaseManager, db_manager
 from app.monitoring.audit import AuditLogger
-from app.monitoring.production_monitor import ProductionMonitor
 from app.security.api_keys import APIKeyManager, RateLimiter
 
 

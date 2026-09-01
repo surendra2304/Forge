@@ -4,8 +4,8 @@ Data Models for FORGE Self-Improvement Engine.
 
 from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional
 from uuid import uuid4
+
 from pydantic import BaseModel, Field
 
 
@@ -25,9 +25,9 @@ class ImprovementProposal(BaseModel):
     affected_component: str
     proposed_remediation: str
     status: ProposalStatus = ProposalStatus.PROPOSED
-    evidence_task_ids: List[str] = Field(default_factory=list)
+    evidence_task_ids: list[str] = Field(default_factory=list)
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
-    applied_at: Optional[datetime] = None
+    applied_at: datetime | None = None
 
 
 class SelfImprovementReport(BaseModel):
@@ -35,6 +35,6 @@ class SelfImprovementReport(BaseModel):
     analysis_period_days: int = 7
     total_tasks_analyzed: int = 0
     total_failures_identified: int = 0
-    failure_clusters: Dict[str, int] = Field(default_factory=dict)
-    proposals: List[ImprovementProposal] = Field(default_factory=list)
+    failure_clusters: dict[str, int] = Field(default_factory=dict)
+    proposals: list[ImprovementProposal] = Field(default_factory=list)
     generated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))

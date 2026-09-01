@@ -2,9 +2,9 @@
 API Key Authentication, Token Verification, Sliding Window Rate Limiting, and Burst Control for Project FORGE.
 """
 
-from collections import defaultdict
 import time
-from typing import Dict, List, Optional
+from collections import defaultdict
+
 from fastapi import Header, HTTPException, Request, Security, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
@@ -22,8 +22,8 @@ class RateLimiter:
     def __init__(self, limit_per_hour: int = 100, burst_limit_per_minute: int = 10):
         self.limit_per_hour = limit_per_hour
         self.burst_limit_per_minute = burst_limit_per_minute
-        self.requests: Dict[str, List[float]] = defaultdict(list)
-        self.failed_attempts: Dict[str, List[float]] = defaultdict(list)
+        self.requests: dict[str, list[float]] = defaultdict(list)
+        self.failed_attempts: dict[str, list[float]] = defaultdict(list)
 
     def is_allowed(self, identifier: str) -> bool:
         """Check if client identifier is within hourly and burst request thresholds."""
@@ -89,7 +89,7 @@ class APIKeyManager:
         self.revoke_key(old_key)
         self.add_key(new_key)
 
-    def validate_key(self, key: Optional[str]) -> bool:
+    def validate_key(self, key: str | None) -> bool:
         if self.valid_keys:
             return key in self.valid_keys
         if not production_settings.api_key_required:
@@ -103,8 +103,8 @@ api_key_manager = APIKeyManager()
 
 async def verify_api_key(
     request: Request,
-    x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
-    bearer_auth: Optional[HTTPAuthorizationCredentials] = Security(bearer_scheme),
+    x_api_key: str | None = Header(None, alias="X-API-Key"),
+    bearer_auth: HTTPAuthorizationCredentials | None = Security(bearer_scheme),
 ) -> str:
     """
     FastAPI security dependency validating incoming API key and enforcing rate limits.

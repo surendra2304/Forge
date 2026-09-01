@@ -316,7 +316,7 @@ JS_BASE = """document.addEventListener("DOMContentLoaded", () => {
     // Theme toggle functionality
     const themeToggleBtn = document.getElementById("theme-toggle");
     const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-    
+
     // Initialize theme from localStorage or system preference
     const savedTheme = localStorage.getItem("theme");
     if (savedTheme === "dark" || (!savedTheme && prefersDark)) {

@@ -3,7 +3,7 @@ Unit tests for Documentation Generator and Quality Assessment.
 """
 
 from pathlib import Path
-import pytest
+
 from app.delivery.docs_generator import DocumentationGenerator
 
 

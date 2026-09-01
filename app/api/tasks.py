@@ -5,7 +5,7 @@ Provides full task lifecycle, inspection, logging, artifact download, cancellati
 
 import json
 import mimetypes
-from datetime import datetime
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import FileResponse
@@ -24,6 +24,7 @@ from app.api.schemas import (
     TaskResponse,
     TaskSummaryResponse,
 )
+from app.api.webhooks import webhook_dispatcher
 from app.api.websocket import ws_manager
 from app.core.logging import get_logger
 from app.core.orchestrator import OrchestratorCore
@@ -34,8 +35,6 @@ from app.memory.db import db_manager
 from app.memory.models import TaskState
 from app.memory.state_store import StateStore
 from app.memory.task_lifecycle import InvalidStateTransitionError, TaskStateMachine
-
-from app.api.webhooks import webhook_dispatcher
 
 logger = get_logger("api.tasks")
 tasks_router = APIRouter(prefix="/tasks", tags=["Tasks"])
@@ -410,7 +409,7 @@ async def cancel_task(
     reason = request.reason if request else "Cancelled via FRIDAY management API"
 
     try:
-        updated_task = await lifecycle.transition(
+        await lifecycle.transition(
             task_id=task_id,
             to_state=TaskState.CANCELLED,
             reason=reason,
@@ -465,7 +464,7 @@ async def archive_task(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Task '{task_id}' not found.")
 
     task.metadata["archived"] = True
-    task.metadata["archived_at"] = datetime.now().isoformat()
+    task.metadata["archived_at"] = datetime.now(UTC).isoformat()
     await store.save_task(task)
 
     logger.info(f"Task '{task_id}' archived successfully.")

@@ -3,7 +3,6 @@ Unit tests for Multi-Language and Framework Expansion in Project FORGE.
 """
 
 from pathlib import Path
-import pytest
 
 from app.agents.language_builders import (
     FullStackBuilder,
@@ -97,7 +96,7 @@ def test_fullstack_builder(tmp_path: Path):
     manifest = builder.file_manifest("Fullstack React + FastAPI application")
     assert "contracts/api_contract.json" in manifest.files_to_generate
 
-    files = builder.scaffold_project("Fullstack React + FastAPI application", tmp_path)
+    builder.scaffold_project("Fullstack React + FastAPI application", tmp_path)
     assert (tmp_path / "backend" / "app" / "main.py").exists()
     assert (tmp_path / "frontend" / "package.json").exists()
     assert (tmp_path / "contracts" / "api_contract.json").exists()

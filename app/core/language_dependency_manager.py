@@ -5,7 +5,7 @@ Supports Python (pip/requirements.txt), Node.js/JavaScript (npm/package.json), a
 
 import json
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+
 from pydantic import BaseModel, Field
 
 from app.core.logging import get_logger
@@ -17,8 +17,8 @@ class DependencyCheckResult(BaseModel):
     is_valid: bool
     language: str
     manifest_file: str
-    dependencies: Dict[str, str] = Field(default_factory=dict)
-    warnings: List[str] = Field(default_factory=list)
+    dependencies: dict[str, str] = Field(default_factory=dict)
+    warnings: list[str] = Field(default_factory=list)
     install_command: str = ""
 
 
@@ -39,8 +39,8 @@ class LanguageDependencyManager:
                 warnings=["requirements.txt not found in workspace."],
             )
 
-        deps: Dict[str, str] = {}
-        warnings: List[str] = []
+        deps: dict[str, str] = {}
+        warnings: list[str] = []
 
         for line in req_file.read_text(encoding="utf-8").splitlines():
             cleaned = line.strip()
@@ -65,7 +65,7 @@ class LanguageDependencyManager:
             install_command="pip install -r requirements.txt",
         )
 
-    def inspect_node_dependencies(self, subdir: Optional[str] = None) -> DependencyCheckResult:
+    def inspect_node_dependencies(self, subdir: str | None = None) -> DependencyCheckResult:
         """Inspect and parse Node.js package.json."""
         target_dir = (self.workspace_path / subdir) if subdir else self.workspace_path
         pkg_file = target_dir / "package.json"
@@ -81,7 +81,7 @@ class LanguageDependencyManager:
         try:
             data = json.loads(pkg_file.read_text(encoding="utf-8"))
             deps = {**data.get("dependencies", {}), **data.get("devDependencies", {})}
-            warnings: List[str] = []
+            warnings: list[str] = []
 
             if not data.get("name"):
                 warnings.append("package.json is missing 'name' field.")
@@ -104,13 +104,13 @@ class LanguageDependencyManager:
                 warnings=[f"Malformed package.json: {e}"],
             )
 
-    def remediate_vulnerabilities(self) -> List[str]:
+    def remediate_vulnerabilities(self) -> list[str]:
         """Scan and automatically upgrade vulnerable dependencies to safe patched versions."""
         from app.verification.security_scanner import OutputSecurityScanner
         scanner = OutputSecurityScanner(self.workspace_path)
         return scanner.remediate_vulnerable_dependencies()
 
-    def generate_lockfile(self, language: str) -> Optional[Path]:
+    def generate_lockfile(self, language: str) -> Path | None:
         """Generate simulated deterministic lockfile for dependency reproducibility."""
         if language == "python":
             req_res = self.inspect_python_dependencies()

@@ -3,13 +3,13 @@ Unit tests for Generic Consumer-Agnostic Webhook Dispatcher.
 """
 
 from unittest.mock import AsyncMock, patch
-from httpx import ASGITransport, AsyncClient, Response
+
 import pytest
-from app.api.webhooks import WebhookDispatcher, webhook_dispatcher
+from httpx import ASGITransport, AsyncClient, Response
+
+from app.api.webhooks import webhook_dispatcher
 from app.main import app
 from app.memory.db import db_manager
-from app.memory.models import TaskEntity, TaskState
-from app.memory.state_store import StateStore
 
 
 @pytest.mark.asyncio
@@ -25,7 +25,7 @@ async def test_webhook_dispatch_success():
         )
         assert delivered is True
         assert mock_post.call_count == 1
-        args, kwargs = mock_post.call_args
+        _, kwargs = mock_post.call_args
         payload = kwargs.get("json", {})
         assert payload["event"] == "stage_completed"
         assert payload["task_id"] == "task_webhook_1"

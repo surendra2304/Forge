@@ -5,7 +5,8 @@ Dispatches progress and lifecycle notifications only when a task provides an opt
 
 import asyncio
 from datetime import UTC, datetime
-from typing import Any, Dict, Optional
+from typing import Any
+
 import httpx
 from pydantic import BaseModel, Field
 
@@ -19,7 +20,7 @@ class GenericWebhookPayload(BaseModel):
     event: str  # task_started, stage_completed, verification_result, task_completed, task_failed
     timestamp: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
     task_id: str
-    data: Dict[str, Any] = Field(default_factory=dict)
+    data: dict[str, Any] = Field(default_factory=dict)
     source: str = "forge"
 
 
@@ -29,10 +30,10 @@ class WebhookDispatcher:
     @classmethod
     async def dispatch_event(
         cls,
-        webhook_url: Optional[str],
+        webhook_url: str | None,
         task_id: str,
         event: str,
-        data: Optional[Dict[str, Any]] = None,
+        data: dict[str, Any] | None = None,
         max_retries: int = 3,
     ) -> bool:
         """

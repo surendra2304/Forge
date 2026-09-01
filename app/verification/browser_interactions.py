@@ -3,9 +3,9 @@ Browser Interaction and UI Responsiveness Verifier for Project FORGE.
 Tests interactive elements (buttons, forms, links), form validation, viewport responsive breakpoints (375px/768px/1920px), JS console error tolerance, and accessibility focus navigation.
 """
 
-from pathlib import Path
 import re
-from typing import Any, Dict, List
+from pathlib import Path
+
 from bs4 import BeautifulSoup
 
 from app.core.logging import get_logger
@@ -146,7 +146,7 @@ class BrowserInteractionVerifier:
                 pass
 
         # Check media query coverage in CSS
-        media_queries_found: List[str] = []
+        media_queries_found: list[str] = []
         for css_file in css_files:
             try:
                 content = css_file.read_text(encoding="utf-8", errors="ignore")
@@ -195,7 +195,7 @@ class BrowserInteractionVerifier:
         """Scan JavaScript files for syntax/runtime hazards and check CSS/HTML for visible focus indicators."""
         js_files = list(self.workspace_path.rglob("*.js"))
         css_files = list(self.workspace_path.rglob("*.css"))
-        html_files = list(self.workspace_path.rglob("*.html"))
+        list(self.workspace_path.rglob("*.html"))
 
         js_hazards = []
         for js_file in js_files:
@@ -239,7 +239,7 @@ class BrowserInteractionVerifier:
             fix_suggestions=fix_suggestions,
         )
 
-    def run_all(self) -> List[VerificationCheck]:
+    def run_all(self) -> list[VerificationCheck]:
         """Run all browser interaction and responsiveness checks."""
         return [
             self.verify_interactive_elements(),

@@ -59,7 +59,7 @@ class GitHubTool:
     ) -> dict[str, Any]:
         """Create or checkout a local Git branch for the task."""
         self.pm.check_permission(role, ToolPermission.GIT_WRITE)
-        paths = self.wm.get_workspace_paths(task_id) or self.wm.create_workspace(task_id)
+        self.wm.get_workspace_paths(task_id) or self.wm.create_workspace(task_id)
 
         # Initialize repo if needed
         await self.git.init_repo(task_id, role=role)

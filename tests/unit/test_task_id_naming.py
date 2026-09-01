@@ -2,7 +2,7 @@
 Unit tests for human-readable Task ID and workspace directory naming format.
 """
 
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from unittest.mock import patch
 
@@ -19,7 +19,7 @@ from app.memory.state_store import StateStore
 @pytest.mark.asyncio
 async def test_generate_task_id_format():
     """Validates generate_task_id generates task<num><DDMMYYYY><HHMMSS>."""
-    fixed_time = datetime(2026, 8, 26, 11, 35, 42)
+    fixed_time = datetime(2026, 8, 26, 11, 35, 42, tzinfo=UTC)
     with patch("app.memory.models.datetime") as mock_dt:
         mock_dt.now.return_value = fixed_time
         task_id = generate_task_id(1)

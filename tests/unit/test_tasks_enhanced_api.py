@@ -7,7 +7,6 @@ from httpx import ASGITransport, AsyncClient
 
 from app.main import app
 from app.memory.db import db_manager
-from app.memory.state_store import StateStore
 
 
 @pytest.mark.asyncio

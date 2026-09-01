@@ -3,12 +3,11 @@ Unit and API integration tests for Template Marketplace and Smart Matcher in Pro
 """
 
 from fastapi.testclient import TestClient
-import pytest
 
 from app.agents.template_matcher import SmartTemplateMatcher
 from app.analytics.templates import TemplateAnalytics
 from app.main import app
-from app.marketplace.models import TemplateCategory, TemplateManifest, TemplateVariable
+from app.marketplace.models import TemplateCategory
 from app.marketplace.registry import TemplateRegistry
 
 

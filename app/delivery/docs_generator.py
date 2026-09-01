@@ -4,8 +4,8 @@ Generates comprehensive README.md, API endpoint specifications, and evaluates co
 """
 
 from pathlib import Path
-from typing import Any, Dict, List, Optional
-from pydantic import BaseModel, Field
+
+from pydantic import BaseModel
 
 from app.core.logging import get_logger
 
@@ -27,8 +27,8 @@ class DocumentationGenerator:
         self,
         project_name: str,
         goal: str,
-        requirements: Optional[List[str]] = None,
-        files: Optional[List[str]] = None,
+        requirements: list[str] | None = None,
+        files: list[str] | None = None,
         is_api: bool = False,
         is_cli: bool = False,
     ) -> str:

@@ -7,13 +7,12 @@ Provides predictive intelligence for autonomous build optimization:
 - CALIBRATION_FEEDBACK: Post-build outcome reporting for model self-tuning
 """
 
-from datetime import UTC, datetime
-from functools import lru_cache
 import math
 import os
-import re
-import time
-from typing import Any, Dict, List, Optional, Tuple
+from datetime import UTC, datetime
+from functools import lru_cache
+from typing import Any
+
 import httpx
 from pydantic import BaseModel, Field
 
@@ -29,8 +28,8 @@ class SuccessPrediction(BaseModel):
     archetype: str
     predicted_pass_probability: float = Field(..., ge=0.0, le=1.0)
     confidence: float = Field(default=0.90, ge=0.0, le=1.0)
-    risk_factors: List[str] = Field(default_factory=list)
-    recommended_mitigation: Optional[str] = None
+    risk_factors: list[str] = Field(default_factory=list)
+    recommended_mitigation: str | None = None
 
 
 class DurationForecast(BaseModel):
@@ -57,7 +56,7 @@ class FuturisBuildAssessment(BaseModel):
     """Consolidated predictive assessment for a proposed build task."""
     prediction_id: str = Field(default_factory=lambda: f"fut_{os.urandom(4).hex()}")
     goal: str
-    success_predictions: List[SuccessPrediction] = Field(default_factory=list)
+    success_predictions: list[SuccessPrediction] = Field(default_factory=list)
     best_template: SuccessPrediction
     duration_forecast: DurationForecast
     capacity_check: CapacityForecast
@@ -73,8 +72,8 @@ class FuturisBuildClient:
 
     def __init__(
         self,
-        base_url: Optional[str] = None,
-        api_key: Optional[str] = None,
+        base_url: str | None = None,
+        api_key: str | None = None,
         timeout: float = 6.0,
     ):
         settings = get_settings()
@@ -82,7 +81,7 @@ class FuturisBuildClient:
         self.api_key = api_key or getattr(settings, "futuris_api_key", None)
         self.timeout = timeout
         # Internal calibration feedback memory
-        self.calibration_history: List[Dict[str, Any]] = []
+        self.calibration_history: list[dict[str, Any]] = []
 
     async def check_health(self) -> bool:
         """Check if Futuris predictive service is reachable."""
@@ -96,15 +95,15 @@ class FuturisBuildClient:
     def predict_build_success(
         self,
         goal: str,
-        template_candidates: Optional[List[str]] = None,
-    ) -> List[SuccessPrediction]:
+        template_candidates: list[str] | None = None,
+    ) -> list[SuccessPrediction]:
         """
         Evaluate goal characteristics against historical success distribution
         and compute predicted verification pass probability across candidate templates.
         """
         goal_lower = goal.lower()
         candidates = template_candidates or ["default_scaffold", "modular_service", "minimal_script", "fullstack_app"]
-        predictions: List[SuccessPrediction] = []
+        predictions: list[SuccessPrediction] = []
 
         # Analyze task complexity & characteristics
         is_complex = any(k in goal_lower for k in ["full-stack", "fullstack", "kafka", "graphql", "real-time", "distributed", "auth", "oauth"])
@@ -160,7 +159,7 @@ class FuturisBuildClient:
     def forecast_duration(
         self,
         goal: str,
-        file_count_estimate: Optional[int] = None,
+        file_count_estimate: int | None = None,
     ) -> DurationForecast:
         """
         Forecast task build duration (seconds) with p50 and p90 confidence bounds.
@@ -237,7 +236,7 @@ class FuturisBuildClient:
         goal: str,
         current_active_tasks: int = 0,
         max_capacity: int = 10,
-        template_candidates: Optional[List[str]] = None,
+        template_candidates: list[str] | None = None,
     ) -> FuturisBuildAssessment:
         """
         Consolidated pre-build assessment:
@@ -269,7 +268,7 @@ class FuturisBuildClient:
         template_used: str,
         actual_duration_seconds: float,
         passed: bool,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Send build completion outcome back to Futuris for historical calibration improvement.
         """

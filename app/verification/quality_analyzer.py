@@ -4,11 +4,12 @@ Evaluates cyclomatic complexity, function/file lengths, duplicate code, dead cod
 """
 
 import ast
-from collections import defaultdict
 import hashlib
-from pathlib import Path
 import re
-from typing import Any, Dict, List, Set
+from collections import defaultdict
+from pathlib import Path
+from typing import Any
+
 from app.core.logging import get_logger
 from app.verification.advanced_battery import VerificationCheck
 
@@ -163,7 +164,7 @@ class CodeQualityAnalyzer:
 
     def analyze_duplicate_code(self) -> VerificationCheck:
         """Detect near-duplicate code blocks across codebase files using rolling hash shingles."""
-        block_hashes: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
+        block_hashes: dict[str, list[dict[str, Any]]] = defaultdict(list)
         duplicates = []
 
         for p in self.workspace_path.rglob("*"):
@@ -173,7 +174,7 @@ class CodeQualityAnalyzer:
                 continue
 
             try:
-                lines = [l.strip() for l in p.read_text(encoding="utf-8", errors="ignore").splitlines() if l.strip() and not l.strip().startswith(("#", "//"))]
+                lines = [line_text.strip() for line_text in p.read_text(encoding="utf-8", errors="ignore").splitlines() if line_text.strip() and not line_text.strip().startswith(("#", "//"))]
                 # 6-line sliding window shingle
                 for i in range(len(lines) - 5):
                     chunk = "\n".join(lines[i : i + 6])
@@ -209,14 +210,11 @@ class CodeQualityAnalyzer:
                 content = py_file.read_text(encoding="utf-8")
                 tree = ast.parse(content)
 
-                imported_names: Set[str] = set()
-                used_names: Set[str] = set()
+                imported_names: set[str] = set()
+                used_names: set[str] = set()
 
                 for node in ast.walk(tree):
-                    if isinstance(node, ast.Import):
-                        for alias in node.names:
-                            imported_names.add(alias.asname or alias.name)
-                    elif isinstance(node, ast.ImportFrom):
+                    if isinstance(node, ast.Import) or isinstance(node, ast.ImportFrom):
                         for alias in node.names:
                             imported_names.add(alias.asname or alias.name)
                     elif isinstance(node, ast.Name) and not isinstance(node.ctx, ast.Store):
@@ -329,7 +327,7 @@ class CodeQualityAnalyzer:
             ] if coverage_pct < 60.0 else [],
         )
 
-    def run_all(self) -> List[VerificationCheck]:
+    def run_all(self) -> list[VerificationCheck]:
         """Run all code quality checks."""
         return [
             self.analyze_cyclomatic_complexity(),

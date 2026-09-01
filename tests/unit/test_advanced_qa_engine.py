@@ -3,7 +3,6 @@ Unit tests for the Advanced Verification & Quality Assurance Engine in Project F
 """
 
 from pathlib import Path
-import pytest
 
 from app.verification.advanced_battery import (
     AdvancedSecurityVerifier,

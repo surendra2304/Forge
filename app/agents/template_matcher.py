@@ -3,27 +3,27 @@ Smart Template Matcher and Hybrid AI Scaffolding Engine for Project FORGE.
 """
 
 import re
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
+
 from pydantic import BaseModel, Field
 
 from app.core.logging import get_logger
-from app.marketplace.models import TemplateManifest
 from app.marketplace.registry import template_registry
 
 logger = get_logger("agents.template_matcher")
 
 
 class TemplateMatchResult(BaseModel):
-    matched_template_id: Optional[str] = None
-    template_name: Optional[str] = None
+    matched_template_id: str | None = None
+    template_name: str | None = None
     confidence: float = 0.0  # 0.0 to 1.0
     reasoning: str = ""
     use_hybrid_scaffold: bool = False
-    customization_hints: List[str] = Field(default_factory=list)
+    customization_hints: list[str] = Field(default_factory=list)
 
 
 # Keyword weights for semantic matching
-TEMPLATE_INTENT_RULES: Dict[str, Dict[str, Any]] = {
+TEMPLATE_INTENT_RULES: dict[str, dict[str, Any]] = {
     "portfolio-web": {
         "keywords": ["portfolio", "resume", "personal website", "showcase", "developer page", "bio"],
         "min_score": 0.85,
@@ -91,10 +91,10 @@ class SmartTemplateMatcher:
     """Matches task goals against curated marketplace templates to guide hybrid synthesis."""
 
     @classmethod
-    def match_goal(cls, goal: str, requirements: Optional[List[str]] = None) -> TemplateMatchResult:
+    def match_goal(cls, goal: str, requirements: list[str] | None = None) -> TemplateMatchResult:
         combined_text = f"{goal} {' '.join(requirements or [])}".lower()
 
-        best_template_id: Optional[str] = None
+        best_template_id: str | None = None
         best_score = 0.0
         best_reason = "No matching template found; generating codebase from scratch."
 

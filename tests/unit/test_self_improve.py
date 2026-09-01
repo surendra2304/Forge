@@ -3,12 +3,14 @@ Unit and API integration tests for Self-Improvement Engine.
 """
 
 from pathlib import Path
-from httpx import ASGITransport, AsyncClient
+
 import pytest
+from httpx import ASGITransport, AsyncClient
+
 from app.improvement.models import ProposalStatus
 from app.improvement.self_improve import SelfImprovementEngine
 from app.main import app
-from app.memory.db import DatabaseManager, db_manager
+from app.memory.db import DatabaseManager
 from app.memory.models import TaskEntity, TaskState
 from app.memory.state_store import StateStore
 

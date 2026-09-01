@@ -6,7 +6,6 @@ and formulates actionable improvement proposals that require explicit human appr
 
 from collections import defaultdict
 from datetime import UTC, datetime, timedelta
-from typing import Any, Dict, List, Optional
 
 from app.core.logging import get_logger
 from app.improvement.models import (
@@ -24,10 +23,10 @@ logger = get_logger("improvement.self_improve")
 class SelfImprovementEngine:
     """Mines task histories for failure clusters and governs safe improvement proposals."""
 
-    def __init__(self, db: Optional[DatabaseManager] = None):
+    def __init__(self, db: DatabaseManager | None = None):
         self.db = db or db_manager
         self.store = StateStore(self.db)
-        self.proposals: Dict[str, ImprovementProposal] = {}
+        self.proposals: dict[str, ImprovementProposal] = {}
 
     async def generate_weekly_report(self, days: int = 7) -> SelfImprovementReport:
         """Analyze failed tasks from past N days, cluster root causes, and generate proposals."""
@@ -37,7 +36,7 @@ class SelfImprovementEngine:
         recent_tasks = [t for t in tasks if t.created_at and t.created_at >= cutoff]
         failed_tasks = [t for t in recent_tasks if t.state == TaskState.FAILED]
 
-        clusters: Dict[str, List[TaskEntity]] = defaultdict(list)
+        clusters: dict[str, list[TaskEntity]] = defaultdict(list)
 
         for t in failed_tasks:
             err = (t.error_message or "").lower()
@@ -54,7 +53,7 @@ class SelfImprovementEngine:
             else:
                 clusters["runtime_failures"].append(t)
 
-        new_proposals: List[ImprovementProposal] = []
+        new_proposals: list[ImprovementProposal] = []
 
         # Formulate proposal for missing dependencies if failures detected
         if len(clusters.get("missing_dependencies", [])) >= 1:
@@ -121,7 +120,7 @@ class SelfImprovementEngine:
             proposals=list(self.proposals.values()),
         )
 
-    def apply_proposal(self, proposal_id: str) -> Optional[ImprovementProposal]:
+    def apply_proposal(self, proposal_id: str) -> ImprovementProposal | None:
         """
         Apply an approved improvement proposal.
         SAFETY RULE: Never executes without explicit approval.

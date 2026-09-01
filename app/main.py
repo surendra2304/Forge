@@ -20,7 +20,6 @@ from app.core.config import get_settings
 from app.core.logging import get_logger, setup_logging
 from app.dashboard.routes import dashboard_router
 from app.memory.db import db_manager
-from app.monitoring.production_monitor import production_monitor
 from app.optimization.performance import performance_optimizer
 
 logger = get_logger("main")

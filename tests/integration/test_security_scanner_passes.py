@@ -2,13 +2,13 @@
 Integration Test: Security Scanner Allows Clean, Secure Deliverables.
 """
 
-from pathlib import Path
 import tempfile
+from pathlib import Path
+
 import pytest
 
 from app.verification.security_scanner import (
     OutputSecurityScanner,
-    SecuritySeverity,
 )
 
 

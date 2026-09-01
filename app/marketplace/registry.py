@@ -2,8 +2,6 @@
 Curated Template Registry and Variable Interpolation Engine for Project FORGE.
 """
 
-from pathlib import Path
-from typing import Dict, List, Optional
 from app.core.logging import get_logger
 from app.marketplace.models import TemplateCategory, TemplateManifest, TemplateVariable
 
@@ -14,7 +12,7 @@ class TemplateRegistry:
     """In-memory and file-backed catalog of curated templates."""
 
     def __init__(self):
-        self._templates: Dict[str, TemplateManifest] = {}
+        self._templates: dict[str, TemplateManifest] = {}
         self._load_curated_templates()
 
     def _load_curated_templates(self):
@@ -257,18 +255,18 @@ class TemplateRegistry:
         self._templates[manifest.id] = manifest
         return manifest
 
-    def get_template(self, template_id: str) -> Optional[TemplateManifest]:
+    def get_template(self, template_id: str) -> TemplateManifest | None:
         """Fetch template by ID."""
         return self._templates.get(template_id)
 
     def list_templates(
         self,
-        category: Optional[TemplateCategory] = None,
-        language: Optional[str] = None,
-        framework: Optional[str] = None,
-        query: Optional[str] = None,
+        category: TemplateCategory | None = None,
+        language: str | None = None,
+        framework: str | None = None,
+        query: str | None = None,
         sort_by: str = "rating",  # rating, downloads, name
-    ) -> List[TemplateManifest]:
+    ) -> list[TemplateManifest]:
         """Filter and sort catalog templates."""
         results = list(self._templates.values())
 
@@ -291,7 +289,7 @@ class TemplateRegistry:
 
         return results
 
-    def render_template(self, template_id: str, variables: Dict[str, str]) -> Dict[str, str]:
+    def render_template(self, template_id: str, variables: dict[str, str]) -> dict[str, str]:
         """Render all files in a template with supplied variable values."""
         template = self.get_template(template_id)
         if not template:
