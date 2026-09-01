@@ -37,9 +37,9 @@ class AIUniverseClient:
         self.base_url = (base_url or settings.ai_universe_url).rstrip("/")
         self.api_key = api_key if api_key is not None else settings.ai_universe_api_key
         if timeout is None:
-            self.timeout = httpx.Timeout(10.0, connect=1.0)
+            self.timeout = httpx.Timeout(60.0, connect=5.0)
         elif isinstance(timeout, (int, float)):
-            self.timeout = httpx.Timeout(timeout, connect=min(timeout, 2.0))
+            self.timeout = httpx.Timeout(timeout, connect=min(timeout, 5.0))
         else:
             self.timeout = timeout
 
@@ -70,6 +70,37 @@ class AIUniverseClient:
             response.raise_for_status()
             data = response.json()
             return AIUniverseResponse(**data)
+
+    async def generate_code(
+        self,
+        filename: str,
+        goal: str,
+        file_type: str = "python",
+        requirements: list[str] | None = None,
+        context: dict | None = None,
+    ) -> AIUniverseResponse:
+        """
+        Query Inference specialized code generation service: POST /v1/forge/generate-code
+        """
+        url = f"{self.base_url}/v1/forge/generate-code"
+        headers = self._get_headers()
+        payload = {
+            "filename": filename,
+            "file_type": file_type,
+            "requirements": requirements or [],
+            "context": context or {"project_goal": goal},
+        }
+
+        logger.info(f"Querying Inference generate-code service for '{filename}'")
+        async with httpx.AsyncClient(timeout=self.timeout) as client:
+            response = await client.post(url, json=payload, headers=headers)
+            response.raise_for_status()
+            data = response.json()
+            return AIUniverseResponse(
+                answer=data.get("code", ""),
+                confidence=data.get("confidence", 0.90),
+                run_id=data.get("filename", filename),
+            )
 
     async def debate(self, question: str, max_agents: int = 5) -> AIUniverseResponse:
         """

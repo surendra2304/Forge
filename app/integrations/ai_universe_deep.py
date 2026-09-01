@@ -116,7 +116,7 @@ class DeepAIUniverseIntegration:
         )
 
         try:
-            res = await self.client.debate(topic=debate_prompt, rounds=2)
+            res = await self.client.debate(question=debate_prompt, max_agents=3)
             if not res:
                 return CodeReviewResult(original_code=code, confidence=0.0)
 

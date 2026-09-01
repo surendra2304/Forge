@@ -77,7 +77,7 @@ class ArchitectRole(BaseAgent):
             ai_res = await ai_client.consult_with_verification(
                 question=f"Architectural tradeoffs, schemas, and module structure for: {goal}. Stage: {node_title}",
                 min_confidence=0.70,
-                use_debate=True,
+                use_debate=False,
             )
             if ai_res:
                 consensus_info = f"\nExternal Multi-Agent Consensus (Run ID: {ai_res.run_id}):\n{ai_res.answer}\n"
@@ -317,14 +317,38 @@ class DeveloperRole(BaseAgent):
             try:
                 from app.integrations.ai_universe_client import get_ai_universe_client
                 ai_client = get_ai_universe_client()
-                ask_prompt = (
-                    f"Write the complete code for {filename} based on the overall architecture: {goal or node_title}.\n"
-                    f"{research_context_str}\n\n"
-                    f"Security requirements: Input validation on all user inputs, parameterized SQL (never string concatenation), "
-                    f"clean error handling without stack trace leaks, secure default configurations, authentication checks on protected endpoints, "
-                    f"and CSRF / secure headers where applicable. Return ONLY the raw code."
-                )
-                ai_res = await ai_client.ask(question=ask_prompt, mode="auto")
+                # Determine file type
+                ext = filename.split(".")[-1].lower() if "." in filename else "python"
+                file_type = "python"
+                if ext in ["html", "htm"]:
+                    file_type = "html"
+                elif ext in ["css", "scss"]:
+                    file_type = "css"
+                elif ext in ["js", "jsx", "ts", "tsx"]:
+                    file_type = "js"
+                elif ext == "json":
+                    file_type = "json"
+                elif ext in ["md", "markdown"]:
+                    file_type = "markdown"
+
+                try:
+                    ai_res = await ai_client.generate_code(
+                        filename=filename,
+                        goal=goal or node_title,
+                        file_type=file_type,
+                        requirements=context.get("requirements", []),
+                        context={"project_goal": goal, "research_context": research_context_str},
+                    )
+                except Exception as e_gen:
+                    logger.debug(f"Direct generate-code endpoint failed ({e_gen}), trying ask endpoint...")
+                    ask_prompt = (
+                        f"Write the complete code for {filename} based on the overall architecture: {goal or node_title}.\n"
+                        f"{research_context_str}\n\n"
+                        f"Security requirements: Input validation on all user inputs, parameterized SQL (never string concatenation), "
+                        f"clean error handling without stack trace leaks, secure default configurations, authentication checks on protected endpoints, "
+                        f"and CSRF / secure headers where applicable. Return ONLY the raw code."
+                    )
+                    ai_res = await ai_client.ask(question=ask_prompt, mode="auto")
 
                 if ai_res and ai_res.confidence >= 0.70 and ai_res.answer and ai_res.answer.strip():
                     ai_code = ai_res.answer
