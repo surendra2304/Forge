@@ -129,6 +129,31 @@ class AIUniverseClient:
             response.raise_for_status()
             return response.json()
 
+    async def generate_tests(
+        self,
+        code: str,
+        file_type: str = "python",
+        test_framework: str = "pytest",
+        coverage_targets: list[str] | None = None,
+    ) -> dict[str, Any]:
+        """
+        Query Inference specialized test generation service: POST /v1/forge/generate-tests
+        """
+        url = f"{self.base_url}/v1/forge/generate-tests"
+        headers = self._get_headers()
+        payload = {
+            "code": code,
+            "file_type": file_type,
+            "test_framework": test_framework,
+            "coverage_targets": coverage_targets or [],
+        }
+
+        logger.info(f"Querying Inference test generation service for {file_type} code ({len(code)} bytes)")
+        async with httpx.AsyncClient(timeout=self.timeout) as client:
+            response = await client.post(url, json=payload, headers=headers)
+            response.raise_for_status()
+            return response.json()
+
     async def debate(self, question: str, max_agents: int = 5) -> AIUniverseResponse:
         """
         Initiate an adversarial multi-agent debate in AI Universe for complex decisions: POST /v1/friday/debate

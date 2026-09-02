@@ -322,9 +322,12 @@ class DeveloperRole(BaseAgent):
         except Exception:
             pass
 
-        # 2. Iterate through each file in File Manifest and synthesize code
+        # 2. Iterate through each implementation file in File Manifest and synthesize code
         for filename in file_manifest:
             if not filename or not isinstance(filename, str):
+                continue
+            # Skip test files and README in developer role as TesterRole and ReleaseEngineer handle them
+            if filename.startswith("test_") or filename == "README.md":
                 continue
 
             ai_code = None
@@ -598,18 +601,64 @@ class TesterRole(BaseAgent):
 
         # Check existing test files
         test_files = engine.fs.search_files(task_id=task_id, pattern="test_*.py", role=self.role_name)
+        existing_test_is_stub = False
+        if test_files:
+            try:
+                first_test_content = engine.fs.read_file(task_id, test_files[0], role=self.role_name)
+                if "assert main() == 0" in first_test_content and len(first_test_content.splitlines()) <= 6:
+                    existing_test_is_stub = True
+            except Exception:
+                pass
 
-        # If no tests exist and this is a test generation step, prompt for test synthesis
-        if not test_files and "verify" not in node_title.lower():
-            prompt = (
-                f"Objective: {goal}\n"
-                f"QA Task: {node_title}\n"
-                f"{workspace_summary}\n\n"
-                f"Write comprehensive pytest unit tests for the existing application.\n"
-                f"Format tests as:\n### File: test_main.py\n```python\n...\n```"
-            )
-            response = await self.prompt_model(prompt)
-            self.apply_extracted_files(task_id, response.content, engine, default_filename="test_main.py")
+        # If no tests exist or only dummy stub exists, synthesize tests via Inference
+        if not test_files or existing_test_is_stub:
+            test_synthesized = False
+            try:
+                from app.integrations.ai_universe_client import get_ai_universe_client
+                ai_client = get_ai_universe_client()
+                
+                # Try generating tests from existing main.py / implementation files
+                main_code = ""
+                try:
+                    main_code = engine.fs.read_file(task_id, "main.py", role=self.role_name)
+                except Exception:
+                    pass
+
+                if main_code:
+                    test_res = await ai_client.generate_tests(
+                        code=main_code,
+                        file_type="python",
+                        test_framework="pytest",
+                        coverage_targets=["happy_path", "boundary_conditions", "error_handling"],
+                    )
+                    if test_res and test_res.get("test_code"):
+                        test_code = test_res["test_code"]
+                        engine.fs.create_file(
+                            task_id=task_id,
+                            relative_path="test_main.py",
+                            content=test_code,
+                            role=self.role_name,
+                        )
+                        engine.fs.create_file(
+                            task_id=task_id,
+                            relative_path="tests/test_main.py",
+                            content=test_code,
+                            role=self.role_name,
+                        )
+                        test_synthesized = True
+            except Exception:
+                pass
+
+            if not test_synthesized:
+                prompt = (
+                    f"Objective: {goal}\n"
+                    f"QA Task: {node_title}\n"
+                    f"{workspace_summary}\n\n"
+                    f"Write comprehensive pytest unit tests for the existing application.\n"
+                    f"Format tests as:\n### File: test_main.py\n```python\n...\n```"
+                )
+                response = await self.prompt_model(prompt)
+                self.apply_extracted_files(task_id, response.content, engine, default_filename="test_main.py")
 
         # Execute test runner
         cmd_res = await engine.terminal.run_command(task_id=task_id, command="pytest -v", role=self.role_name)

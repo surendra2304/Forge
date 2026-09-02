@@ -193,6 +193,22 @@ class RecoveryEngine:
             if diagnosis.failing_line and 0 < diagnosis.failing_line <= len(lines):
                 bad_line = lines[diagnosis.failing_line - 1]
                 fixed_line = bad_line
+
+                # Check if failure is due to empty block or comment after except/def/try/if
+                prev_line = lines[diagnosis.failing_line - 2] if diagnosis.failing_line >= 2 else ""
+                if prev_line.strip().startswith("except ") and (not bad_line.strip() or bad_line.strip().startswith("#")):
+                    indent = " " * (len(prev_line) - len(prev_line.lstrip()) + 4)
+                    lines.insert(diagnosis.failing_line - 1, f"{indent}print(f'Error: {{exc}}', file=sys.stderr)")
+                    lines.insert(diagnosis.failing_line, f"{indent}return 1")
+                    if "__main__" not in current_content:
+                        lines.append('\nif __name__ == "__main__":\n    main()\n')
+                    return RepairPatch(
+                        target_file=target_file,
+                        replacement_snippet="\n".join(lines) + "\n",
+                        explanation=f"Repaired missing exception block on line {diagnosis.failing_line}",
+                        patch_type="rewrite",
+                    )
+
                 if fixed_line.count('"') % 2 != 0:
                     fixed_line += '"'
                 if fixed_line.count("'") % 2 != 0:

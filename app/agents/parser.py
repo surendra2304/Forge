@@ -39,7 +39,10 @@ class LLMResponseParser:
         if not response_text or not response_text.strip():
             return []
 
-        text = response_text.strip()
+        # Normalize unicode hyphens and dashes (e.g. \u2011, \u2013, \u2014) to standard ASCII '-'
+        text = response_text.replace("\u2011", "-").replace("\u2013", "-").replace("\u2014", "-")
+        text = text.replace("\u2018", "'").replace("\u2019", "'").replace("\u201c", '"').replace("\u201d", '"')
+        text = text.strip()
         extracted: list[ExtractedFile] = []
         seen_paths: set[str] = set()
 

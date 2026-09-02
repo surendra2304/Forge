@@ -88,9 +88,16 @@ async def handle_build(
                 task_id,
                 "tests/test_main.py",
                 (
-                    'from main import main\n\n'
-                    'def test_main():\n'
-                    '    assert main() == 0\n'
+                    'import pytest\n'
+                    'from main import build_parser, main\n\n'
+                    'def test_parser_creation():\n'
+                    '    parser = build_parser()\n'
+                    '    assert parser is not None\n\n'
+                    'def test_help_execution():\n'
+                    '    parser = build_parser()\n'
+                    '    with pytest.raises(SystemExit) as exc_info:\n'
+                    '        parser.parse_args(["--help"])\n'
+                    '    assert exc_info.value.code == 0\n'
                 ),
             )
 
