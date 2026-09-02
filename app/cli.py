@@ -113,13 +113,17 @@ async def handle_build(
         # 5. Debug / Recovery Loop if any verification check failed
         if not report.all_passed:
             progress.update(task_p, description="[red]Verification failed. Initiating Self-Repair & Debugger...")
+            any_recovered = False
             for ev in report.evidence:
                 if not ev.passed:
                     recovered, msg, patch = await recovery_engine.attempt_recovery(task_id, ev)
                     if recovered:
+                        any_recovered = True
                         console.print(f"[green][OK] Self-Repair succeeded:[/green] {msg}")
                     else:
                         console.print(f"[red][FAIL] Self-Repair warning:[/red] {msg}")
+            if any_recovered:
+                report = await verification_engine.verify_task(task_id)
 
         # Re-check task status from store to reflect accurate final state
         store = StateStore(db_manager)

@@ -3,6 +3,8 @@ AI Universe Multi-Agent Intelligence Client for Project FORGE.
 Enables peer reasoning and debate integration with external AI Universe running at http://localhost:8000.
 """
 
+from typing import Any
+
 import httpx
 from pydantic import BaseModel, Field
 
@@ -101,6 +103,31 @@ class AIUniverseClient:
                 confidence=data.get("confidence", 0.90),
                 run_id=data.get("filename", filename),
             )
+
+    async def plan_architecture(
+        self,
+        goal: str,
+        project_type: str = "web",
+        constraints: list[str] | None = None,
+        preferences: list[str] | None = None,
+    ) -> dict[str, Any]:
+        """
+        Query Inference specialized architecture planning service: POST /v1/forge/plan-architecture
+        """
+        url = f"{self.base_url}/v1/forge/plan-architecture"
+        headers = self._get_headers()
+        payload = {
+            "goal": goal,
+            "project_type": project_type,
+            "constraints": constraints or [],
+            "preferences": preferences or [],
+        }
+
+        logger.info(f"Querying Inference architecture planning service for '{goal[:40]}'")
+        async with httpx.AsyncClient(timeout=self.timeout) as client:
+            response = await client.post(url, json=payload, headers=headers)
+            response.raise_for_status()
+            return response.json()
 
     async def debate(self, question: str, max_agents: int = 5) -> AIUniverseResponse:
         """
