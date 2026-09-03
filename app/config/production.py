@@ -18,6 +18,7 @@ class EnvironmentType(str, Enum):
 
 class ProductionSettings(BaseModel):
     """Production-grade security, logging, and operational configuration."""
+
     env: EnvironmentType = Field(
         default_factory=lambda: EnvironmentType(os.getenv("FORGE_ENV", "development").lower())
     )
@@ -31,18 +32,20 @@ class ProductionSettings(BaseModel):
 
     # API Security
     api_key_required: bool = Field(
-        default_factory=lambda: os.getenv("API_KEY_REQUIRED", "false").lower() in ["true", "1", "yes"]
+        default_factory=lambda: (
+            os.getenv("API_KEY_REQUIRED", "false").lower() in ["true", "1", "yes"]
+        )
     )
-    forge_api_key: str | None = Field(
-        default_factory=lambda: os.getenv("FORGE_API_KEY")
-    )
+    forge_api_key: str | None = Field(default_factory=lambda: os.getenv("FORGE_API_KEY"))
     secret_key: str = Field(
         default_factory=lambda: os.getenv("FORGE_SECRET_KEY", secrets.token_hex(32))
     )
 
     # Network
     cors_origins: list[str] = Field(
-        default_factory=lambda: [o.strip() for o in os.getenv("CORS_ORIGINS", "*").split(",") if o.strip()]
+        default_factory=lambda: [
+            o.strip() for o in os.getenv("CORS_ORIGINS", "*").split(",") if o.strip()
+        ]
     )
 
     # Hardening

@@ -41,8 +41,6 @@ class DiagnosticResponse(BaseModel):
     alerts: AlertStatus
 
 
-
-
 @health_router.get("/health", response_model=LivenessResponse, summary="Liveness Probe")
 async def health_liveness():
     """Lightweight liveness probe checking that HTTP server is responsive."""
@@ -72,7 +70,11 @@ async def health_readiness():
 
     try:
         settings = get_settings()
-        ws_dir = settings.base_dir / settings.workspaces_dir if not settings.workspaces_dir.is_absolute() else settings.workspaces_dir
+        ws_dir = (
+            settings.base_dir / settings.workspaces_dir
+            if not settings.workspaces_dir.is_absolute()
+            else settings.workspaces_dir
+        )
         ws_dir.mkdir(parents=True, exist_ok=True)
         test_file = ws_dir / ".write_test"
         test_file.write_text("ok", encoding="utf-8")
@@ -98,7 +100,9 @@ async def health_readiness():
     )
 
 
-@health_router.get("/health/detailed", response_model=DiagnosticResponse, summary="Detailed Diagnostics")
+@health_router.get(
+    "/health/detailed", response_model=DiagnosticResponse, summary="Detailed Diagnostics"
+)
 async def health_detailed():
     """Comprehensive diagnostic diagnostics across storage, AI-Universe, and system resources."""
     settings = get_settings()
@@ -159,7 +163,6 @@ async def health_detailed():
         },
         alerts=alerts,
     )
-
 
 
 @health_router.get("/metrics", summary="Prometheus Metrics Exporter")

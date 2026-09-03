@@ -73,7 +73,9 @@ async def test_verification_engine_battery(verification_context):
     task_id = "test_engine_battery"
 
     wm.write_project_file(task_id, "main.py", "def run():\n    return 'OK'\n")
-    wm.write_project_file(task_id, "test_main.py", "from main import run\ndef test_run():\n    assert run() == 'OK'\n")
+    wm.write_project_file(
+        task_id, "test_main.py", "from main import run\ndef test_run():\n    assert run() == 'OK'\n"
+    )
 
     verifier = VerificationEngine(engine=engine, wm=wm)
     report = await verifier.verify_task(task_id)

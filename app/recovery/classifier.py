@@ -48,11 +48,16 @@ class FailureClassifier:
             or evidence.check_name == "Python AST Build & Syntax Check"
         )
         if is_syntax:
-            file_match = re.search(r'(?:File "|[\'"]file[\'"]:\s*[\'"]|([a-zA-Z0-9_\-./\\]+\.py)[,\s]+line\s+)(\d+)?', text)
+            file_match = re.search(
+                r'(?:File "|[\'"]file[\'"]:\s*[\'"]|([a-zA-Z0-9_\-./\\]+\.py)[,\s]+line\s+)(\d+)?',
+                text,
+            )
             # Try structured dictionary match from AST checker: [{'file': 'main.py', 'line': 12
-            dict_match = re.search(r"['\"]file['\"]:\s*['\"]([^'\"]+)['\"],\s*['\"]line['\"]:\s*(\d+)", text)
+            dict_match = re.search(
+                r"['\"]file['\"]:\s*['\"]([^'\"]+)['\"],\s*['\"]line['\"]:\s*(\d+)", text
+            )
             file_path_match = re.search(r'File "([^"]+)", line (\d+)', text)
-            paren_match = re.search(r'invalid syntax \(([^,]+),\s*line\s*(\d+)\)', text)
+            paren_match = re.search(r"invalid syntax \(([^,]+),\s*line\s*(\d+)\)", text)
 
             failing_f = None
             failing_l = None
@@ -67,7 +72,11 @@ class FailureClassifier:
                 failing_f = paren_match.group(1)
                 failing_l = int(paren_match.group(2))
 
-            msg_match = re.search(r'(SyntaxError|IndentationError|TabError|invalid syntax)[\s:]*(.*)', text, re.IGNORECASE)
+            msg_match = re.search(
+                r"(SyntaxError|IndentationError|TabError|invalid syntax)[\s:]*(.*)",
+                text,
+                re.IGNORECASE,
+            )
             return FailureDiagnosis(
                 failure_class=FailureClass.SYNTAX_ERROR,
                 failing_file=failing_f,
@@ -80,7 +89,7 @@ class FailureClassifier:
 
         # 2. Dependency Missing / Import Error
         if "ModuleNotFoundError:" in text or "ImportError:" in text or "No module named" in text:
-            msg_match = re.search(r'(ModuleNotFoundError|ImportError): (.*)', text)
+            msg_match = re.search(r"(ModuleNotFoundError|ImportError): (.*)", text)
             return FailureDiagnosis(
                 failure_class=FailureClass.DEPENDENCY_MISSING,
                 error_message=msg_match.group(0) if msg_match else "Missing dependency or module",
@@ -110,8 +119,13 @@ class FailureClassifier:
             )
 
         # 5. Logic Bug / Test Failure
-        if "AssertionError" in text or "FAILED (" in text or "FAILED tests" in text or "FAILED" in text:
-            file_match = re.search(r'([\w/\\._-]+\.py):(\d+): in ', text)
+        if (
+            "AssertionError" in text
+            or "FAILED (" in text
+            or "FAILED tests" in text
+            or "FAILED" in text
+        ):
+            file_match = re.search(r"([\w/\\._-]+\.py):(\d+): in ", text)
             return FailureDiagnosis(
                 failure_class=FailureClass.LOGIC_BUG,
                 failing_file=file_match.group(1) if file_match else None,

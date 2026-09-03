@@ -65,7 +65,7 @@ class BaseModelProvider(ABC):
         """Generate a complete text completion."""
 
     @abstractmethod
-    async def stream(
+    def stream(
         self,
         prompt: str,
         system_prompt: str | None = None,

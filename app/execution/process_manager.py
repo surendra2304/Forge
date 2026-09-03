@@ -91,10 +91,14 @@ class ProcessManagerTool:
 
         self._processes[key] = proc
         self._info[key] = info
-        logger.info(f"Started background process '{process_id}' (pid={proc.pid}) in task '{task_id}'")
+        logger.info(
+            f"Started background process '{process_id}' (pid={proc.pid}) in task '{task_id}'"
+        )
         return info
 
-    def inspect_process(self, task_id: str, process_id: str, role: str = "developer") -> ProcessInfo | None:
+    def inspect_process(
+        self, task_id: str, process_id: str, role: str = "developer"
+    ) -> ProcessInfo | None:
         """Inspect current state and PID of a background process."""
         self.pm.check_permission(role, ToolPermission.FS_READ)
         key = self._key(task_id, process_id)
@@ -127,11 +131,19 @@ class ProcessManagerTool:
             return False
 
         try:
+            if os.name == "nt":
+                import subprocess
+
+                subprocess.run(
+                    ["taskkill", "/F", "/T", "/PID", str(proc.pid)],
+                    capture_output=True,
+                    timeout=5,
+                )
             proc.terminate()
             await asyncio.sleep(0.1)
             if proc.returncode is None:
                 proc.kill()
-        except ProcessLookupError:
+        except Exception:
             pass
 
         if info:
@@ -142,7 +154,9 @@ class ProcessManagerTool:
         logger.info(f"Stopped background process '{process_id}' in task '{task_id}'")
         return True
 
-    async def restart_process(self, task_id: str, process_id: str, role: str = "developer") -> ProcessInfo:
+    async def restart_process(
+        self, task_id: str, process_id: str, role: str = "developer"
+    ) -> ProcessInfo:
         """Restart an existing background process."""
         self.pm.check_permission(role, ToolPermission.PROCESS_SPAWN)
         self.pm.check_permission(role, ToolPermission.PROCESS_KILL)
@@ -163,7 +177,7 @@ class ProcessManagerTool:
         prefix = f"{task_id}:"
         for key in list(self._info.keys()):
             if key.startswith(prefix):
-                proc_id = key[len(prefix):]
+                proc_id = key[len(prefix) :]
                 inspected = self.inspect_process(task_id, proc_id, role=role)
                 if inspected:
                     results.append(inspected)

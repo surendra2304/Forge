@@ -12,25 +12,42 @@ from app.providers.base import ProviderCapabilities, ProviderHealthStatus
 
 # --- Task Metadata & Requests ---
 
+
 class TaskMetadata(BaseModel):
     source: str | None = Field(default=None, description="Optional caller identifier")
-    priority: str = Field(default="normal", description="Task execution priority: normal | high | urgent")
+    priority: str = Field(
+        default="normal", description="Task execution priority: normal | high | urgent"
+    )
     deadline: datetime | None = Field(default=None, description="Optional target deadline")
     tags: list[str] = Field(default_factory=list, description="Categorization or project tags")
-    webhook_url: str | None = Field(default=None, description="Optional webhook URL for progress and lifecycle notifications")
+    webhook_url: str | None = Field(
+        default=None, description="Optional webhook URL for progress and lifecycle notifications"
+    )
     archived: bool = Field(default=False, description="Soft-archive status")
 
 
 class TaskCreateRequest(BaseModel):
     goal: str = Field(..., description="High-level engineering objective", min_length=3)
-    requirements: list[str] = Field(default_factory=list, description="Explicit constraints or requirements")
+    requirements: list[str] = Field(
+        default_factory=list, description="Explicit constraints or requirements"
+    )
     mode: TaskMode = Field(default=TaskMode.AUTONOMOUS, description="Execution mode")
-    workspace: str | None = Field(default=None, description="Optional custom workspace path or identifier")
-    repo_url: str | None = Field(default=None, description="Optional remote Git repository URL to clone")
-    local_path: str | None = Field(default=None, description="Optional local directory path to copy into project sandbox")
+    workspace: str | None = Field(
+        default=None, description="Optional custom workspace path or identifier"
+    )
+    repo_url: str | None = Field(
+        default=None, description="Optional remote Git repository URL to clone"
+    )
+    local_path: str | None = Field(
+        default=None, description="Optional local directory path to copy into project sandbox"
+    )
     max_budget: float = Field(default=10.0, ge=0.1, description="Maximum allowed budget in USD")
-    task_metadata: TaskMetadata | None = Field(default=None, description="Optional caller task metadata")
-    webhook_url: str | None = Field(default=None, description="Optional webhook URL for progress events")
+    task_metadata: TaskMetadata | None = Field(
+        default=None, description="Optional caller task metadata"
+    )
+    webhook_url: str | None = Field(
+        default=None, description="Optional webhook URL for progress events"
+    )
 
 
 class TaskActionRequest(BaseModel):
@@ -38,6 +55,7 @@ class TaskActionRequest(BaseModel):
 
 
 # --- Task Responses ---
+
 
 class TaskSummaryResponse(BaseModel):
     id: str
@@ -87,6 +105,7 @@ class TaskActionResponse(BaseModel):
 
 # --- Deep Inspection & Logs ---
 
+
 class FileInspection(BaseModel):
     path: str
     size_bytes: int
@@ -118,6 +137,7 @@ class TaskLogsResponse(BaseModel):
 
 # --- Run / Audit Event Schemas ---
 
+
 class AuditEventResponse(BaseModel):
     id: str
     task_id: str
@@ -134,6 +154,7 @@ class RunAuditResponse(BaseModel):
 
 # --- Artifact Schemas ---
 
+
 class ArtifactResponse(BaseModel):
     id: str
     task_id: str
@@ -146,6 +167,7 @@ class ArtifactResponse(BaseModel):
 
 
 # --- Capabilities & Diagnostic Schemas ---
+
 
 class EngineCapabilitiesResponse(BaseModel):
     engine_name: str = "FORGE Autonomous Software Engineering Engine"

@@ -44,7 +44,9 @@ async def test_developer_role_calls_ai_universe_ask_and_writes_raw_code(temp_eng
         run_id="run_ai_universe_coder_001",
     )
 
-    with patch("app.integrations.ai_universe_client.AIUniverseClient.ask", new_callable=AsyncMock) as mock_ask:
+    with patch(
+        "app.integrations.ai_universe_client.AIUniverseClient.ask", new_callable=AsyncMock
+    ) as mock_ask:
         mock_ask.return_value = mock_ai_response
 
         context = {"goal": "Build an expense calculator utility"}
@@ -62,7 +64,9 @@ async def test_developer_role_calls_ai_universe_ask_and_writes_raw_code(temp_eng
         # Verify mock call prompt
         mock_ask.assert_called_once()
         call_prompt = mock_ask.call_args[1]["question"]
-        assert "Write the complete code for main.py based on the overall architecture" in call_prompt
+        assert (
+            "Write the complete code for main.py based on the overall architecture" in call_prompt
+        )
         assert "Build an expense calculator utility" in call_prompt
 
         # Verify file content on disk
@@ -99,7 +103,9 @@ def format_currency(val):
         run_id="run_ai_universe_multi_file_002",
     )
 
-    with patch("app.integrations.ai_universe_client.AIUniverseClient.ask", new_callable=AsyncMock) as mock_ask:
+    with patch(
+        "app.integrations.ai_universe_client.AIUniverseClient.ask", new_callable=AsyncMock
+    ) as mock_ask:
         mock_ask.return_value = mock_ai_response
 
         context = {"goal": "Build modular calculator"}
@@ -137,7 +143,9 @@ async def test_developer_role_fallback_on_low_confidence(temp_engine):
         run_id="run_low_conf",
     )
 
-    with patch("app.integrations.ai_universe_client.AIUniverseClient.ask", new_callable=AsyncMock) as mock_ask:
+    with patch(
+        "app.integrations.ai_universe_client.AIUniverseClient.ask", new_callable=AsyncMock
+    ) as mock_ask:
         mock_ask.return_value = mock_ai_response
 
         context = {"goal": "Build fallback task"}
@@ -166,7 +174,10 @@ async def test_developer_role_fallback_on_ai_universe_error(temp_engine):
 
     developer = DeveloperRole()
 
-    with patch("app.integrations.ai_universe_client.AIUniverseClient.ask", side_effect=RuntimeError("AI Universe offline")):
+    with patch(
+        "app.integrations.ai_universe_client.AIUniverseClient.ask",
+        side_effect=RuntimeError("AI Universe offline"),
+    ):
         context = {"goal": "Build offline resilience test"}
         result = await developer.execute_step(
             task_id=task_id,

@@ -38,24 +38,43 @@ class BrowserInteractionVerifier:
 
         for html_file in html_files:
             try:
-                soup = BeautifulSoup(html_file.read_text(encoding="utf-8", errors="ignore"), "html.parser")
+                soup = BeautifulSoup(
+                    html_file.read_text(encoding="utf-8", errors="ignore"), "html.parser"
+                )
 
                 # Links verification
                 for a in soup.find_all("a"):
                     total_links += 1
-                    href = a.get("href")
+                    raw_href = a.get("href")
+                    href = raw_href if isinstance(raw_href, str) else ""
                     if not href or href.strip() in ["", "#"]:
                         # If no onclick and no href, flag as dead link
-                        if not a.has_attr("onclick") and not a.has_attr("@click") and not a.has_attr("v-on:click"):
-                            dead_links.append({"file": html_file.name, "text": a.get_text(strip=True)[:30] or "<empty>"})
+                        if (
+                            not a.has_attr("onclick")
+                            and not a.has_attr("@click")
+                            and not a.has_attr("v-on:click")
+                        ):
+                            dead_links.append(
+                                {
+                                    "file": html_file.name,
+                                    "text": a.get_text(strip=True)[:30] or "<empty>",
+                                }
+                            )
 
                 # Buttons verification
                 for btn in soup.find_all("button"):
                     total_buttons += 1
                     btn_type = btn.get("type", "button")
-                    has_handler = btn.has_attr("onclick") or btn.has_attr("@click") or btn.has_attr("id") or btn.has_attr("class")
+                    has_handler = (
+                        btn.has_attr("onclick")
+                        or btn.has_attr("@click")
+                        or btn.has_attr("id")
+                        or btn.has_attr("class")
+                    )
                     if btn_type == "button" and not has_handler:
-                        unbound_buttons.append({"file": html_file.name, "text": btn.get_text(strip=True)[:30]})
+                        unbound_buttons.append(
+                            {"file": html_file.name, "text": btn.get_text(strip=True)[:30]}
+                        )
 
             except Exception as e:
                 logger.debug(f"Error checking interactive elements in {html_file}: {e}")
@@ -74,7 +93,9 @@ class BrowserInteractionVerifier:
             },
             fix_suggestions=[
                 "Provide valid href destinations or event handlers for empty anchor tags."
-            ] if dead_links else [],
+            ]
+            if dead_links
+            else [],
         )
 
     def verify_form_validation(self) -> VerificationCheck:
@@ -85,7 +106,9 @@ class BrowserInteractionVerifier:
 
         for html_file in html_files:
             try:
-                soup = BeautifulSoup(html_file.read_text(encoding="utf-8", errors="ignore"), "html.parser")
+                soup = BeautifulSoup(
+                    html_file.read_text(encoding="utf-8", errors="ignore"), "html.parser"
+                )
                 forms = soup.find_all("form")
                 total_forms += len(forms)
 
@@ -98,11 +121,13 @@ class BrowserInteractionVerifier:
                         for inp in inputs
                     )
                     if inputs and not has_validation:
-                        unvalidated_forms.append({
-                            "file": html_file.name,
-                            "form_id": form.get("id", "unnamed_form"),
-                            "input_count": len(inputs),
-                        })
+                        unvalidated_forms.append(
+                            {
+                                "file": html_file.name,
+                                "form_id": form.get("id", "unnamed_form"),
+                                "input_count": len(inputs),
+                            }
+                        )
             except Exception as e:
                 logger.debug(f"Form validation check error in {html_file}: {e}")
 
@@ -138,7 +163,9 @@ class BrowserInteractionVerifier:
         missing_viewport_meta = []
         for html_file in html_files:
             try:
-                soup = BeautifulSoup(html_file.read_text(encoding="utf-8", errors="ignore"), "html.parser")
+                soup = BeautifulSoup(
+                    html_file.read_text(encoding="utf-8", errors="ignore"), "html.parser"
+                )
                 viewport = soup.find("meta", attrs={"name": "viewport"})
                 if not viewport or "width=device-width" not in str(viewport.get("content", "")):
                     missing_viewport_meta.append(html_file.name)
@@ -158,7 +185,9 @@ class BrowserInteractionVerifier:
         # Also inspect inline styles or <style> tags
         for html_file in html_files:
             try:
-                soup = BeautifulSoup(html_file.read_text(encoding="utf-8", errors="ignore"), "html.parser")
+                soup = BeautifulSoup(
+                    html_file.read_text(encoding="utf-8", errors="ignore"), "html.parser"
+                )
                 for style in soup.find_all("style"):
                     matches = re.findall(r"@media\s*\([^)]+\)", style.get_text())
                     media_queries_found.extend(matches)
@@ -170,13 +199,25 @@ class BrowserInteractionVerifier:
 
         if missing_viewport_meta:
             status = "fail"
-            fix_suggestions.append(f"Add `<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">` to {', '.join(missing_viewport_meta)}.")
+            fix_suggestions.append(
+                f'Add `<meta name="viewport" content="width=device-width, initial-scale=1.0">` to {", ".join(missing_viewport_meta)}.'
+            )
 
-        has_mobile_bp = any("375" in mq or "480" in mq or "576" in mq or "600" in mq or "768" in mq or "max-width" in mq for mq in media_queries_found)
+        has_mobile_bp = any(
+            "375" in mq
+            or "480" in mq
+            or "576" in mq
+            or "600" in mq
+            or "768" in mq
+            or "max-width" in mq
+            for mq in media_queries_found
+        )
         if not has_mobile_bp and (css_files or len(html_files) > 0):
             if status != "fail":
                 status = "warn"
-            fix_suggestions.append("Add responsive CSS media queries (e.g. `@media (max-width: 768px)`) for mobile and tablet viewports.")
+            fix_suggestions.append(
+                "Add responsive CSS media queries (e.g. `@media (max-width: 768px)`) for mobile and tablet viewports."
+            )
 
         return VerificationCheck(
             name="Responsive Breakpoints Verification",
@@ -203,7 +244,12 @@ class BrowserInteractionVerifier:
                 content = js_file.read_text(encoding="utf-8", errors="ignore")
                 # Look for undefined variable accesses or unhandled throw statements
                 if "console.error(" in content:
-                    js_hazards.append({"file": js_file.name, "issue": "Hardcoded console.error() statements present."})
+                    js_hazards.append(
+                        {
+                            "file": js_file.name,
+                            "issue": "Hardcoded console.error() statements present.",
+                        }
+                    )
             except Exception:
                 pass
 
@@ -225,7 +271,9 @@ class BrowserInteractionVerifier:
 
         if outline_none_count > 0 and focus_styles_found == 0:
             status = "warn"
-            fix_suggestions.append("Avoid removing focus outlines (`outline: none`) without providing replacement `:focus-visible` styling.")
+            fix_suggestions.append(
+                "Avoid removing focus outlines (`outline: none`) without providing replacement `:focus-visible` styling."
+            )
 
         return VerificationCheck(
             name="JavaScript Console & Accessibility Focus Verification",

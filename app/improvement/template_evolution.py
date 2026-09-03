@@ -15,6 +15,7 @@ logger = get_logger("improvement.template_evolution")
 
 class TemplateVariant(BaseModel):
     """A template component variant under evaluation."""
+
     name: str
     archetype: str  # website, cli, api, script
     code_pattern: str
@@ -41,7 +42,6 @@ class TemplateVariant(BaseModel):
     def composite_score(self) -> float:
         """Composite score weighing functionality (60%) and security (40%)."""
         return round((self.success_rate * 0.60) + (self.security_pass_rate * 0.40), 1)
-
 
 
 class TemplateEvolutionEngine:
@@ -94,7 +94,9 @@ class TemplateEvolutionEngine:
             var.success_count += 1
         else:
             var.failure_count += 1
-        logger.debug(f"Template variant '{variant_name}' updated: {var.success_rate}% success ({var.total_evaluations} runs)")
+        logger.debug(
+            f"Template variant '{variant_name}' updated: {var.success_rate}% success ({var.total_evaluations} runs)"
+        )
 
     def record_security_outcome(self, variant_name: str, passed_security: bool):
         """Record security scan outcome for a template variant."""
@@ -105,14 +107,20 @@ class TemplateEvolutionEngine:
             var.security_scan_passes += 1
         else:
             var.security_scan_failures += 1
-        logger.debug(f"Template variant '{variant_name}' security updated: {var.security_pass_rate}% security pass ({var.security_scan_passes + var.security_scan_failures} scans)")
+        logger.debug(
+            f"Template variant '{variant_name}' security updated: {var.security_pass_rate}% security pass ({var.security_scan_passes + var.security_scan_failures} scans)"
+        )
 
     def get_winning_variant(self, archetype: str) -> TemplateVariant | None:
         """Select the highest scoring template variant for an archetype, factoring in security and function."""
         candidates = [v for v in self.variants.values() if v.archetype == archetype]
         if not candidates:
             return None
-        evaluated = [v for v in candidates if v.total_evaluations > 0 or (v.security_scan_passes + v.security_scan_failures) > 0]
+        evaluated = [
+            v
+            for v in candidates
+            if v.total_evaluations > 0 or (v.security_scan_passes + v.security_scan_failures) > 0
+        ]
         if evaluated:
             return max(evaluated, key=lambda v: (v.composite_score, v.total_evaluations))
         return candidates[0]
@@ -126,8 +134,16 @@ class TemplateEvolutionEngine:
 
         winner = va.name if va.success_rate >= vb.success_rate else vb.name
         return {
-            "variant_a": {"name": va.name, "success_rate": va.success_rate, "runs": va.total_evaluations},
-            "variant_b": {"name": vb.name, "success_rate": vb.success_rate, "runs": vb.total_evaluations},
+            "variant_a": {
+                "name": va.name,
+                "success_rate": va.success_rate,
+                "runs": va.total_evaluations,
+            },
+            "variant_b": {
+                "name": vb.name,
+                "success_rate": vb.success_rate,
+                "runs": vb.total_evaluations,
+            },
             "promoted_winner": winner,
         }
 

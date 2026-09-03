@@ -43,11 +43,13 @@ async def test_event_emitter_structured_event_generation(temp_dir: Path):
     store = StateStore(db_mgr)
 
     task_id = str(uuid4())
-    await store.create_task(TaskEntity(
-        id=task_id,
-        goal="Observability test task",
-        workspace_path="/workspaces/test",
-    ))
+    await store.create_task(
+        TaskEntity(
+            id=task_id,
+            goal="Observability test task",
+            workspace_path="/workspaces/test",
+        )
+    )
 
     emitter = EventEmitter(store=store)
 

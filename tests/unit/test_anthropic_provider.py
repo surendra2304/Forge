@@ -119,9 +119,7 @@ async def test_anthropic_provider_retry_on_rate_limit():
         body=None,
     )
 
-    mock_client.messages.create = AsyncMock(
-        side_effect=[rate_limit_err, mock_response]
-    )
+    mock_client.messages.create = AsyncMock(side_effect=[rate_limit_err, mock_response])
 
     provider = AnthropicProvider(
         model_name="claude-3-5-sonnet-20241022",

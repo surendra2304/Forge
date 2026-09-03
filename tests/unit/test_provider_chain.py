@@ -47,7 +47,10 @@ async def test_provider_chain_falls_back_to_direct_on_low_confidence():
             run_id="run_low",
         )
     )
-    fallback_prov = DirectProvider(mock_mode=True, mock_response="### File: main.py\n```python\nprint('Direct Provider Code')\n```")
+    fallback_prov = DirectProvider(
+        mock_mode=True,
+        mock_response="### File: main.py\n```python\nprint('Direct Provider Code')\n```",
+    )
     chain = ProviderChain(primary_client=mock_ai, fallback_provider=fallback_prov)
 
     result = await chain.synthesize_file("main.py", "Create CLI tool")
@@ -69,7 +72,9 @@ async def test_provider_chain_falls_back_to_template_on_network_failure():
 def test_calculate_provenance():
     results = [
         ProviderChainResult(filename="main.py", code="...", tier_used=ProviderTier.AI_UNIVERSE),
-        ProviderChainResult(filename="test_main.py", code="...", tier_used=ProviderTier.AI_UNIVERSE),
+        ProviderChainResult(
+            filename="test_main.py", code="...", tier_used=ProviderTier.AI_UNIVERSE
+        ),
         ProviderChainResult(filename="index.html", code="...", tier_used=ProviderTier.TEMPLATE),
     ]
     prov = ProviderChain.calculate_provenance(results)

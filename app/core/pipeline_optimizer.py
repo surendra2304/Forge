@@ -20,6 +20,7 @@ logger = get_logger("core.pipeline_optimizer")
 
 class CostEstimate(BaseModel):
     """Estimated resource and token consumption before task execution."""
+
     task_goal: str
     manifest_files_count: int
     estimated_ai_calls: int

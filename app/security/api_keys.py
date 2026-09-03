@@ -53,7 +53,9 @@ class RateLimiter:
         """Record failed auth attempt and return True if under lockout threshold."""
         now = time.time()
         window = now - 60.0
-        self.failed_attempts[ip_address] = [ts for ts in self.failed_attempts[ip_address] if ts > window]
+        self.failed_attempts[ip_address] = [
+            ts for ts in self.failed_attempts[ip_address] if ts > window
+        ]
         self.failed_attempts[ip_address].append(now)
         return len(self.failed_attempts[ip_address]) <= 10
 
@@ -115,7 +117,9 @@ async def verify_api_key(
 
     # Check for excessive failed auth attempts from client IP
     if not rate_limiter.record_failed_auth(client_ip):
-        logger.warning(f"Excessive failed authentication attempts from {client_ip}. Temporarily rate-limited.")
+        logger.warning(
+            f"Excessive failed authentication attempts from {client_ip}. Temporarily rate-limited."
+        )
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail="Too many failed authentication attempts. Please retry later.",

@@ -168,7 +168,9 @@ async def test_trust_but_verify_network_error_graceful_fallback():
     """Validates consult_with_verification catches network/HTTP errors and gracefully returns None."""
     client = AIUniverseClient(api_key="test_key")
 
-    with patch.object(client, "debate", side_effect=httpx.ConnectError("Connection refused to AI Universe")):
+    with patch.object(
+        client, "debate", side_effect=httpx.ConnectError("Connection refused to AI Universe")
+    ):
         verified = await client.consult_with_verification(
             question="Will handle network error gracefully",
             min_confidence=0.70,

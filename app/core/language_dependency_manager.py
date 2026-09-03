@@ -107,6 +107,7 @@ class LanguageDependencyManager:
     def remediate_vulnerabilities(self) -> list[str]:
         """Scan and automatically upgrade vulnerable dependencies to safe patched versions."""
         from app.verification.security_scanner import OutputSecurityScanner
+
         scanner = OutputSecurityScanner(self.workspace_path)
         return scanner.remediate_vulnerable_dependencies()
 
@@ -117,7 +118,10 @@ class LanguageDependencyManager:
             if not req_res.is_valid:
                 return None
             lock_path = self.workspace_path / "requirements.lock"
-            lines = [f"{pkg}=={ver.replace('>=', '') if '>=' in ver else (ver if ver != 'latest' else '1.0.0')}" for pkg, ver in req_res.dependencies.items()]
+            lines = [
+                f"{pkg}=={ver.replace('>=', '') if '>=' in ver else (ver if ver != 'latest' else '1.0.0')}"
+                for pkg, ver in req_res.dependencies.items()
+            ]
             lock_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
             return lock_path
 
@@ -130,12 +134,9 @@ class LanguageDependencyManager:
                 "name": "forge-generated-app",
                 "lockfileVersion": 3,
                 "requires": True,
-                "packages": {
-                    "": {"dependencies": node_res.dependencies}
-                },
+                "packages": {"": {"dependencies": node_res.dependencies}},
             }
             lock_path.write_text(json.dumps(lock_payload, indent=2), encoding="utf-8")
             return lock_path
 
         return None
-

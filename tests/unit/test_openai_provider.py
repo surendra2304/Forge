@@ -114,9 +114,7 @@ async def test_openai_provider_retry_on_rate_limit():
     )
 
     # Fail on first attempt, succeed on second attempt
-    mock_client.chat.completions.create = AsyncMock(
-        side_effect=[rate_limit_err, mock_response]
-    )
+    mock_client.chat.completions.create = AsyncMock(side_effect=[rate_limit_err, mock_response])
 
     provider = OpenAIProvider(
         model_name="gpt-4o",
@@ -160,7 +158,9 @@ async def test_openai_provider_stream():
 async def test_openai_provider_structured_output_json_fallback():
     mock_client = MagicMock()
     # Mock beta parse raising error to test JSON extraction fallback
-    mock_client.beta.chat.completions.parse = AsyncMock(side_effect=Exception("Beta parse not supported"))
+    mock_client.beta.chat.completions.parse = AsyncMock(
+        side_effect=Exception("Beta parse not supported")
+    )
 
     json_text = """```json
     {
@@ -181,7 +181,9 @@ async def test_openai_provider_structured_output_json_fallback():
     mock_client.chat.completions.create = AsyncMock(return_value=mock_response)
     provider = OpenAIProvider(model_name="gpt-4o", api_key="sk-test", client=mock_client)
 
-    result = await provider.structured_output("Generate structured plan", response_model=SampleOutput)
+    result = await provider.structured_output(
+        "Generate structured plan", response_model=SampleOutput
+    )
     assert isinstance(result, SampleOutput)
     assert result.title == "Autonomous Forge"
     assert len(result.tasks) == 3

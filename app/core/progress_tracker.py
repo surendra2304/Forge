@@ -39,6 +39,7 @@ STAGE_WEIGHTS: dict[PipelineStage, int] = {
 
 class StageProgress(BaseModel):
     """Progress record for a single stage in the 8-stage pipeline."""
+
     stage: PipelineStage
     status: str = "pending"  # pending, running, completed, failed, skipped
     started_at: datetime | None = None
@@ -49,6 +50,7 @@ class StageProgress(BaseModel):
 
 class TaskProgressSnapshot(BaseModel):
     """Aggregated progress and ETA snapshot for a task."""
+
     task_id: str
     project_type: str = "default"
     current_stage: PipelineStage = PipelineStage.PROJECT
@@ -68,7 +70,9 @@ class ProgressTracker:
 
     _instances: dict[str, "ProgressTracker"] = {}
 
-    def __init__(self, task_id: str, project_type: str = "default", emitter: EventEmitter | None = None):
+    def __init__(
+        self, task_id: str, project_type: str = "default", emitter: EventEmitter | None = None
+    ):
         self.task_id = task_id
         self.project_type = project_type.lower()
         self.emitter = emitter
@@ -82,7 +86,9 @@ class ProgressTracker:
             stage: StageProgress(stage=stage) for stage in PipelineStage
         }
 
-        base_duration = DEFAULT_TYPE_DURATIONS.get(self.project_type, DEFAULT_TYPE_DURATIONS["default"])
+        base_duration = DEFAULT_TYPE_DURATIONS.get(
+            self.project_type, DEFAULT_TYPE_DURATIONS["default"]
+        )
         self.estimated_total_seconds = base_duration
 
         # Store in global registry
@@ -94,7 +100,9 @@ class ProgressTracker:
         return cls._instances.get(task_id)
 
     @classmethod
-    def get_or_create(cls, task_id: str, project_type: str = "default", emitter: EventEmitter | None = None) -> "ProgressTracker":
+    def get_or_create(
+        cls, task_id: str, project_type: str = "default", emitter: EventEmitter | None = None
+    ) -> "ProgressTracker":
         """Get existing or create new progress tracker."""
         if task_id in cls._instances:
             return cls._instances[task_id]
@@ -128,7 +136,9 @@ class ProgressTracker:
         if details:
             sp.details.update(details)
 
-        logger.info(f"Task '{self.task_id}' completed stage: {stage.value} in {sp.duration_seconds or 0}s")
+        logger.info(
+            f"Task '{self.task_id}' completed stage: {stage.value} in {sp.duration_seconds or 0}s"
+        )
 
         if self.emitter:
             await self.emitter.emit(
@@ -149,7 +159,9 @@ class ProgressTracker:
             STAGE_WEIGHTS[stage] for stage, sp in self.stages.items() if sp.status == "completed"
         )
         running_weight = sum(
-            int(STAGE_WEIGHTS[stage] * 0.5) for stage, sp in self.stages.items() if sp.status == "running"
+            int(STAGE_WEIGHTS[stage] * 0.5)
+            for stage, sp in self.stages.items()
+            if sp.status == "running"
         )
         return min(95, completed_weight + running_weight)
 
@@ -202,5 +214,8 @@ class ProgressTracker:
             await self.emitter.emit(
                 task_id=self.task_id,
                 event_type=event_name,
-                payload={"progress": 100 if success else self.get_progress_percentage(), "error": error},
+                payload={
+                    "progress": 100 if success else self.get_progress_percentage(),
+                    "error": error,
+                },
             )

@@ -53,10 +53,9 @@ class DirectProvider(BaseModelProvider):
         completion_tokens = max(0, len(output) // 4) if output else 0
         total_tokens = prompt_tokens + completion_tokens
 
-        cost = (
-            (prompt_tokens / 1000.0) * self.cost_per_1k_input
-            + (completion_tokens / 1000.0) * self.cost_per_1k_output
-        )
+        cost = (prompt_tokens / 1000.0) * self.cost_per_1k_input + (
+            completion_tokens / 1000.0
+        ) * self.cost_per_1k_output
 
         return UsageEstimate(
             prompt_tokens=prompt_tokens,
@@ -178,7 +177,9 @@ class DirectProvider(BaseModelProvider):
         try:
             return response_model.model_validate(parsed_data)
         except ValidationError as e:
-            logger.warning(f"Validation failed on structured output: {e}. Attempting fallback instance.")
+            logger.warning(
+                f"Validation failed on structured output: {e}. Attempting fallback instance."
+            )
             # Fallback attempt
             return response_model.model_validate(self._synthesize_dict_for_model(response_model))
 

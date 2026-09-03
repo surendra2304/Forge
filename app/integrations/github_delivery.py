@@ -18,6 +18,7 @@ logger = get_logger("integrations.github_delivery")
 
 class GitHubDeliveryResult(BaseModel):
     """Manifest of remote GitHub repository delivery."""
+
     repo_name: str
     repo_url: str
     release_url: str | None = None
@@ -92,7 +93,9 @@ class GitHubDeliveryService:
                         "clone_url": f"https://github.com/user/{repo_name}.git",
                     }
                 else:
-                    logger.warning(f"GitHub API repository creation returned status {resp.status_code}: {resp.text}")
+                    logger.warning(
+                        f"GitHub API repository creation returned status {resp.status_code}: {resp.text}"
+                    )
                     return {
                         "name": repo_name,
                         "html_url": f"https://github.com/forge-deliveries/{repo_name}",

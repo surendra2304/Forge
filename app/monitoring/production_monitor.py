@@ -119,7 +119,9 @@ class ProductionMonitor:
 
         # 1. Disk usage > 80%
         if sys_m["disk_used_percent"] > 80.0:
-            alerts.append(f"High disk space usage ({sys_m['disk_used_percent']}%) on workspaces volume.")
+            alerts.append(
+                f"High disk space usage ({sys_m['disk_used_percent']}%) on workspaces volume."
+            )
 
         # 2. Error rate > 5%
         if self.total_requests > 20:

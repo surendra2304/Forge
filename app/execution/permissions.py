@@ -13,6 +13,7 @@ logger = get_logger("execution.permissions")
 
 class ToolPermission(str, Enum):
     """Granular permissions for tool actions."""
+
     FS_READ = "fs:read"
     FS_WRITE = "fs:write"
     FS_DELETE = "fs:delete"
@@ -117,7 +118,8 @@ class PermissionManager:
     def __init__(self, custom_allowlist: dict[str, set[ToolPermission]] | None = None):
         # Freeze default allowlist copy so agents cannot grant themselves permissions at runtime
         self._allowlist: dict[str, set[ToolPermission]] = {
-            role: set(perms) for role, perms in (custom_allowlist or DEFAULT_ROLE_PERMISSIONS).items()
+            role: set(perms)
+            for role, perms in (custom_allowlist or DEFAULT_ROLE_PERMISSIONS).items()
         }
 
     def get_role_permissions(self, role_name: str) -> set[ToolPermission]:
@@ -138,12 +140,16 @@ class PermissionManager:
         Raises SandboxViolationError on path traversal attempts.
         """
         resolved_sandbox = sandbox_root.resolve()
-        resolved_target = (sandbox_root / target_path if not target_path.is_absolute() else target_path).resolve()
+        resolved_target = (
+            sandbox_root / target_path if not target_path.is_absolute() else target_path
+        ).resolve()
 
-        if not str(resolved_target).startswith(str(resolved_sandbox)):
+        try:
+            resolved_target.relative_to(resolved_sandbox)
+        except ValueError as exc:
             msg = f"Sandbox Violation: Path '{target_path}' escapes sandbox root '{sandbox_root}'"
             logger.error(msg)
-            raise SandboxViolationError(msg)
+            raise SandboxViolationError(msg) from exc
 
         return resolved_target
 

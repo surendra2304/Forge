@@ -69,6 +69,7 @@ class BuildChecker(BaseChecker):
 
         if pkg_json_file.exists() or ts_files:
             import json as py_json
+
             build_cmd = None
             if pkg_json_file.exists():
                 try:
@@ -95,7 +96,9 @@ class BuildChecker(BaseChecker):
                     duration_ms=round(duration_ms, 2),
                     stdout=cmd_res.stdout,
                     stderr=cmd_res.stderr,
-                    artifacts_inspected=[str(p.relative_to(paths.project)) for p in ts_files + js_files],
+                    artifacts_inspected=[
+                        str(p.relative_to(paths.project)) for p in ts_files + js_files
+                    ],
                 )
 
         # 3. Python Stack Check (AST Parse)
@@ -110,18 +113,22 @@ class BuildChecker(BaseChecker):
                 content = full_path.read_text(encoding="utf-8")
                 ast.parse(content, filename=rel_path)
             except SyntaxError as e:
-                issues.append({
-                    "file": rel_path,
-                    "line": e.lineno,
-                    "offset": e.offset,
-                    "text": e.text,
-                    "error": str(e),
-                })
+                issues.append(
+                    {
+                        "file": rel_path,
+                        "line": e.lineno,
+                        "offset": e.offset,
+                        "text": e.text,
+                        "error": str(e),
+                    }
+                )
             except Exception as e:
                 issues.append({"file": rel_path, "error": str(e)})
 
         # 4. HTML & Static Web Assets Syntax Check
-        html_files = engine.fs.search_files(task_id, pattern="*.html", role="tester") + engine.fs.search_files(task_id, pattern="*.htm", role="tester")
+        html_files = engine.fs.search_files(
+            task_id, pattern="*.html", role="tester"
+        ) + engine.fs.search_files(task_id, pattern="*.htm", role="tester")
         if html_files:
             from html.parser import HTMLParser
 
@@ -132,7 +139,22 @@ class BuildChecker(BaseChecker):
                     self.tag_stack = []
 
                 def handle_starttag(self, tag, attrs):
-                    void_tags = {"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track", "wbr"}
+                    void_tags = {
+                        "area",
+                        "base",
+                        "br",
+                        "col",
+                        "embed",
+                        "hr",
+                        "img",
+                        "input",
+                        "link",
+                        "meta",
+                        "param",
+                        "source",
+                        "track",
+                        "wbr",
+                    }
                     if tag.lower() not in void_tags:
                         self.tag_stack.append(tag.lower())
 
@@ -208,10 +230,13 @@ class LintChecker(BaseChecker):
         pkg_json_file = paths.project / "package.json"
         if pkg_json_file.exists():
             import json as py_json
+
             try:
                 pkg_data = py_json.loads(pkg_json_file.read_text(encoding="utf-8"))
                 if "lint" in pkg_data.get("scripts", {}):
-                    cmd_res = await engine.terminal.run_command(task_id, "npm run lint", role="tester")
+                    cmd_res = await engine.terminal.run_command(
+                        task_id, "npm run lint", role="tester"
+                    )
                     duration_ms = (time.perf_counter() - start_time) * 1000.0
                     return VerificationEvidence(
                         check_name="ESLint / Node Linter",
@@ -236,7 +261,9 @@ class LintChecker(BaseChecker):
             lint_issues = []
             for hf in html_files:
                 try:
-                    content = (paths.project / hf).read_text(encoding="utf-8", errors="ignore").lower()
+                    content = (
+                        (paths.project / hf).read_text(encoding="utf-8", errors="ignore").lower()
+                    )
                     if "<html" not in content and "<!doctype html>" not in content:
                         lint_issues.append(f"{hf}: Missing <html> or <!DOCTYPE html> root element")
                 except Exception as e:
@@ -259,7 +286,9 @@ class LintChecker(BaseChecker):
                 exit_code=0 if passed else 1,
                 passed=passed,
                 duration_ms=round(duration_ms, 2),
-                stdout=f"Linted {len(html_files) + len(js_files) + len(css_files)} web assets successfully." if passed else "",
+                stdout=f"Linted {len(html_files) + len(js_files) + len(css_files)} web assets successfully."
+                if passed
+                else "",
                 stderr="\n".join(lint_issues) if not passed else "",
             )
 
@@ -275,7 +304,9 @@ class LintChecker(BaseChecker):
                 stdout="No source files require linting.",
             )
 
-        cmd_res = await engine.terminal.run_command(task_id, "ruff check . --select=E,F --ignore=E501,F841", role="tester")
+        cmd_res = await engine.terminal.run_command(
+            task_id, "ruff check . --select=E,F --ignore=E501,F841", role="tester"
+        )
         duration_ms = (time.perf_counter() - start_time) * 1000.0
         passed = cmd_res.exit_code == 0 or "command not found" in cmd_res.stderr.lower()
 
@@ -294,6 +325,7 @@ class LintChecker(BaseChecker):
 
 class TestChecker(BaseChecker):
     """Executes automated unit and integration tests across Python (pytest), Node/TS (npm test/jest), and Go (go test)."""
+
     __test__ = False
 
     def __init__(self):
@@ -330,9 +362,15 @@ class TestChecker(BaseChecker):
 
         # 2. Node.js / TypeScript Tests
         pkg_json_file = paths.project / "package.json"
-        node_test_files = list(paths.project.glob("**/*.test.ts")) + list(paths.project.glob("**/*.test.js")) + list(paths.project.glob("**/*.spec.ts")) + list(paths.project.glob("**/*.spec.js"))
+        node_test_files = (
+            list(paths.project.glob("**/*.test.ts"))
+            + list(paths.project.glob("**/*.test.js"))
+            + list(paths.project.glob("**/*.spec.ts"))
+            + list(paths.project.glob("**/*.spec.js"))
+        )
         if pkg_json_file.exists():
             import json as py_json
+
             test_cmd = None
             try:
                 pkg_data = py_json.loads(pkg_json_file.read_text(encoding="utf-8"))
@@ -343,7 +381,11 @@ class TestChecker(BaseChecker):
                 pass
 
             if not test_cmd and node_test_files:
-                test_cmd = "npx jest --passWithNoTests" if any(".ts" in str(p) for p in node_test_files) else "node --test"
+                test_cmd = (
+                    "npx jest --passWithNoTests"
+                    if any(".ts" in str(p) for p in node_test_files)
+                    else "node --test"
+                )
 
             if test_cmd:
                 cmd_res = await engine.terminal.run_command(task_id, test_cmd, role="tester")
@@ -357,12 +399,16 @@ class TestChecker(BaseChecker):
                     duration_ms=round(duration_ms, 2),
                     stdout=cmd_res.stdout,
                     stderr=cmd_res.stderr,
-                    artifacts_inspected=[str(p.relative_to(paths.project)) for p in node_test_files],
+                    artifacts_inspected=[
+                        str(p.relative_to(paths.project)) for p in node_test_files
+                    ],
                 )
 
         # 3. Python Tests (Pytest)
         py_test_files = engine.fs.search_files(task_id, pattern="test_*.py", role="tester")
-        has_tests_dir = (paths.project / "tests").exists() and list((paths.project / "tests").glob("*.py"))
+        has_tests_dir = (paths.project / "tests").exists() and list(
+            (paths.project / "tests").glob("*.py")
+        )
 
         if not py_test_files and not has_tests_dir:
             return VerificationEvidence(
@@ -434,9 +480,17 @@ class RuntimeChecker(BaseChecker):
             else:
                 py_files = engine.fs.search_files(task_id, pattern="*.py", role="tester")
                 if "main.py" in py_files or "src/main.py" in py_files:
-                    cmd = "python main.py --help" if "main.py" in py_files else "python src/main.py --help"
+                    cmd = (
+                        "python main.py --help"
+                        if "main.py" in py_files
+                        else "python src/main.py --help"
+                    )
                 elif "cli.py" in py_files or "src/cli.py" in py_files:
-                    cmd = "python cli.py --help" if "cli.py" in py_files else "python src/cli.py --help"
+                    cmd = (
+                        "python cli.py --help"
+                        if "cli.py" in py_files
+                        else "python src/cli.py --help"
+                    )
 
         if not cmd:
             return VerificationEvidence(
@@ -475,12 +529,15 @@ class BrowserChecker(BaseChecker):
     """
 
     def __init__(self, start_server_cmd: str | None = None, port: int | None = None):
-        super().__init__(name="Playwright / Headless Browser Verification", category=CheckCategory.RUNTIME)
+        super().__init__(
+            name="Playwright / Headless Browser Verification", category=CheckCategory.RUNTIME
+        )
         self.start_server_cmd = start_server_cmd
         self.port = port
 
     def _find_free_port(self) -> int:
         import socket
+
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.bind(("", 0))
             return s.getsockname()[1]
@@ -492,7 +549,9 @@ class BrowserChecker(BaseChecker):
         import httpx
 
         start_time = time.perf_counter()
-        paths = engine.wm.get_workspace_paths(task_id)
+        paths = engine.wm.get_workspace_paths(task_id) or engine.wm.create_workspace(
+            task_id
+        )
 
         # 1. Inspect workspace for HTML/web assets
         html_files = list(paths.project.glob("**/*.html"))
@@ -560,16 +619,34 @@ class BrowserChecker(BaseChecker):
             playwright_used = False
             try:
                 from playwright.async_api import async_playwright
+
                 async with async_playwright() as p:
                     browser = await p.chromium.launch(headless=True)
                     page = await browser.new_page()
 
                     # Listen for console errors
-                    page.on("console", lambda msg: console_errors.append(msg.text) if msg.type in ["error", "warning"] else None)
+                    page.on(
+                        "console",
+                        lambda msg: (
+                            console_errors.append(msg.text)
+                            if msg.type in ["error", "warning"]
+                            else None
+                        ),
+                    )
 
                     # Listen for network failures
-                    page.on("requestfailed", lambda req: network_failures.append(f"{req.url} - {req.failure}"))
-                    page.on("response", lambda resp: network_failures.append(f"{resp.url} returned status {resp.status}") if resp.status >= 400 else None)
+                    page.on(
+                        "requestfailed",
+                        lambda req: network_failures.append(f"{req.url} - {req.failure}"),
+                    )
+                    page.on(
+                        "response",
+                        lambda resp: (
+                            network_failures.append(f"{resp.url} returned status {resp.status}")
+                            if resp.status >= 400
+                            else None
+                        ),
+                    )
 
                     # Navigate to dev server
                     await page.goto(base_url, wait_until="networkidle", timeout=5000)
@@ -593,7 +670,9 @@ class BrowserChecker(BaseChecker):
                     await browser.close()
                     playwright_used = True
             except Exception as pe:
-                logger.info(f"Playwright browser engine fallback to headless HTTP/DOM verifier: {pe}")
+                logger.info(
+                    f"Playwright browser engine fallback to headless HTTP/DOM verifier: {pe}"
+                )
 
             # 4. Fallback headless HTTP/DOM verifier if Playwright not installed or headless failed
             if not playwright_used:
@@ -604,13 +683,18 @@ class BrowserChecker(BaseChecker):
 
                     # Check for linked script / css assets in HTML
                     import re
-                    linked_assets = re.findall(r'(?:src|href)=["\']([^"\']+\.(?:css|js|png|jpg|svg))["\']', resp.text)
+
+                    linked_assets = re.findall(
+                        r'(?:src|href)=["\']([^"\']+\.(?:css|js|png|jpg|svg))["\']', resp.text
+                    )
                     for asset in linked_assets:
                         asset_url = f"{base_url}/{asset.lstrip('/')}"
                         try:
                             a_resp = await client.get(asset_url, timeout=2.0)
                             if a_resp.status_code >= 400:
-                                missing_assets.append(f"Missing asset: {asset} (status={a_resp.status_code})")
+                                missing_assets.append(
+                                    f"Missing asset: {asset} (status={a_resp.status_code})"
+                                )
                         except Exception:
                             missing_assets.append(f"Failed to fetch asset: {asset}")
 
@@ -621,11 +705,29 @@ class BrowserChecker(BaseChecker):
 
             # Compile issues
             if console_errors:
-                issues.append({"type": "console_errors", "count": len(console_errors), "samples": console_errors[:3]})
+                issues.append(
+                    {
+                        "type": "console_errors",
+                        "count": len(console_errors),
+                        "samples": console_errors[:3],
+                    }
+                )
             if network_failures:
-                issues.append({"type": "network_failures", "count": len(network_failures), "samples": network_failures[:3]})
+                issues.append(
+                    {
+                        "type": "network_failures",
+                        "count": len(network_failures),
+                        "samples": network_failures[:3],
+                    }
+                )
             if missing_assets:
-                issues.append({"type": "missing_assets", "count": len(missing_assets), "samples": missing_assets[:3]})
+                issues.append(
+                    {
+                        "type": "missing_assets",
+                        "count": len(missing_assets),
+                        "samples": missing_assets[:3],
+                    }
+                )
 
             passed = len(issues) == 0
             duration_ms = (time.perf_counter() - start_time) * 1000.0
@@ -633,7 +735,11 @@ class BrowserChecker(BaseChecker):
             if screenshot_path.exists():
                 artifacts_inspected.append(str(screenshot_path.relative_to(paths.root)))
 
-            stdout = f"Browser verification completed on {base_url}. Screenshot saved to {screenshot_path.name}." if passed else ""
+            stdout = (
+                f"Browser verification completed on {base_url}. Screenshot saved to {screenshot_path.name}."
+                if passed
+                else ""
+            )
             stderr = f"Browser verification detected issues: {issues}" if not passed else ""
 
             return VerificationEvidence(
@@ -684,6 +790,7 @@ class SecurityChecker(BaseChecker):
 
     async def run_check(self, task_id: str, engine: ExecutionEngine) -> VerificationEvidence:
         import re
+
         start_time = time.perf_counter()
         paths = engine.wm.get_workspace_paths(task_id)
         if not paths:
@@ -699,11 +806,28 @@ class SecurityChecker(BaseChecker):
         artifacts_inspected = []
 
         # 1. Regex-based Secret Scanning across all workspace files
-        scannable_extensions = {".py", ".ts", ".js", ".jsx", ".tsx", ".json", ".env", ".yaml", ".yml", ".go", ".html"}
+        scannable_extensions = {
+            ".py",
+            ".ts",
+            ".js",
+            ".jsx",
+            ".tsx",
+            ".json",
+            ".env",
+            ".yaml",
+            ".yml",
+            ".go",
+            ".html",
+        }
         for file_path in paths.project.rglob("*"):
             if file_path.is_file() and file_path.suffix in scannable_extensions:
                 # Ignore git directory and cache
-                if ".git" in file_path.parts or "node_modules" in file_path.parts or "__pycache__" in file_path.parts or "artifacts" in file_path.parts:
+                if (
+                    ".git" in file_path.parts
+                    or "node_modules" in file_path.parts
+                    or "__pycache__" in file_path.parts
+                    or "artifacts" in file_path.parts
+                ):
                     continue
 
                 rel_path = str(file_path.relative_to(paths.project))
@@ -718,22 +842,45 @@ class SecurityChecker(BaseChecker):
                             if match:
                                 val = match.group(0)
                                 # Filter obvious safe placeholders
-                                if any(safe in val.lower() for safe in ["example", "placeholder", "your_", "test_mock", "mock_key", "changeme", "dummy", "<", ">", "env"]):
+                                if any(
+                                    safe in val.lower()
+                                    for safe in [
+                                        "example",
+                                        "placeholder",
+                                        "your_",
+                                        "test_mock",
+                                        "mock_key",
+                                        "changeme",
+                                        "dummy",
+                                        "<",
+                                        ">",
+                                        "env",
+                                    ]
+                                ):
                                     continue
-                                issues.append({
-                                    "file": rel_path,
-                                    "line": line_idx,
-                                    "type": "hardcoded_secret",
-                                    "rule": pattern_name,
-                                    "preview": f"{val[:6]}***{val[-4:]}" if len(val) > 10 else "***",
-                                })
+                                issues.append(
+                                    {
+                                        "file": rel_path,
+                                        "line": line_idx,
+                                        "type": "hardcoded_secret",
+                                        "rule": pattern_name,
+                                        "preview": f"{val[:6]}***{val[-4:]}"
+                                        if len(val) > 10
+                                        else "***",
+                                    }
+                                )
                 except Exception as e:
                     logger.debug(f"Error scanning file '{rel_path}' for secrets: {e}")
 
         # 2. Static Security Tooling: Python (Bandit) or Node (npm audit)
         if (paths.project / "package.json").exists():
-            cmd_res = await engine.terminal.run_command(task_id, "npm audit --json", timeout_seconds=15, role="security_reviewer")
-            if cmd_res.exit_code not in [0, 1] and "command not found" not in cmd_res.stderr.lower():
+            cmd_res = await engine.terminal.run_command(
+                task_id, "npm audit --json", timeout_seconds=15, role="security_reviewer"
+            )
+            if (
+                cmd_res.exit_code not in [0, 1]
+                and "command not found" not in cmd_res.stderr.lower()
+            ):
                 pass
         else:
             # Python AST SAST & Bandit
@@ -743,19 +890,27 @@ class SecurityChecker(BaseChecker):
                     try:
                         code = py_file.read_text(encoding="utf-8", errors="ignore")
                         if "eval(" in code or "exec(" in code:
-                            issues.append({
-                                "file": str(py_file.relative_to(paths.project)),
-                                "type": "vulnerability",
-                                "rule": "Insecure eval/exec execution detected",
-                            })
+                            issues.append(
+                                {
+                                    "file": str(py_file.relative_to(paths.project)),
+                                    "type": "vulnerability",
+                                    "rule": "Insecure eval/exec execution detected",
+                                }
+                            )
                     except Exception:
                         pass
 
         duration_ms = (time.perf_counter() - start_time) * 1000.0
         passed = len(issues) == 0
 
-        stdout = f"Scanned {len(artifacts_inspected)} files. Zero secret leaks or security violations detected." if passed else ""
-        stderr = f"Security violations detected ({len(issues)} items): {issues}" if not passed else ""
+        stdout = (
+            f"Scanned {len(artifacts_inspected)} files. Zero secret leaks or security violations detected."
+            if passed
+            else ""
+        )
+        stderr = (
+            f"Security violations detected ({len(issues)} items): {issues}" if not passed else ""
+        )
 
         return VerificationEvidence(
             check_name=self.name,
@@ -813,7 +968,18 @@ class FeaturePresenceChecker(BaseChecker):
         files_map = {}
         artifacts_inspected = []
         for file_path in paths.project.rglob("*"):
-            if file_path.is_file() and not any(p in file_path.parts for p in [".git", "node_modules", "__pycache__", "artifacts", "state", "logs", "cache"]):
+            if file_path.is_file() and not any(
+                p in file_path.parts
+                for p in [
+                    ".git",
+                    "node_modules",
+                    "__pycache__",
+                    "artifacts",
+                    "state",
+                    "logs",
+                    "cache",
+                ]
+            ):
                 rel_path = str(file_path.relative_to(paths.project))
                 artifacts_inspected.append(rel_path)
                 try:
@@ -829,12 +995,27 @@ class FeaturePresenceChecker(BaseChecker):
 
         # Check: If fallback stub was flagged
         if fallback_stub_detected:
-            issues.append({"error": "Task files were generated using fallback stub generator due to AI Universe unavailability or low confidence.", "rule": "fallback_stub"})
+            issues.append(
+                {
+                    "error": "Task files were generated using fallback stub generator due to AI Universe unavailability or low confidence.",
+                    "rule": "fallback_stub",
+                }
+            )
 
         # Check: Detect untouched placeholder stubs in files
         for rel_path, content in files_map.items():
-            if 'print("Running: ' in content and 'def main():' in content and len(content.splitlines()) <= 15:
-                issues.append({"file": rel_path, "error": "Contains untouched default scaffold placeholder stub without feature implementation.", "rule": "placeholder_stub"})
+            if (
+                'print("Running: ' in content
+                and "def main():" in content
+                and len(content.splitlines()) <= 15
+            ):
+                issues.append(
+                    {
+                        "file": rel_path,
+                        "error": "Contains untouched default scaffold placeholder stub without feature implementation.",
+                        "rule": "placeholder_stub",
+                    }
+                )
 
         # Check: Goal-specific feature presence
         # FastAPI
@@ -843,7 +1024,12 @@ class FeaturePresenceChecker(BaseChecker):
                 k in all_text for k in ["from fastapi", "import fastapi", "FastAPI(", "fastapi."]
             )
             if not has_fastapi:
-                issues.append({"error": "Objective specifies 'FastAPI', but no FastAPI library imports or application instances were found in project files.", "rule": "fastapi_presence"})
+                issues.append(
+                    {
+                        "error": "Objective specifies 'FastAPI', but no FastAPI library imports or application instances were found in project files.",
+                        "rule": "fastapi_presence",
+                    }
+                )
 
         # Flask
         if "flask" in goal_lower:
@@ -851,39 +1037,98 @@ class FeaturePresenceChecker(BaseChecker):
                 k in all_text for k in ["from flask", "import flask", "Flask(", "flask."]
             )
             if not has_flask:
-                issues.append({"error": "Objective specifies 'Flask', but no Flask library imports or application instances were found in project files.", "rule": "flask_presence"})
+                issues.append(
+                    {
+                        "error": "Objective specifies 'Flask', but no Flask library imports or application instances were found in project files.",
+                        "rule": "flask_presence",
+                    }
+                )
 
         # SQLite / Database
         if "sqlite" in goal_lower or ("database" in goal_lower and "sql" in goal_lower):
-            if not any(k in all_text_lower for k in ["sqlite3", "sqlalchemy", "cursor", "execute(", "create table", "select "]):
-                issues.append({"error": "Objective specifies SQLite/Database, but no database operations or queries were found in project files.", "rule": "sqlite_presence"})
+            if not any(
+                k in all_text_lower
+                for k in ["sqlite3", "sqlalchemy", "cursor", "execute(", "create table", "select "]
+            ):
+                issues.append(
+                    {
+                        "error": "Objective specifies SQLite/Database, but no database operations or queries were found in project files.",
+                        "rule": "sqlite_presence",
+                    }
+                )
 
         # Portfolio Website / Dark Mode / Hero
         if "dark mode" in goal_lower or "dark-mode" in goal_lower:
             if not any(k in all_text_lower for k in ["dark", "toggle", "theme", "mode"]):
-                issues.append({"error": "Objective specifies 'dark mode', but no dark mode toggle or theme styling was found in HTML/CSS/JS.", "rule": "dark_mode_presence"})
+                issues.append(
+                    {
+                        "error": "Objective specifies 'dark mode', but no dark mode toggle or theme styling was found in HTML/CSS/JS.",
+                        "rule": "dark_mode_presence",
+                    }
+                )
 
         if "hero" in goal_lower:
             if not any(k in all_text_lower for k in ["hero", "header", "banner", "intro"]):
-                issues.append({"error": "Objective specifies 'hero section', but no hero section was found in HTML/CSS.", "rule": "hero_presence"})
+                issues.append(
+                    {
+                        "error": "Objective specifies 'hero section', but no hero section was found in HTML/CSS.",
+                        "rule": "hero_presence",
+                    }
+                )
 
         if any(w in goal_lower for w in ["portfolio", "portfolio website"]):
-            if not any(k in all_text_lower for k in ["portfolio", "project", "about", "skill", "contact"]):
-                issues.append({"error": "Objective specifies 'portfolio website', but core portfolio sections (projects, about, skills, contact) were missing.", "rule": "portfolio_presence"})
+            if not any(
+                k in all_text_lower for k in ["portfolio", "project", "about", "skill", "contact"]
+            ):
+                issues.append(
+                    {
+                        "error": "Objective specifies 'portfolio website', but core portfolio sections (projects, about, skills, contact) were missing.",
+                        "rule": "portfolio_presence",
+                    }
+                )
 
         # Multi-file static web files if explicitly required in goal
         if "index.html" in goal_lower and "index.html" not in files_map:
-            issues.append({"file": "index.html", "error": "Objective required 'index.html', but index.html was not generated.", "rule": "file_manifest_presence"})
+            issues.append(
+                {
+                    "file": "index.html",
+                    "error": "Objective required 'index.html', but index.html was not generated.",
+                    "rule": "file_manifest_presence",
+                }
+            )
         if "style.css" in goal_lower and "style.css" not in files_map:
-            issues.append({"file": "style.css", "error": "Objective required 'style.css', but style.css was not generated.", "rule": "file_manifest_presence"})
-        if ("script.js" in goal_lower or "app.js" in goal_lower) and not any(f in files_map for f in ["script.js", "app.js"]):
-            issues.append({"file": "script.js", "error": "Objective required JavaScript file ('script.js' / 'app.js'), but neither was found.", "rule": "file_manifest_presence"})
+            issues.append(
+                {
+                    "file": "style.css",
+                    "error": "Objective required 'style.css', but style.css was not generated.",
+                    "rule": "file_manifest_presence",
+                }
+            )
+        if ("script.js" in goal_lower or "app.js" in goal_lower) and not any(
+            f in files_map for f in ["script.js", "app.js"]
+        ):
+            issues.append(
+                {
+                    "file": "script.js",
+                    "error": "Objective required JavaScript file ('script.js' / 'app.js'), but neither was found.",
+                    "rule": "file_manifest_presence",
+                }
+            )
 
         duration_ms = (time.perf_counter() - start_time) * 1000.0
         passed = len(issues) == 0
 
-        stdout = f"Verified {len(artifacts_inspected)} project files. All requested features, libraries, and objective elements are present and implemented." if passed else ""
-        stderr = "Feature presence verification failed:\n" + "\n".join(f"- {issue.get('error', issue)}" for issue in issues) if not passed else ""
+        stdout = (
+            f"Verified {len(artifacts_inspected)} project files. All requested features, libraries, and objective elements are present and implemented."
+            if passed
+            else ""
+        )
+        stderr = (
+            "Feature presence verification failed:\n"
+            + "\n".join(f"- {issue.get('error', issue)}" for issue in issues)
+            if not passed
+            else ""
+        )
 
         return VerificationEvidence(
             check_name=self.name,

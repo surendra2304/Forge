@@ -132,13 +132,15 @@ class CodeQualityAnalyzer:
                             end_lineno = getattr(node, "end_lineno", node.lineno)
                             length = end_lineno - node.lineno + 1
                             if length > 50:
-                                long_functions.append({
-                                    "file": p.name,
-                                    "function": node.name,
-                                    "start_line": node.lineno,
-                                    "length": length,
-                                    "severity": "fail" if length > 100 else "warn",
-                                })
+                                long_functions.append(
+                                    {
+                                        "file": p.name,
+                                        "function": node.name,
+                                        "start_line": node.lineno,
+                                        "length": length,
+                                        "severity": "fail" if length > 100 else "warn",
+                                    }
+                                )
             except Exception as e:
                 logger.debug(f"Length check error in {p}: {e}")
 
@@ -156,7 +158,8 @@ class CodeQualityAnalyzer:
             fix_suggestions=[
                 f"Decompose {f['function']}() in {f['file']} ({f['length']} lines) into distinct single-responsibility routines."
                 for f in long_functions[:5]
-            ] + [
+            ]
+            + [
                 f"Split {f['file']} ({f['lines']} lines) into separate submodules."
                 for f in long_files[:3]
             ],
@@ -174,7 +177,11 @@ class CodeQualityAnalyzer:
                 continue
 
             try:
-                lines = [line_text.strip() for line_text in p.read_text(encoding="utf-8", errors="ignore").splitlines() if line_text.strip() and not line_text.strip().startswith(("#", "//"))]
+                lines = [
+                    line_text.strip()
+                    for line_text in p.read_text(encoding="utf-8", errors="ignore").splitlines()
+                    if line_text.strip() and not line_text.strip().startswith(("#", "//"))
+                ]
                 # 6-line sliding window shingle
                 for i in range(len(lines) - 5):
                     chunk = "\n".join(lines[i : i + 6])
@@ -195,10 +202,15 @@ class CodeQualityAnalyzer:
             name="Duplicate Code Detection",
             category="quality",
             status=status,
-            evidence={"duplicate_block_count": len(duplicates), "sample_duplicates": duplicates[:5]},
+            evidence={
+                "duplicate_block_count": len(duplicates),
+                "sample_duplicates": duplicates[:5],
+            },
             fix_suggestions=[
                 "Extract duplicate logic across files into shared utility modules or helper classes."
-            ] if duplicates else [],
+            ]
+            if duplicates
+            else [],
         )
 
     def analyze_dead_code_and_unused_imports(self) -> VerificationCheck:
@@ -224,10 +236,12 @@ class CodeQualityAnalyzer:
                 # Filter special names
                 unused = {u for u in unused if not u.startswith("__")}
                 if unused:
-                    dead_code_items.append({
-                        "file": py_file.name,
-                        "unused_imports": sorted(list(unused)),
-                    })
+                    dead_code_items.append(
+                        {
+                            "file": py_file.name,
+                            "unused_imports": sorted(list(unused)),
+                        }
+                    )
             except Exception as e:
                 logger.debug(f"Dead code analysis error in {py_file}: {e}")
 
@@ -254,23 +268,29 @@ class CodeQualityAnalyzer:
                     # Classes should be PascalCase
                     if isinstance(node, ast.ClassDef):
                         if not re.match(r"^[A-Z][a-zA-Z0-9]*$", node.name):
-                            naming_violations.append({
-                                "file": py_file.name,
-                                "line": node.lineno,
-                                "name": node.name,
-                                "type": "class",
-                                "expected": "PascalCase",
-                            })
+                            naming_violations.append(
+                                {
+                                    "file": py_file.name,
+                                    "line": node.lineno,
+                                    "name": node.name,
+                                    "type": "class",
+                                    "expected": "PascalCase",
+                                }
+                            )
                     # Functions should be snake_case
                     elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                        if not re.match(r"^[a-z_][a-z0-9_]*$", node.name) and not (node.name.startswith("__") and node.name.endswith("__")):
-                            naming_violations.append({
-                                "file": py_file.name,
-                                "line": node.lineno,
-                                "name": node.name,
-                                "type": "function",
-                                "expected": "snake_case",
-                            })
+                        if not re.match(r"^[a-z_][a-z0-9_]*$", node.name) and not (
+                            node.name.startswith("__") and node.name.endswith("__")
+                        ):
+                            naming_violations.append(
+                                {
+                                    "file": py_file.name,
+                                    "line": node.lineno,
+                                    "name": node.name,
+                                    "type": "function",
+                                    "expected": "snake_case",
+                                }
+                            )
             except Exception as e:
                 logger.debug(f"Naming convention parse error in {py_file}: {e}")
 
@@ -279,7 +299,10 @@ class CodeQualityAnalyzer:
             name="Naming Convention Adherence",
             category="quality",
             status=status,
-            evidence={"violations_count": len(naming_violations), "violations": naming_violations[:10]},
+            evidence={
+                "violations_count": len(naming_violations),
+                "violations": naming_violations[:10],
+            },
             fix_suggestions=[
                 f"Rename {v['type']} '{v['name']}' in {v['file']} (line {v['line']}) to follow {v['expected']} convention."
                 for v in naming_violations[:5]
@@ -304,11 +327,15 @@ class CodeQualityAnalyzer:
                         if docstring:
                             documented_symbols += 1
                         else:
-                            missing_docs.append({"file": py_file.name, "symbol": node.name, "line": node.lineno})
+                            missing_docs.append(
+                                {"file": py_file.name, "symbol": node.name, "line": node.lineno}
+                            )
             except Exception:
                 pass
 
-        coverage_pct = round((documented_symbols / total_symbols * 100.0), 1) if total_symbols > 0 else 100.0
+        coverage_pct = (
+            round((documented_symbols / total_symbols * 100.0), 1) if total_symbols > 0 else 100.0
+        )
         status = "pass" if coverage_pct >= 60.0 else "warn"
 
         return VerificationCheck(
@@ -324,7 +351,9 @@ class CodeQualityAnalyzer:
             fix_suggestions=[
                 f"Add docstring to public symbol '{m['symbol']}' in {m['file']} (line {m['line']})."
                 for m in missing_docs[:5]
-            ] if coverage_pct < 60.0 else [],
+            ]
+            if coverage_pct < 60.0
+            else [],
         )
 
     def run_all(self) -> list[VerificationCheck]:

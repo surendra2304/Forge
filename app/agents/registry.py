@@ -3,7 +3,6 @@ Agent Capability Registry and Factory for Project FORGE.
 Registers and instantiates specialist engineering roles with decoupled model providers.
 """
 
-
 from pydantic import BaseModel, Field
 
 from app.agents.base import BaseAgent
@@ -47,7 +46,7 @@ class AgentRegistry:
 
     def __init__(self):
         self._capabilities: dict[str, AgentCapability] = {}
-        self._role_classes: dict[str, type[BaseAgent]] = {}
+        self._role_classes: dict[str, Any] = {}
         self._register_default_roles()
 
     def _register_default_roles(self) -> None:
@@ -60,7 +59,11 @@ class AgentRegistry:
                     display_name="Planner & Requirement Decomposer",
                     description="Decomposes goals into a hierarchical task tree and executable DAG.",
                     category="Planning",
-                    supported_tasks=["goal_decomposition", "dependency_graph_synthesis", "spec_generation"],
+                    supported_tasks=[
+                        "goal_decomposition",
+                        "dependency_graph_synthesis",
+                        "spec_generation",
+                    ],
                     available_tools=["fs:read", "git:read"],
                     preferred_models={
                         "openai": "gpt-4o",
@@ -77,7 +80,12 @@ class AgentRegistry:
                     display_name="Codebase Analyzer & Onboarding Specialist",
                     description="Inspects existing repositories, manifests, entrypoints, and produces context summaries.",
                     category="Analysis",
-                    supported_tasks=["codebase_mapping", "manifest_inspection", "architecture_mapping", "context_synthesis"],
+                    supported_tasks=[
+                        "codebase_mapping",
+                        "manifest_inspection",
+                        "architecture_mapping",
+                        "context_synthesis",
+                    ],
                     available_tools=["fs:read", "fs:write", "git:read"],
                     preferred_models={
                         "openai": "gpt-4o",
@@ -112,7 +120,14 @@ class AgentRegistry:
                     description="Authors clean, tested implementation code across modules.",
                     category="Implementation",
                     supported_tasks=["code_generation", "refactoring", "module_synthesis"],
-                    available_tools=["fs:read", "fs:write", "fs:delete", "terminal:exec", "git:read", "git:write"],
+                    available_tools=[
+                        "fs:read",
+                        "fs:write",
+                        "fs:delete",
+                        "terminal:exec",
+                        "git:read",
+                        "git:write",
+                    ],
                     preferred_models={
                         "openai": "gpt-4o",
                         "anthropic": "claude-3-5-sonnet-20241022",
@@ -129,7 +144,14 @@ class AgentRegistry:
                     description="Builds interactive UI components, styles, and client state.",
                     category="Implementation",
                     supported_tasks=["ui_components", "state_management", "client_integration"],
-                    available_tools=["fs:read", "fs:write", "fs:delete", "terminal:exec", "git:read", "git:write"],
+                    available_tools=[
+                        "fs:read",
+                        "fs:write",
+                        "fs:delete",
+                        "terminal:exec",
+                        "git:read",
+                        "git:write",
+                    ],
                     preferred_models={
                         "openai": "gpt-4o",
                         "anthropic": "claude-3-5-sonnet-20241022",
@@ -146,7 +168,14 @@ class AgentRegistry:
                     description="Implements REST APIs, data layers, queues, and server logic.",
                     category="Implementation",
                     supported_tasks=["rest_apis", "database_models", "background_workers"],
-                    available_tools=["fs:read", "fs:write", "fs:delete", "terminal:exec", "git:read", "git:write"],
+                    available_tools=[
+                        "fs:read",
+                        "fs:write",
+                        "fs:delete",
+                        "terminal:exec",
+                        "git:read",
+                        "git:write",
+                    ],
                     preferred_models={
                         "openai": "gpt-4o",
                         "anthropic": "claude-3-5-sonnet-20241022",
@@ -179,7 +208,11 @@ class AgentRegistry:
                     display_name="Debugger & Diagnostics Specialist",
                     description="Performs root-cause analysis on logs, tracebacks, and test failures.",
                     category="Diagnostics",
-                    supported_tasks=["error_diagnosis", "stack_trace_analysis", "patch_formulation"],
+                    supported_tasks=[
+                        "error_diagnosis",
+                        "stack_trace_analysis",
+                        "patch_formulation",
+                    ],
                     available_tools=["fs:read", "fs:write", "terminal:exec", "git:read"],
                     preferred_models={
                         "openai": "gpt-4o",
@@ -231,7 +264,13 @@ class AgentRegistry:
                     description="Validates packages, creates release checkpoints, and prepares artifacts.",
                     category="Release",
                     supported_tasks=["packaging", "tagging", "release_verification"],
-                    available_tools=["fs:read", "fs:write", "terminal:exec", "git:read", "git:write"],
+                    available_tools=[
+                        "fs:read",
+                        "fs:write",
+                        "terminal:exec",
+                        "git:read",
+                        "git:write",
+                    ],
                     preferred_models={
                         "openai": "gpt-4o-mini",
                         "anthropic": "claude-3-5-haiku-20241022",

@@ -21,6 +21,7 @@ logger = get_logger("integrations.intelx")
 
 class IntelXResearchFinding(BaseModel):
     """Structured technical research insight returned by IntelX."""
+
     id: str = Field(default_factory=lambda: f"IX-{os.urandom(2).hex().upper()}")
     technology: str
     category: str  # best_practices, common_pitfalls, recommended_patterns, performance_considerations, security_considerations
@@ -33,6 +34,7 @@ class IntelXResearchFinding(BaseModel):
 
 class IntelXResearchResult(BaseModel):
     """Consolidated technical research report for a technology."""
+
     query: str
     technology: str
     findings: list[IntelXResearchFinding] = Field(default_factory=list)
@@ -48,8 +50,21 @@ class IntelXResearchResult(BaseModel):
 
 # Default known technologies in starter templates library
 STANDARD_TEMPLATE_TECHNOLOGIES: set[str] = {
-    "python", "fastapi", "flask", "sqlite", "pytest", "html", "css", "javascript",
-    "vanilla js", "cli", "argparse", "click", "rest api", "json", "markdown"
+    "python",
+    "fastapi",
+    "flask",
+    "sqlite",
+    "pytest",
+    "html",
+    "css",
+    "javascript",
+    "vanilla js",
+    "cli",
+    "argparse",
+    "click",
+    "rest api",
+    "json",
+    "markdown",
 }
 
 # Rich IntelX Built-in Research Intelligence for Unfamiliar & Complex Technologies
@@ -223,7 +238,9 @@ class IntelXTechClient:
         timeout: float = 8.0,
     ):
         settings = get_settings()
-        self.base_url = (base_url or getattr(settings, "intelx_url", "http://localhost:8002")).rstrip("/")
+        self.base_url = str(
+            base_url or getattr(settings, "intelx_url", "http://localhost:8002") or ""
+        ).rstrip("/")
         self.api_key = api_key or getattr(settings, "intelx_api_key", None)
         self.timeout = timeout
 
@@ -249,16 +266,46 @@ class IntelXTechClient:
         normalized_goal = goal.lower()
 
         candidate_techs = [
-            "graphql", "websockets", "websocket", "redis", "kafka", "celery",
-            "rust", "elasticsearch", "elastic", "grpc", "rabbitmq", "webrtc",
-            "mongodb", "dynamodb", "neo4j", "cassandra", "svelte", "vue",
-            "nextjs", "angular", "actix", "axum", "gin", "kubernetes", "docker",
-            "oauth2", "jwt", "stripe", "langchain", "ollama", "weaviate"
+            "graphql",
+            "websockets",
+            "websocket",
+            "redis",
+            "kafka",
+            "celery",
+            "rust",
+            "elasticsearch",
+            "elastic",
+            "grpc",
+            "rabbitmq",
+            "webrtc",
+            "mongodb",
+            "dynamodb",
+            "neo4j",
+            "cassandra",
+            "svelte",
+            "vue",
+            "nextjs",
+            "angular",
+            "actix",
+            "axum",
+            "gin",
+            "kubernetes",
+            "docker",
+            "oauth2",
+            "jwt",
+            "stripe",
+            "langchain",
+            "ollama",
+            "weaviate",
         ]
 
         for tech in candidate_techs:
             if re.search(rf"\b{re.escape(tech)}\b", normalized_goal):
-                clean_tech = "websockets" if tech == "websocket" else ("elasticsearch" if tech == "elastic" else tech)
+                clean_tech = (
+                    "websockets"
+                    if tech == "websocket"
+                    else ("elasticsearch" if tech == "elastic" else tech)
+                )
                 if clean_tech not in detected:
                     detected.append(clean_tech)
 
@@ -307,7 +354,9 @@ class IntelXTechClient:
                         confidence=data.get("confidence", 0.95),
                     )
         except Exception as e:
-            logger.debug(f"IntelX remote research unavailable for '{technology}' ({e}). Using built-in technical intelligence.")
+            logger.debug(
+                f"IntelX remote research unavailable for '{technology}' ({e}). Using built-in technical intelligence."
+            )
 
         # 2. Use Built-in High-Fidelity Technical Research DB
         if tech_key in BUILTIN_TECH_RESEARCH_DB:
@@ -315,34 +364,40 @@ class IntelXTechClient:
             findings = []
             for bp in tech_data.get("best_practices", []):
                 fid = self._extract_finding_id(bp)
-                findings.append(IntelXResearchFinding(
-                    id=fid,
-                    technology=technology,
-                    category="best_practices",
-                    title=f"{technology.title()} Best Practice",
-                    detail=bp,
-                    recommendation=bp,
-                ))
+                findings.append(
+                    IntelXResearchFinding(
+                        id=fid,
+                        technology=technology,
+                        category="best_practices",
+                        title=f"{technology.title()} Best Practice",
+                        detail=bp,
+                        recommendation=bp,
+                    )
+                )
             for pf in tech_data.get("pitfalls", []):
                 fid = self._extract_finding_id(pf)
-                findings.append(IntelXResearchFinding(
-                    id=fid,
-                    technology=technology,
-                    category="common_pitfalls",
-                    title=f"{technology.title()} Pitfall to Avoid",
-                    detail=pf,
-                    recommendation=f"Avoid: {pf}",
-                ))
+                findings.append(
+                    IntelXResearchFinding(
+                        id=fid,
+                        technology=technology,
+                        category="common_pitfalls",
+                        title=f"{technology.title()} Pitfall to Avoid",
+                        detail=pf,
+                        recommendation=f"Avoid: {pf}",
+                    )
+                )
             for pt in tech_data.get("patterns", []):
                 fid = self._extract_finding_id(pt)
-                findings.append(IntelXResearchFinding(
-                    id=fid,
-                    technology=technology,
-                    category="recommended_patterns",
-                    title=f"{technology.title()} Recommended Pattern",
-                    detail=pt,
-                    recommendation=pt,
-                ))
+                findings.append(
+                    IntelXResearchFinding(
+                        id=fid,
+                        technology=technology,
+                        category="recommended_patterns",
+                        title=f"{technology.title()} Recommended Pattern",
+                        detail=pt,
+                        recommendation=pt,
+                    )
+                )
 
             summary = (
                 f"IntelX Technical Research on {technology.title()}: Found {len(tech_data.get('best_practices', []))} best practices, "
@@ -386,11 +441,19 @@ class IntelXTechClient:
             query=query_text,
             technology=technology,
             findings=generic_findings,
-            best_practices=[f.recommendation for f in generic_findings if f.category == "best_practices"],
-            pitfalls_to_avoid=[f.recommendation for f in generic_findings if f.category == "common_pitfalls"],
+            best_practices=[
+                f.recommendation for f in generic_findings if f.category == "best_practices"
+            ],
+            pitfalls_to_avoid=[
+                f.recommendation for f in generic_findings if f.category == "common_pitfalls"
+            ],
             recommended_patterns=[f"Dedicated {technology} client adapter with health checks"],
-            performance_considerations=[f"Use connection pooling and asynchronous execution with {technology}"],
-            verification_requirements=[f"Verify {technology} client initializes and gracefully terminates"],
+            performance_considerations=[
+                f"Use connection pooling and asynchronous execution with {technology}"
+            ],
+            verification_requirements=[
+                f"Verify {technology} client initializes and gracefully terminates"
+            ],
             raw_summary=f"IntelX Research for {technology}: Identified modular architecture requirements and lifecycle management patterns.",
             confidence=0.85,
         )

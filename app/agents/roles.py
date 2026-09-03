@@ -30,7 +30,9 @@ class PlannerRole(BaseAgent):
             provider=provider,
         )
 
-    async def execute_step(self, task_id: str, node_title: str, context: dict[str, Any], engine) -> dict[str, Any]:
+    async def execute_step(
+        self, task_id: str, node_title: str, context: dict[str, Any], engine
+    ) -> dict[str, Any]:
         goal = context.get("goal", node_title)
         workspace_summary = self.get_workspace_summary(task_id, engine)
         prompt = (
@@ -65,7 +67,9 @@ class ArchitectRole(BaseAgent):
             provider=provider,
         )
 
-    async def execute_step(self, task_id: str, node_title: str, context: dict[str, Any], engine) -> dict[str, Any]:
+    async def execute_step(
+        self, task_id: str, node_title: str, context: dict[str, Any], engine
+    ) -> dict[str, Any]:
         goal = context.get("goal", "Engineering Project")
         workspace_summary = self.get_workspace_summary(task_id, engine)
 
@@ -73,10 +77,17 @@ class ArchitectRole(BaseAgent):
         consensus_info = ""
         try:
             from app.integrations.ai_universe_client import get_ai_universe_client
+
             ai_client = get_ai_universe_client()
             goal_lower = goal.lower()
-            ptype = "web" if any(k in goal_lower for k in ["website", "portfolio", "html", "css", "web"]) else ("api" if any(k in goal_lower for k in ["fastapi", "api", "backend"]) else "cli")
-            
+            ptype = (
+                "web"
+                if any(k in goal_lower for k in ["website", "portfolio", "html", "css", "web"])
+                else (
+                    "api" if any(k in goal_lower for k in ["fastapi", "api", "backend"]) else "cli"
+                )
+            )
+
             try:
                 plan_res = await ai_client.plan_architecture(goal=goal, project_type=ptype)
                 if plan_res and plan_res.get("architecture_spec"):
@@ -85,7 +96,10 @@ class ArchitectRole(BaseAgent):
                         await engine.store.record_event(
                             task_id=task_id,
                             event_type="ai_universe.architecture_planned",
-                            payload={"confidence": plan_res.get("confidence", 0.95), "stage": "architecture"},
+                            payload={
+                                "confidence": plan_res.get("confidence", 0.95),
+                                "stage": "architecture",
+                            },
                         )
             except Exception:
                 ai_res = await ai_client.consult_with_verification(
@@ -99,7 +113,11 @@ class ArchitectRole(BaseAgent):
                         await engine.store.record_event(
                             task_id=task_id,
                             event_type="ai_universe.consulted",
-                            payload={"run_id": ai_res.run_id, "confidence": ai_res.confidence, "stage": "architecture"},
+                            payload={
+                                "run_id": ai_res.run_id,
+                                "confidence": ai_res.confidence,
+                                "stage": "architecture",
+                            },
                         )
         except Exception:
             pass
@@ -109,6 +127,7 @@ class ArchitectRole(BaseAgent):
         try:
             from app.integrations.intelx_client import get_intelx_client
             from app.monitoring.production_monitor import production_monitor
+
             intelx_client = get_intelx_client()
             unfamiliar = intelx_client.detect_unfamiliar_technologies(goal)
             if unfamiliar:
@@ -118,7 +137,9 @@ class ArchitectRole(BaseAgent):
                     research_res.append(res)
                     production_monitor.record_intelx_query()
                 production_monitor.record_research_informed_build()
-                research_info = "\n" + intelx_client.format_research_context_for_prompt(research_res) + "\n"
+                research_info = (
+                    "\n" + intelx_client.format_research_context_for_prompt(research_res) + "\n"
+                )
                 if hasattr(engine, "store") and engine.store:
                     await engine.store.record_event(
                         task_id=task_id,
@@ -133,6 +154,7 @@ class ArchitectRole(BaseAgent):
         try:
             from app.integrations.futuris_client import get_futuris_client
             from app.monitoring.production_monitor import production_monitor
+
             futuris_client = get_futuris_client()
             assessment = futuris_client.get_full_assessment(goal=goal)
             production_monitor.record_futuris_consultation()
@@ -180,9 +202,9 @@ class ArchitectRole(BaseAgent):
             f"### File: docs/FILE_MANIFEST.json\n"
             f"```json\n"
             f"[\n"
-            f"  \"index.html\",\n"
-            f"  \"style.css\",\n"
-            f"  \"app.js\"\n"
+            f'  "index.html",\n'
+            f'  "style.css",\n'
+            f'  "app.js"\n'
             f"]\n"
             f"```"
         )
@@ -211,7 +233,10 @@ class ArchitectRole(BaseAgent):
         if "docs/FILE_MANIFEST.json" in written:
             try:
                 import json
-                raw_json = engine.fs.read_file(task_id, "docs/FILE_MANIFEST.json", role=self.role_name)
+
+                raw_json = engine.fs.read_file(
+                    task_id, "docs/FILE_MANIFEST.json", role=self.role_name
+                )
                 parsed = json.loads(raw_json)
                 if isinstance(parsed, list):
                     manifest_files = [str(x) for x in parsed if x]
@@ -223,15 +248,39 @@ class ArchitectRole(BaseAgent):
         if not manifest_files:
             goal_lower = goal.lower()
             if any(k in goal_lower for k in ["full-stack", "fullstack", "dashboard"]):
-                manifest_files = ["main.py", "test_main.py", "index.html", "style.css", "app.js", "requirements.txt", "README.md"]
-            elif any(k in goal_lower for k in ["website", "landing page", "web page", "html", "portfolio", "css", "calculator website", "static"]):
+                manifest_files = [
+                    "main.py",
+                    "test_main.py",
+                    "index.html",
+                    "style.css",
+                    "app.js",
+                    "requirements.txt",
+                    "README.md",
+                ]
+            elif any(
+                k in goal_lower
+                for k in [
+                    "website",
+                    "landing page",
+                    "web page",
+                    "html",
+                    "portfolio",
+                    "css",
+                    "calculator website",
+                    "static",
+                ]
+            ):
                 manifest_files = ["index.html", "style.css", "app.js"]
-            elif any(k in goal_lower for k in ["fastapi", "rest api", "backend", "database", "sqlite", "service"]) or any(k in goal_lower for k in ["cli", "python tool", "command-line", "script"]):
+            elif any(
+                k in goal_lower
+                for k in ["fastapi", "rest api", "backend", "database", "sqlite", "service"]
+            ) or any(k in goal_lower for k in ["cli", "python tool", "command-line", "script"]):
                 manifest_files = ["main.py", "test_main.py", "README.md"]
             else:
                 manifest_files = ["main.py", "README.md"]
 
             import json
+
             engine.fs.create_file(
                 task_id=task_id,
                 relative_path="docs/FILE_MANIFEST.json",
@@ -267,7 +316,9 @@ class DeveloperRole(BaseAgent):
             provider=provider,
         )
 
-    async def execute_step(self, task_id: str, node_title: str, context: dict[str, Any], engine) -> dict[str, Any]:
+    async def execute_step(
+        self, task_id: str, node_title: str, context: dict[str, Any], engine
+    ) -> dict[str, Any]:
         goal = context.get("goal", "")
         workspace_summary = self.get_workspace_summary(task_id, engine)
         existing_code_summary = ""
@@ -282,7 +333,10 @@ class DeveloperRole(BaseAgent):
         if not file_manifest:
             try:
                 import json
-                raw_json = engine.fs.read_file(task_id, "docs/FILE_MANIFEST.json", role=self.role_name)
+
+                raw_json = engine.fs.read_file(
+                    task_id, "docs/FILE_MANIFEST.json", role=self.role_name
+                )
                 parsed = json.loads(raw_json)
                 if isinstance(parsed, list):
                     file_manifest = [str(x) for x in parsed if x]
@@ -293,7 +347,19 @@ class DeveloperRole(BaseAgent):
 
         if not file_manifest:
             goal_lower = goal.lower()
-            if any(k in goal_lower for k in ["website", "landing page", "web page", "html", "portfolio", "css", "calculator website", "static"]):
+            if any(
+                k in goal_lower
+                for k in [
+                    "website",
+                    "landing page",
+                    "web page",
+                    "html",
+                    "portfolio",
+                    "css",
+                    "calculator website",
+                    "static",
+                ]
+            ):
                 file_manifest = ["index.html", "style.css", "app.js"]
             elif any(k in goal_lower for k in ["full-stack", "fullstack"]):
                 file_manifest = ["main.py", "index.html", "style.css", "app.js"]
@@ -309,12 +375,15 @@ class DeveloperRole(BaseAgent):
         try:
             from app.integrations.intelx_client import get_intelx_client
             from app.monitoring.production_monitor import production_monitor
+
             intelx_client = get_intelx_client()
             unfamiliar = intelx_client.detect_unfamiliar_technologies(goal or node_title)
             if unfamiliar:
                 res_list = []
                 for tech in unfamiliar:
-                    res = await intelx_client.research_technology(tech, goal_context=goal or node_title)
+                    res = await intelx_client.research_technology(
+                        tech, goal_context=goal or node_title
+                    )
                     res_list.append(res)
                     production_monitor.record_intelx_query()
                 production_monitor.record_research_informed_build()
@@ -333,6 +402,7 @@ class DeveloperRole(BaseAgent):
             ai_code = None
             try:
                 from app.integrations.ai_universe_client import get_ai_universe_client
+
                 ai_client = get_ai_universe_client()
                 # Determine file type
                 ext = filename.split(".")[-1].lower() if "." in filename else "python"
@@ -356,7 +426,7 @@ class DeveloperRole(BaseAgent):
                         "Fully dynamic interactivity: live category filter, interactive project modal preview, animated typing/particle hero, active scroll spy navigation",
                         "Smooth CSS transitions, keyframe animations, responsive mobile drawer menu, and persistent dark/light theme switch",
                         "Zero broken external asset dependencies (include embedded inline SVG icons and embedded mock project data in JS)",
-                        "Clean, linked CSS and JS files with matching selectors and IDs (index.html loads style.css and app.js)"
+                        "Clean, linked stylesheets and scripts with matching element selectors and IDs",
                     ]
                     for std in web_standards:
                         if std not in enriched_requirements:
@@ -366,32 +436,28 @@ class DeveloperRole(BaseAgent):
                 sibling_files: dict[str, str] = {}
                 for w_file in written:
                     try:
-                        sibling_files[w_file] = engine.fs.read_file(task_id, w_file, role=self.role_name)[:2500]
+                        sibling_files[w_file] = engine.fs.read_file(
+                            task_id, w_file, role=self.role_name
+                        )[:2500]
                     except Exception:
                         pass
 
-                try:
-                    ai_res = await ai_client.generate_code(
-                        filename=filename,
-                        goal=goal or node_title,
-                        file_type=file_type,
-                        requirements=enriched_requirements,
-                        context={
-                            "project_goal": goal,
-                            "research_context": research_context_str,
-                            "architecture_spec": "Modern, highly interactive single-page web app with style.css and app.js linked in index.html.",
-                            "related_files": sibling_files,
-                        },
+                ask_prompt = (
+                    f"Write the complete code for {filename} based on the overall architecture: {goal or node_title}.\n"
+                    f"{research_context_str}\n\n"
+                    f"Security requirements: Input validation on all user inputs, parameterized SQL (never string concatenation), "
+                    f"clean error handling without stack trace leaks, secure default configurations, authentication checks on protected endpoints, "
+                    f"and CSRF / secure headers where applicable."
+                )
+                if file_type in ["html", "css", "js"]:
+                    ask_prompt += (
+                        "\n\nDesign requirements: Modern polished UI, CSS variables, glassmorphic card effects, smooth animations, "
+                        "interactive elements, no placeholder images or broken links.\nRequirements:\n"
+                        + "\n".join([f"- {r}" for r in enriched_requirements])
                     )
-                except Exception as e_gen:
-                    logger.debug(f"Direct generate-code endpoint failed ({e_gen}), trying ask endpoint...")
-                    ask_prompt = (
-                        f"Write complete, production-grade, highly interactive code for {filename} for: {goal or node_title}.\n"
-                        f"Requirements:\n" + "\n".join([f"- {r}" for r in enriched_requirements]) + "\n\n"
-                        f"{research_context_str}\n\n"
-                        f"Design requirements: Modern polished UI, CSS variables, glassmorphic card effects, smooth animations, interactive elements, no placeholder images or broken links. Return ONLY the raw code."
-                    )
-                    ai_res = await ai_client.ask(question=ask_prompt, mode="auto")
+                ask_prompt += "\nReturn ONLY the raw code."
+
+                ai_res = await ai_client.ask(question=ask_prompt, mode="auto")
 
                 if ai_res and ai_res.confidence >= 0.70 and ai_res.answer and ai_res.answer.strip():
                     ai_code = ai_res.answer
@@ -400,14 +466,21 @@ class DeveloperRole(BaseAgent):
                         await engine.store.record_event(
                             task_id=task_id,
                             event_type="ai_universe.code_generated",
-                            payload={"file": filename, "run_id": ai_res.run_id, "confidence": ai_res.confidence, "stage": "developer"},
+                            payload={
+                                "file": filename,
+                                "run_id": ai_res.run_id,
+                                "confidence": ai_res.confidence,
+                                "stage": "developer",
+                            },
                         )
                 elif ai_res and ai_res.confidence < 0.70:
                     logger.warning(
                         f"AI Universe code generation for '{filename}' confidence ({ai_res.confidence:.2f}) below threshold 0.70. Falling back to local model."
                     )
             except Exception as e:
-                logger.warning(f"AI Universe code generation call for '{filename}' failed ({e}). Falling back to local model.")
+                logger.warning(
+                    f"AI Universe code generation call for '{filename}' failed ({e}). Falling back to local model."
+                )
 
             if ai_code:
                 # Extract structured file blocks or save directly to filename
@@ -466,9 +539,12 @@ class DeveloperRole(BaseAgent):
         # Flag fallback_stub in workspace state
         if fallback_files:
             import json as py_json
+
             fallback_meta = {"fallback_stub": True, "fallback_files": fallback_files}
             paths = engine.wm.get_workspace_paths(task_id) or engine.wm.create_workspace(task_id)
-            (paths.state / "FALLBACK_STUB.json").write_text(py_json.dumps(fallback_meta, indent=2), encoding="utf-8")
+            (paths.state / "FALLBACK_STUB.json").write_text(
+                py_json.dumps(fallback_meta, indent=2), encoding="utf-8"
+            )
             if hasattr(engine, "store") and engine.store:
                 try:
                     await engine.store.record_event(
@@ -508,7 +584,9 @@ class FrontendEngineerRole(BaseAgent):
             provider=provider,
         )
 
-    async def execute_step(self, task_id: str, node_title: str, context: dict[str, Any], engine) -> dict[str, Any]:
+    async def execute_step(
+        self, task_id: str, node_title: str, context: dict[str, Any], engine
+    ) -> dict[str, Any]:
         goal = context.get("goal", "")
         workspace_summary = self.get_workspace_summary(task_id, engine)
 
@@ -551,7 +629,9 @@ class BackendEngineerRole(BaseAgent):
             provider=provider,
         )
 
-    async def execute_step(self, task_id: str, node_title: str, context: dict[str, Any], engine) -> dict[str, Any]:
+    async def execute_step(
+        self, task_id: str, node_title: str, context: dict[str, Any], engine
+    ) -> dict[str, Any]:
         goal = context.get("goal", "")
         workspace_summary = self.get_workspace_summary(task_id, engine)
 
@@ -580,6 +660,7 @@ class BackendEngineerRole(BaseAgent):
 
 class TesterRole(BaseAgent):
     """Specialist in unit tests, integration tests, fuzzing, and coverage analysis."""
+
     __test__ = False
 
     def __init__(self, provider: BaseModelProvider | None = None):
@@ -595,17 +676,26 @@ class TesterRole(BaseAgent):
             provider=provider,
         )
 
-    async def execute_step(self, task_id: str, node_title: str, context: dict[str, Any], engine) -> dict[str, Any]:
+    async def execute_step(
+        self, task_id: str, node_title: str, context: dict[str, Any], engine
+    ) -> dict[str, Any]:
         goal = context.get("goal", "")
         workspace_summary = self.get_workspace_summary(task_id, engine)
 
         # Check existing test files
-        test_files = engine.fs.search_files(task_id=task_id, pattern="test_*.py", role=self.role_name)
+        test_files = engine.fs.search_files(
+            task_id=task_id, pattern="test_*.py", role=self.role_name
+        )
         existing_test_is_stub = False
         if test_files:
             try:
-                first_test_content = engine.fs.read_file(task_id, test_files[0], role=self.role_name)
-                if "assert main() == 0" in first_test_content and len(first_test_content.splitlines()) <= 6:
+                first_test_content = engine.fs.read_file(
+                    task_id, test_files[0], role=self.role_name
+                )
+                if (
+                    "assert main() == 0" in first_test_content
+                    and len(first_test_content.splitlines()) <= 6
+                ):
                     existing_test_is_stub = True
             except Exception:
                 pass
@@ -615,8 +705,9 @@ class TesterRole(BaseAgent):
             test_synthesized = False
             try:
                 from app.integrations.ai_universe_client import get_ai_universe_client
+
                 ai_client = get_ai_universe_client()
-                
+
                 # Try generating tests from existing main.py / implementation files
                 main_code = ""
                 try:
@@ -639,12 +730,6 @@ class TesterRole(BaseAgent):
                             content=test_code,
                             role=self.role_name,
                         )
-                        engine.fs.create_file(
-                            task_id=task_id,
-                            relative_path="tests/test_main.py",
-                            content=test_code,
-                            role=self.role_name,
-                        )
                         test_synthesized = True
             except Exception:
                 pass
@@ -658,10 +743,14 @@ class TesterRole(BaseAgent):
                     f"Format tests as:\n### File: test_main.py\n```python\n...\n```"
                 )
                 response = await self.prompt_model(prompt)
-                self.apply_extracted_files(task_id, response.content, engine, default_filename="test_main.py")
+                self.apply_extracted_files(
+                    task_id, response.content, engine, default_filename="test_main.py"
+                )
 
         # Execute test runner
-        cmd_res = await engine.terminal.run_command(task_id=task_id, command="pytest -v", role=self.role_name)
+        cmd_res = await engine.terminal.run_command(
+            task_id=task_id, command="pytest -v", role=self.role_name
+        )
 
         return {
             "status": "success" if cmd_res.exit_code == 0 else "failed",
@@ -688,7 +777,9 @@ class DebuggerRole(BaseAgent):
             provider=provider,
         )
 
-    async def execute_step(self, task_id: str, node_title: str, context: dict[str, Any], engine) -> dict[str, Any]:
+    async def execute_step(
+        self, task_id: str, node_title: str, context: dict[str, Any], engine
+    ) -> dict[str, Any]:
         error_context = context.get("error", "No explicit error provided")
         terminal_logs = context.get("terminal_logs", "No terminal logs.")
         workspace_summary = self.get_workspace_summary(task_id, engine)
@@ -697,6 +788,7 @@ class DebuggerRole(BaseAgent):
         consensus_info = ""
         try:
             from app.integrations.ai_universe_client import get_ai_universe_client
+
             ai_client = get_ai_universe_client()
             ai_res = await ai_client.consult_with_verification(
                 question=f"Diagnose root cause and bug fix for: {error_context}. Diagnostic Scope: {node_title}",
@@ -709,7 +801,11 @@ class DebuggerRole(BaseAgent):
                     await engine.store.record_event(
                         task_id=task_id,
                         event_type="ai_universe.consulted",
-                        payload={"run_id": ai_res.run_id, "confidence": ai_res.confidence, "stage": "debugging"},
+                        payload={
+                            "run_id": ai_res.run_id,
+                            "confidence": ai_res.confidence,
+                            "stage": "debugging",
+                        },
                     )
         except Exception:
             pass
@@ -753,7 +849,9 @@ class SecurityReviewerRole(BaseAgent):
             provider=provider,
         )
 
-    async def execute_step(self, task_id: str, node_title: str, context: dict[str, Any], engine) -> dict[str, Any]:
+    async def execute_step(
+        self, task_id: str, node_title: str, context: dict[str, Any], engine
+    ) -> dict[str, Any]:
         from app.verification.checkers import SecurityChecker
 
         # 1. Run automated SecurityChecker
@@ -763,7 +861,9 @@ class SecurityReviewerRole(BaseAgent):
 
         files_written = []
         if not evidence.passed and evidence.issues:
-            logger.info(f"SecurityReviewer found {len(evidence.issues)} security violations. Formulating remediation patch...")
+            logger.info(
+                f"SecurityReviewer found {len(evidence.issues)} security violations. Formulating remediation patch..."
+            )
 
             # Read contents of failing files
             violating_files = {issue["file"] for issue in evidence.issues if "file" in issue}
@@ -806,7 +906,9 @@ class SecurityReviewerRole(BaseAgent):
             "security_passed": evidence.passed,
             "violations_detected": len(evidence.issues),
             "files_remediated": files_written,
-            "security_findings": response.content if "response" in locals() else "Security checks passed.",
+            "security_findings": response.content
+            if "response" in locals()
+            else "Security checks passed.",
             "agent": self.role_name,
         }
 
@@ -825,7 +927,9 @@ class CodeReviewerRole(BaseAgent):
             provider=provider,
         )
 
-    async def execute_step(self, task_id: str, node_title: str, context: dict[str, Any], engine) -> dict[str, Any]:
+    async def execute_step(
+        self, task_id: str, node_title: str, context: dict[str, Any], engine
+    ) -> dict[str, Any]:
         diff_text = context.get("recent_diffs")
         if not diff_text:
             diff_text = await engine.git.diff(task_id=task_id, role=self.role_name)
@@ -861,8 +965,11 @@ class ReleaseEngineerRole(BaseAgent):
             provider=provider,
         )
 
-    async def execute_step(self, task_id: str, node_title: str, context: dict[str, Any], engine) -> dict[str, Any]:
+    async def execute_step(
+        self, task_id: str, node_title: str, context: dict[str, Any], engine
+    ) -> dict[str, Any]:
         from app.execution.delivery import DeliveryPackager
+
         packager = DeliveryPackager(engine=engine, wm=engine.wm)
         goal = context.get("goal", "Autonomous Engineering Project")
         reqs = context.get("requirements", [])
@@ -875,12 +982,18 @@ class ReleaseEngineerRole(BaseAgent):
 
         pr_info = None
         push_to_gh = context.get("push_to_github") or False
-        gh_token = context.get("github_token") or (hasattr(engine, "github") and engine.github.settings.github_token)
-        gh_repo = context.get("github_repo") or (hasattr(engine, "github") and engine.github.settings.github_repo)
+        gh_token = context.get("github_token") or (
+            hasattr(engine, "github") and engine.github.settings.github_token
+        )
+        gh_repo = context.get("github_repo") or (
+            hasattr(engine, "github") and engine.github.settings.github_repo
+        )
 
         if push_to_gh or gh_token or gh_repo:
             branch_name = f"forge/feature-{task_id[:8]}"
-            logger.info(f"[Task {task_id}] ReleaseEngineer executing GitHub PR flow on branch '{branch_name}'...")
+            logger.info(
+                f"[Task {task_id}] ReleaseEngineer executing GitHub PR flow on branch '{branch_name}'..."
+            )
 
             # 1. Create and checkout feature branch
             await engine.github.create_branch(task_id, branch_name=branch_name, role=self.role_name)
@@ -905,7 +1018,9 @@ class ReleaseEngineerRole(BaseAgent):
             completion_md = ""
             paths = engine.wm.get_workspace_paths(task_id)
             if paths and (paths.artifacts / "COMPLETION_REPORT.md").exists():
-                completion_md = (paths.artifacts / "COMPLETION_REPORT.md").read_text(encoding="utf-8")
+                completion_md = (paths.artifacts / "COMPLETION_REPORT.md").read_text(
+                    encoding="utf-8"
+                )
             else:
                 completion_md = f"# FORGE Automated Delivery\n\n**Goal**: {goal}\n"
 
@@ -947,16 +1062,29 @@ class CodebaseAnalyzerRole(BaseAgent):
             provider=provider,
         )
 
-    async def execute_step(self, task_id: str, node_title: str, context: dict[str, Any], engine) -> dict[str, Any]:
+    async def execute_step(
+        self, task_id: str, node_title: str, context: dict[str, Any], engine
+    ) -> dict[str, Any]:
         goal = context.get("goal", "Analyze existing codebase")
         workspace_summary = self.get_workspace_summary(task_id, engine)
 
         # 1. Inspect manifest files
         manifests = {}
         candidate_manifests = [
-            "package.json", "requirements.txt", "pyproject.toml", "Pipfile", "setup.py",
-            "go.mod", "Cargo.toml", "pom.xml", "build.gradle", "Gemfile", "composer.json",
-            "Dockerfile", "docker-compose.yml", "Makefile",
+            "package.json",
+            "requirements.txt",
+            "pyproject.toml",
+            "Pipfile",
+            "setup.py",
+            "go.mod",
+            "Cargo.toml",
+            "pom.xml",
+            "build.gradle",
+            "Gemfile",
+            "composer.json",
+            "Dockerfile",
+            "docker-compose.yml",
+            "Makefile",
         ]
         for manifest in candidate_manifests:
             try:
@@ -968,7 +1096,15 @@ class CodebaseAnalyzerRole(BaseAgent):
 
         # 2. Inspect documentation and entrypoints
         key_files = {}
-        for kf in ["README.md", "main.py", "app.py", "src/main.py", "src/index.ts", "src/index.js", "index.html"]:
+        for kf in [
+            "README.md",
+            "main.py",
+            "app.py",
+            "src/main.py",
+            "src/index.ts",
+            "src/index.js",
+            "index.html",
+        ]:
             try:
                 content = engine.fs.read_file(task_id, kf, role=self.role_name)
                 if content:
@@ -980,7 +1116,9 @@ class CodebaseAnalyzerRole(BaseAgent):
         detected_stack = []
         if "package.json" in manifests:
             detected_stack.append("Node.js / JavaScript / TypeScript")
-        if any(m in manifests for m in ["requirements.txt", "pyproject.toml", "setup.py", "Pipfile"]):
+        if any(
+            m in manifests for m in ["requirements.txt", "pyproject.toml", "setup.py", "Pipfile"]
+        ):
             detected_stack.append("Python")
         if "go.mod" in manifests:
             detected_stack.append("Go")

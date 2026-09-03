@@ -92,6 +92,7 @@ async def build_task_from_template(template_id: str, payload: BuildFromTemplateR
     # Generate workspace directory
     settings = get_settings()
     import uuid
+
     task_id = f"task_{uuid.uuid4().hex[:8]}"
     workspace_path = settings.workspaces_dir / task_id
     workspace_path.mkdir(parents=True, exist_ok=True)
@@ -153,6 +154,7 @@ async def submit_template(submission: TemplateSubmission):
             rendered = rendered.replace(f"{{{{{k}}}}}", v)
 
     import uuid
+
     new_id = f"custom-{uuid.uuid4().hex[:8]}"
 
     manifest = TemplateManifest(
@@ -166,13 +168,16 @@ async def submit_template(submission: TemplateSubmission):
         variables=submission.variables,
         files=submission.files,
         requirements=submission.requirements,
-        readme_content=submission.readme_content or f"# {submission.name}\n\n{submission.description}\n",
+        readme_content=submission.readme_content
+        or f"# {submission.name}\n\n{submission.description}\n",
         tests_content=submission.tests_content,
         status="published",
     )
 
     template_registry.register_template(manifest)
-    logger.info(f"New template '{manifest.name}' passed automated quality gates and was registered with ID '{manifest.id}'.")
+    logger.info(
+        f"New template '{manifest.name}' passed automated quality gates and was registered with ID '{manifest.id}'."
+    )
 
     return {
         "success": True,

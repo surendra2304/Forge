@@ -55,7 +55,7 @@ class TaskStateMachine:
             TaskState.CANCELLED,
         },
         TaskState.FAILED: {
-            TaskState.READY,      # Retry mechanism
+            TaskState.READY,  # Retry mechanism
             TaskState.RUNNING,
             TaskState.CANCELLED,
         },
@@ -99,23 +99,30 @@ class TaskStateMachine:
             task_id=task_id,
             state=to_state,
             progress_percentage=progress_percentage,
-            error_message=error_message or (reason if to_state in [TaskState.FAILED, TaskState.BLOCKED] else None),
+            error_message=error_message
+            or (reason if to_state in [TaskState.FAILED, TaskState.BLOCKED] else None),
         )
 
         # Record audit event
         payload = event_payload or {}
-        payload.update({
-            "from_state": task.state.value,
-            "to_state": to_state.value,
-            "reason": reason,
-        })
+        payload.update(
+            {
+                "from_state": task.state.value,
+                "to_state": to_state.value,
+                "reason": reason,
+            }
+        )
         await self.store.record_event(
             task_id=task_id,
             event_type=f"task.state_changed.{to_state.value.lower()}",
             payload=payload,
         )
 
-        logger.info(f"Task {task_id} transitioned: {task.state.value} -> {to_state.value} ({reason or 'no reason provided'})")
+        logger.info(
+            f"Task {task_id} transitioned: {task.state.value} -> {to_state.value} ({reason or 'no reason provided'})"
+        )
+        if not updated_task:
+            raise RuntimeError(f"Failed to persist state transition for task '{task_id}'")
         return updated_task
 
     async def pause(
@@ -132,7 +139,9 @@ class TaskStateMachine:
             raise ValueError(f"Task '{task_id}' not found")
 
         if task.state in [TaskState.COMPLETED, TaskState.CANCELLED]:
-            raise InvalidStateTransitionError(f"Cannot pause task in terminal state {task.state.value}")
+            raise InvalidStateTransitionError(
+                f"Cannot pause task in terminal state {task.state.value}"
+            )
 
         # Save checkpoint before pausing
         checkpoints = await self.store.list_checkpoints(task_id)
@@ -141,7 +150,8 @@ class TaskStateMachine:
         checkpoint = Checkpoint(
             project_id=task_id,
             step_number=next_step,
-            state_data=snapshot_state or {"state": task.state.value, "progress": task.progress_percentage},
+            state_data=snapshot_state
+            or {"state": task.state.value, "progress": task.progress_percentage},
             description=f"Checkpoint on pause: {reason}",
         )
         await self.store.save_checkpoint(checkpoint)
@@ -173,7 +183,12 @@ class TaskStateMachine:
         if not task:
             raise ValueError(f"Task '{task_id}' not found")
 
-        if task.state not in [TaskState.BLOCKED, TaskState.READY, TaskState.PENDING, TaskState.FAILED]:
+        if task.state not in [
+            TaskState.BLOCKED,
+            TaskState.READY,
+            TaskState.PENDING,
+            TaskState.FAILED,
+        ]:
             raise InvalidStateTransitionError(f"Cannot resume task in state {task.state.value}")
 
         latest_cp = await self.store.get_latest_checkpoint(task_id)

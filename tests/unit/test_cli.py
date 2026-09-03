@@ -28,8 +28,23 @@ async def test_cli_build_and_status(temp_dir: Path):
     goal = "Create a minimal CLI todo tool"
     requirements = ["Add items", "List items"]
 
-    # Run CLI build handler
-    built_task = await handle_build(goal=goal, requirements=requirements, max_budget=10.0)
+    from unittest.mock import AsyncMock, patch
+
+    from app.integrations.ai_universe_client import AIUniverseResponse
+
+    mock_resp = AIUniverseResponse(
+        answer='"""Generated CLI."""\ndef main():\n    print("CLI operational")\n    return 0\n',
+        confidence=0.95,
+        run_id="run_cli_test",
+    )
+
+    with patch(
+        "app.integrations.ai_universe_client.AIUniverseClient.ask", new_callable=AsyncMock
+    ) as mock_ask:
+        mock_ask.return_value = mock_resp
+        # Run CLI build handler
+        built_task = await handle_build(goal=goal, requirements=requirements, max_budget=10.0)
+
     assert built_task is not None
     assert built_task.goal == goal
 
@@ -56,6 +71,7 @@ async def test_cli_pause_resume_cancel(temp_dir: Path):
 
     task_id = str(uuid4())
     from app.memory.models import TaskEntity
+
     task = TaskEntity(
         id=task_id,
         goal="CLI Control Flow Test",

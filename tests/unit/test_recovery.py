@@ -70,7 +70,9 @@ def test_anti_loop_controller_retry_limits_and_hash_deduplication():
     controller.record_repair_attempt(task_id, FailureClass.SYNTAX_ERROR, patch_a)
 
     # Duplicate patch attempt (Blocked by hash deduplication)
-    allowed_dup, reason_dup = controller.can_attempt_repair(task_id, FailureClass.SYNTAX_ERROR, patch_a)
+    allowed_dup, reason_dup = controller.can_attempt_repair(
+        task_id, FailureClass.SYNTAX_ERROR, patch_a
+    )
     assert allowed_dup is False
     assert "Duplicate patch detected" in reason_dup
 
@@ -105,11 +107,14 @@ async def test_patch_applicator_and_recovery_flow(temp_dir: Path):
 
     task_id = "task_recovery_flow"
     from app.memory.models import TaskEntity
-    await store.create_task(TaskEntity(
-        id=task_id,
-        goal="Recovery flow test",
-        workspace_path=str(wm.get_task_workspace_dir(task_id)),
-    ))
+
+    await store.create_task(
+        TaskEntity(
+            id=task_id,
+            goal="Recovery flow test",
+            workspace_path=str(wm.get_task_workspace_dir(task_id)),
+        )
+    )
 
     # Create file with broken syntax
     wm.write_project_file(task_id, "broken.py", "def foo(\n    return 42\n")

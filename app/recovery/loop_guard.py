@@ -55,7 +55,9 @@ class AntiLoopController:
         if patch_content:
             p_hash = self._get_hash(patch_content)
             if p_hash in self._patch_hashes[task_id]:
-                msg = "Duplicate patch detected without new evidence. Anti-loop prevention triggered."
+                msg = (
+                    "Duplicate patch detected without new evidence. Anti-loop prevention triggered."
+                )
                 logger.warning(f"[Task {task_id}] {msg}")
                 return False, msg
 
@@ -73,7 +75,9 @@ class AntiLoopController:
         if task_id not in self._patch_hashes:
             self._patch_hashes[task_id] = set()
 
-        self._class_retries[task_id][failure_class] = self._class_retries[task_id].get(failure_class, 0) + 1
+        self._class_retries[task_id][failure_class] = (
+            self._class_retries[task_id].get(failure_class, 0) + 1
+        )
         p_hash = self._get_hash(patch_content)
         self._patch_hashes[task_id].add(p_hash)
 

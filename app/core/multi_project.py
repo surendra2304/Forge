@@ -24,6 +24,7 @@ PRIORITY_WEIGHTS = {
 
 class QueuedTask(BaseModel):
     """Task item inside the priority scheduling queue."""
+
     task_id: str
     priority: str = "normal"
     submitted_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
@@ -64,13 +65,17 @@ class MultiProjectManager:
         """Add task to priority queue."""
         item = QueuedTask(task_id=task_id, priority=priority)
         heapq.heappush(self.queue, item)
-        logger.info(f"Task '{task_id}' enqueued with priority: {priority} (Queue depth: {len(self.queue)})")
+        logger.info(
+            f"Task '{task_id}' enqueued with priority: {priority} (Queue depth: {len(self.queue)})"
+        )
         return item
 
     def get_next_task(self) -> QueuedTask | None:
         """Pop the highest priority task ready for execution if concurrency limit allows."""
         if len(self.active_task_ids) >= self.max_concurrent_tasks:
-            logger.debug(f"Concurrency limit reached ({len(self.active_task_ids)}/{self.max_concurrent_tasks}). Waiting for tasks to complete.")
+            logger.debug(
+                f"Concurrency limit reached ({len(self.active_task_ids)}/{self.max_concurrent_tasks}). Waiting for tasks to complete."
+            )
             return None
 
         if not self.queue:
@@ -130,7 +135,9 @@ class MultiProjectManager:
                     if not archive_target.exists():
                         shutil.move(str(task_folder), str(archive_target))
                         archived_count += 1
-                        logger.info(f"Archived workspace {task_folder.name} to {archive_target.name}")
+                        logger.info(
+                            f"Archived workspace {task_folder.name} to {archive_target.name}"
+                        )
             except Exception as e:
                 logger.debug(f"Error checking workspace {task_folder.name} for pruning: {e}")
 

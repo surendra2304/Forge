@@ -48,20 +48,26 @@ def test_forecast_duration_complexity_scaling(futuris_client: FuturisBuildClient
 def test_capacity_aware_queueing_decision(futuris_client: FuturisBuildClient):
     """Test capacity check triggers queueing when concurrency limits are approached."""
     # Under low load: immediate scheduling
-    low_load = futuris_client.check_capacity(current_active_tasks=2, max_capacity=10, estimated_duration=20.0)
+    low_load = futuris_client.check_capacity(
+        current_active_tasks=2, max_capacity=10, estimated_duration=20.0
+    )
     assert low_load.should_queue is False
     assert low_load.scheduling_tier == "immediate"
     assert low_load.estimated_wait_seconds == 0.0
 
     # Under high load (concurrency >= limit): queued scheduling with wait estimate
-    high_load = futuris_client.check_capacity(current_active_tasks=11, max_capacity=10, estimated_duration=30.0)
+    high_load = futuris_client.check_capacity(
+        current_active_tasks=11, max_capacity=10, estimated_duration=30.0
+    )
     assert high_load.should_queue is True
     assert high_load.scheduling_tier in ["queued_fast", "queued_standard"]
     assert high_load.estimated_wait_seconds > 0.0
     assert high_load.queue_priority == 300  # 30.0 * 10
 
     # Shorter task gets prioritized (lower queue_priority number)
-    short_task_load = futuris_client.check_capacity(current_active_tasks=11, max_capacity=10, estimated_duration=8.0)
+    short_task_load = futuris_client.check_capacity(
+        current_active_tasks=11, max_capacity=10, estimated_duration=8.0
+    )
     assert short_task_load.queue_priority < high_load.queue_priority
 
 

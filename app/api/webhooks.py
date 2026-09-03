@@ -17,6 +17,7 @@ logger = get_logger("api.webhooks")
 
 class GenericWebhookPayload(BaseModel):
     """Standardized webhook payload emitted to optional task-provided webhook URLs."""
+
     event: str  # task_started, stage_completed, verification_result, task_completed, task_failed
     timestamp: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
     task_id: str
@@ -60,17 +61,23 @@ class WebhookDispatcher:
                 async with httpx.AsyncClient(timeout=3.0) as client:
                     resp = await client.post(webhook_url, json=payload, headers=headers)
                     if resp.status_code in [200, 201, 202, 204]:
-                        logger.info(f"Webhook event '{event}' dispatched successfully to {webhook_url} (task={task_id})")
+                        logger.info(
+                            f"Webhook event '{event}' dispatched successfully to {webhook_url} (task={task_id})"
+                        )
                         return True
                     else:
-                        logger.warning(f"Webhook to {webhook_url} returned status {resp.status_code} (attempt {attempt}/{max_retries})")
+                        logger.warning(
+                            f"Webhook to {webhook_url} returned status {resp.status_code} (attempt {attempt}/{max_retries})"
+                        )
             except Exception as e:
                 logger.debug(f"Webhook dispatch failed (attempt {attempt}/{max_retries}): {e}")
 
             if attempt < max_retries:
                 await asyncio.sleep(0.2 * (2 ** (attempt - 1)))
 
-        logger.warning(f"Could not deliver webhook event '{event}' for task '{task_id}' to {webhook_url} after {max_retries} attempts.")
+        logger.warning(
+            f"Could not deliver webhook event '{event}' for task '{task_id}' to {webhook_url} after {max_retries} attempts."
+        )
         return False
 
 

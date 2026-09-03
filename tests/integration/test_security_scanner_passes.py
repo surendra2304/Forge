@@ -48,7 +48,9 @@ def get_user_by_id(conn: sqlite3.Connection, user_id: int) -> Optional[Tuple]:
         (ws / "database.py").write_text(db_code, encoding="utf-8")
 
         # 3. Clean requirements with safe versions
-        (ws / "requirements.txt").write_text("fastapi>=0.110.0\npydantic>=2.6.0\n", encoding="utf-8")
+        (ws / "requirements.txt").write_text(
+            "fastapi>=0.110.0\npydantic>=2.6.0\n", encoding="utf-8"
+        )
 
         yield ws
 

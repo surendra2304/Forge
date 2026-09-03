@@ -83,6 +83,7 @@ def verify_ws_auth(websocket: WebSocket, api_key: str | None) -> bool:
     # Add from production settings or api key manager
     try:
         from app.security.api_keys import api_key_manager
+
         valid_keys.update(api_key_manager.valid_keys)
     except Exception:
         pass
@@ -119,11 +120,13 @@ async def task_websocket_endpoint(
     await ws_manager.connect_task(websocket, task_id)
     try:
         # Send initial connected greeting
-        await websocket.send_json({
-            "event": "connected",
-            "task_id": task_id,
-            "message": f"Subscribed to real-time telemetry for task {task_id}",
-        })
+        await websocket.send_json(
+            {
+                "event": "connected",
+                "task_id": task_id,
+                "message": f"Subscribed to real-time telemetry for task {task_id}",
+            }
+        )
         while True:
             # Keep connection open and receive client heartbeats/pings
             data = await websocket.receive_text()
@@ -148,10 +151,12 @@ async def global_tasks_websocket_endpoint(
 
     await ws_manager.connect_global(websocket)
     try:
-        await websocket.send_json({
-            "event": "connected",
-            "message": "Subscribed to global task event broadcast stream",
-        })
+        await websocket.send_json(
+            {
+                "event": "connected",
+                "message": "Subscribed to global task event broadcast stream",
+            }
+        )
         while True:
             data = await websocket.receive_text()
             if data == "ping":

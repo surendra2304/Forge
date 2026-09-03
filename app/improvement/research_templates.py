@@ -18,6 +18,7 @@ logger = get_logger("improvement.research_templates")
 
 class ResearchTemplatePattern(BaseModel):
     """A template pattern derived from IntelX technical research."""
+
     technology: str
     archetype: str
     pattern_name: str
@@ -138,7 +139,9 @@ class WebSocketConnectionManager:
 
         for finding in research_result.findings:
             if finding.category in ["best_practices", "recommended_patterns"]:
-                pattern_name = f"{research_result.technology}_{finding.id.replace(':', '_').lower()}_pattern"
+                pattern_name = (
+                    f"{research_result.technology}_{finding.id.replace(':', '_').lower()}_pattern"
+                )
                 if pattern_name in self.research_patterns:
                     continue
 
@@ -161,7 +164,9 @@ class WebSocketConnectionManager:
                     self.improvement_engine.proposals[proposal.id] = proposal
 
                 generated_proposals.append(proposal)
-                logger.info(f"Generated research-backed template proposal: '{proposal.title}' ({proposal.id})")
+                logger.info(
+                    f"Generated research-backed template proposal: '{proposal.title}' ({proposal.id})"
+                )
 
         return generated_proposals
 
@@ -176,7 +181,9 @@ class WebSocketConnectionManager:
         Promote an approved proposal into active research template library.
         """
         if proposal.status != ProposalStatus.APPROVED:
-            logger.warning(f"Cannot apply unapproved proposal {proposal.id} (status={proposal.status})")
+            logger.warning(
+                f"Cannot apply unapproved proposal {proposal.id} (status={proposal.status})"
+            )
             return None
 
         finding_id = proposal.evidence_task_ids[0] if proposal.evidence_task_ids else "S:GEN"

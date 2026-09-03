@@ -32,7 +32,9 @@ class TaskAnalyzer:
     async def analyze(self, goal: str, requirements: list[str] | None = None) -> TaskAnalysisResult:
         """Perform static and heuristic analysis on input goal and requirements."""
         req_list = requirements or []
-        logger.info(f"Analyzing task goal: '{goal[:80]}...' with {len(req_list)} explicit requirements")
+        logger.info(
+            f"Analyzing task goal: '{goal[:80]}...' with {len(req_list)} explicit requirements"
+        )
 
         text = f"{goal} {' '.join(req_list)}".lower()
 
@@ -60,13 +62,25 @@ class TaskAnalyzer:
         primary_lang = "Python"
         detected_runtime = "Python"
 
-        if "typescript" in text or "tsx" in text or ("react" in text and "python" not in text) or "next.js" in text or "nextjs" in text:
+        if (
+            "typescript" in text
+            or "tsx" in text
+            or ("react" in text and "python" not in text)
+            or "next.js" in text
+            or "nextjs" in text
+        ):
             primary_lang = "TypeScript"
             detected_runtime = "Node.js"
-        elif any(k in text for k in ["node", "nodejs", "javascript", "js", "npm", "express", "fastify", "yarn"]):
+        elif any(
+            k in text
+            for k in ["node", "nodejs", "javascript", "js", "npm", "express", "fastify", "yarn"]
+        ):
             primary_lang = "TypeScript" if "typescript" in text else "JavaScript"
             detected_runtime = "Node.js"
-        elif any(k in text for k in ["golang", "go ", "go.mod", "gin", "fiber", "chi"]) and "python" not in text:
+        elif (
+            any(k in text for k in ["golang", "go ", "go.mod", "gin", "fiber", "chi"])
+            and "python" not in text
+        ):
             primary_lang = "Go"
             detected_runtime = "Go"
         elif "rust" in text or "cargo" in text:
@@ -74,12 +88,22 @@ class TaskAnalyzer:
             detected_runtime = "Rust"
 
         complexity = "medium"
-        if len(req_list) > 5 or "distributed" in text or "microservice" in text or "full-stack" in text:
+        if (
+            len(req_list) > 5
+            or "distributed" in text
+            or "microservice" in text
+            or "full-stack" in text
+        ):
             complexity = "high"
         elif len(req_list) <= 1 and len(goal.split()) < 10:
             complexity = "low"
 
-        domain = "Full-Stack Engineering" if ("frontend" in text or "react" in text or "ui" in text) and ("backend" in text or "api" in text or "fastapi" in text or "express" in text) else "Software Engineering"
+        domain = (
+            "Full-Stack Engineering"
+            if ("frontend" in text or "react" in text or "ui" in text)
+            and ("backend" in text or "api" in text or "fastapi" in text or "express" in text)
+            else "Software Engineering"
+        )
 
         return TaskAnalysisResult(
             goal_summary=goal.strip(),

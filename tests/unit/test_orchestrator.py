@@ -60,7 +60,9 @@ async def test_orchestrator_intake_and_execution_loop(temp_dir: Path):
     from app.integrations.ai_universe_client import AIUniverseResponse
 
     # 2. Run full autonomous loop
-    with patch("app.integrations.ai_universe_client.AIUniverseClient.ask", new_callable=AsyncMock) as mock_ask:
+    with patch(
+        "app.integrations.ai_universe_client.AIUniverseClient.ask", new_callable=AsyncMock
+    ) as mock_ask:
         mock_ask.return_value = AIUniverseResponse(
             answer="def add(a, b): return a + b\n",
             confidence=0.95,

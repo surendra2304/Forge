@@ -18,6 +18,7 @@ logger = get_logger("execution.delivery")
 
 class CompletionReportData(BaseModel):
     """Complete deliverable manifest adhering to FORGE Section 23/24 spec."""
+
     task_id: str
     objective: str
     requirements: list[str] = Field(default_factory=list)
@@ -57,11 +58,13 @@ class DeliveryPackager:
         """
         Produce completion report (JSON + Markdown), commit files, and create release git tag.
         """
-        paths = self.wm.get_workspace_paths(task_id)
+        paths = self.wm.get_workspace_paths(task_id) or self.wm.create_workspace(task_id)
         req_list = requirements or []
 
         # 1. Implementation Summary
-        all_project_files = [str(f.relative_to(paths.project)) for f in paths.project.glob("**/*") if f.is_file()]
+        all_project_files = [
+            str(f.relative_to(paths.project)) for f in paths.project.glob("**/*") if f.is_file()
+        ]
         code_lines = 0
         for f in paths.project.glob("**/*"):
             if f.is_file() and f.suffix in [".py", ".html", ".css", ".js", ".json", ".md", ".toml"]:
@@ -78,7 +81,12 @@ class DeliveryPackager:
 
         # 2. Test & Build Status (from verification_report.json if present)
         report_file = paths.artifacts / "verification_report.json"
-        test_status = {"all_passed": True, "total_checks": 0, "passed_checks": 0, "failed_checks": 0}
+        test_status = {
+            "all_passed": True,
+            "total_checks": 0,
+            "passed_checks": 0,
+            "failed_checks": 0,
+        }
         if report_file.exists():
             try:
                 rep_data = json.loads(report_file.read_text(encoding="utf-8"))
@@ -114,7 +122,8 @@ class DeliveryPackager:
             test_build_status=test_status,
             browser_verification_evidence=screenshots,
             major_diffs=git_log,
-            known_limitations=known_limitations or ["Local development configuration; production credentials required."],
+            known_limitations=known_limitations
+            or ["Local development configuration; production credentials required."],
             models_used=models_used or ["direct-model"],
             audit_run_ids={"task_id": task_id, "release_tag": tag_name},
             release_tag=tag_name,
@@ -132,9 +141,14 @@ class DeliveryPackager:
         return report_data
 
     def _generate_markdown_report(self, data: CompletionReportData) -> str:
-        files_list = "\n".join([f"- `{f}`" for f in data.implementation_summary.get("manifest", [])])
+        files_list = "\n".join(
+            [f"- `{f}`" for f in data.implementation_summary.get("manifest", [])]
+        )
         limitations = "\n".join([f"- {lim}" for lim in data.known_limitations])
-        evidence = "\n".join([f"- Screenshot: `{s}`" for s in data.browser_verification_evidence]) or "- No visual browser assets."
+        evidence = (
+            "\n".join([f"- Screenshot: `{s}`" for s in data.browser_verification_evidence])
+            or "- No visual browser assets."
+        )
 
         return f"""# Project Delivery & Completion Report
 
@@ -154,8 +168,8 @@ class DeliveryPackager:
 ---
 
 ## 2. Implementation Summary
-- **Files Created:** {data.implementation_summary.get('total_files_synthesized', 0)}
-- **Total Lines of Code:** {data.implementation_summary.get('total_lines_of_code', 0)}
+- **Files Created:** {data.implementation_summary.get("total_files_synthesized", 0)}
+- **Total Lines of Code:** {data.implementation_summary.get("total_lines_of_code", 0)}
 
 ### Files Manifest:
 {files_list}
@@ -163,8 +177,8 @@ class DeliveryPackager:
 ---
 
 ## 3. Verification & Test Status
-- **Build / Lint / Tests Status:** {"✅ PASSED" if data.test_build_status.get('all_passed', True) else "❌ FAILED"}
-- **Total Verification Checks:** {data.test_build_status.get('total_checks', 0)} (Passed: {data.test_build_status.get('passed_checks', 0)}, Failed: {data.test_build_status.get('failed_checks', 0)})
+- **Build / Lint / Tests Status:** {"✅ PASSED" if data.test_build_status.get("all_passed", True) else "❌ FAILED"}
+- **Total Verification Checks:** {data.test_build_status.get("total_checks", 0)} (Passed: {data.test_build_status.get("passed_checks", 0)}, Failed: {data.test_build_status.get("failed_checks", 0)})
 
 ### Visual & Browser Evidence:
 {evidence}
@@ -181,7 +195,7 @@ class DeliveryPackager:
 ## 5. Known Limitations & Production Readiness
 {limitations}
 
-**Models Employed:** {', '.join(data.models_used)}
+**Models Employed:** {", ".join(data.models_used)}
 """
 
 

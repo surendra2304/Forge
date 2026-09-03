@@ -3,7 +3,6 @@ Recovery & Self-Healing Engine for Project FORGE.
 Coordinates diagnosis, anti-loop governance, surgical patch application, and re-verification.
 """
 
-
 from app.core.logging import get_logger
 from app.execution.engine import ExecutionEngine, execution_engine
 from app.memory.db import db_manager
@@ -116,10 +115,18 @@ class RecoveryEngine:
             )
             return True, "Recovery succeeded. All checks passing.", patch
         else:
-            logger.warning(f"[Task {task_id}] Verification still failing after patch application: {new_report.failure_reasons}")
-            return False, f"Re-verification failed after applying patch: {new_report.failure_reasons}", patch
+            logger.warning(
+                f"[Task {task_id}] Verification still failing after patch application: {new_report.failure_reasons}"
+            )
+            return (
+                False,
+                f"Re-verification failed after applying patch: {new_report.failure_reasons}",
+                patch,
+            )
 
-    async def _synthesize_patch_for_diagnosis(self, task_id: str, diagnosis: FailureDiagnosis) -> RepairPatch | None:
+    async def _synthesize_patch_for_diagnosis(
+        self, task_id: str, diagnosis: FailureDiagnosis
+    ) -> RepairPatch | None:
         """Synthesize candidate repair patch based on diagnosis using LLM or heuristics."""
         from app.agents.parser import LLMResponseParser
 
@@ -144,6 +151,7 @@ class RecoveryEngine:
             consensus_info = ""
             try:
                 from app.integrations.ai_universe_client import get_ai_universe_client
+
                 ai_client = get_ai_universe_client()
                 ai_res = await ai_client.consult_with_verification(
                     question=f"Diagnose root cause and suggest code repair for {diagnosis.failure_class.value}: {diagnosis.error_message} in file {target_file}",
@@ -156,10 +164,20 @@ class RecoveryEngine:
                         await self.store.record_event(
                             task_id=task_id,
                             event_type="ai_universe.consulted",
-                            payload={"run_id": ai_res.run_id, "confidence": ai_res.confidence, "stage": "recovery_patch"},
+                            payload={
+                                "run_id": ai_res.run_id,
+                                "confidence": ai_res.confidence,
+                                "stage": "recovery_patch",
+                            },
                         )
-            except Exception:
-                pass
+            except Exception as e:
+                logger.info(f"AI Universe consultation skipped or failed during recovery: {e}")
+                if self.store:
+                    await self.store.record_event(
+                        task_id=task_id,
+                        event_type="ai_universe.consultation_failed",
+                        payload={"error": str(e), "stage": "recovery_patch"},
+                    )
 
             prompt = (
                 f"Fix failure in file '{target_file}':\n"
@@ -176,8 +194,10 @@ class RecoveryEngine:
                     prompt=prompt,
                     system_prompt="You are an expert software debugger. Author verified, syntax-clean, bug-free fixes.",
                 )
-                extracted = LLMResponseParser.extract_files(response.content, default_filename=target_file)
-                if extracted:
+                extracted = LLMResponseParser.extract_files(
+                    response.content, default_filename=target_file
+                )
+                if extracted and extracted[0].content != current_content:
                     return RepairPatch(
                         target_file=extracted[0].relative_path,
                         replacement_snippet=extracted[0].content,
@@ -185,7 +205,9 @@ class RecoveryEngine:
                         patch_type="rewrite",
                     )
             except Exception as e:
-                logger.warning(f"LLM patch synthesis failed: {e}. Falling back to rule-based repair.")
+                logger.warning(
+                    f"LLM patch synthesis failed: {e}. Falling back to rule-based repair."
+                )
 
         # 2. Basic syntax or indentation repair heuristics fallback
         if diagnosis.failure_class.value == "syntax_error":
@@ -196,9 +218,14 @@ class RecoveryEngine:
 
                 # Check if failure is due to empty block or comment after except/def/try/if
                 prev_line = lines[diagnosis.failing_line - 2] if diagnosis.failing_line >= 2 else ""
-                if prev_line.strip().startswith("except ") and (not bad_line.strip() or bad_line.strip().startswith("#")):
+                if prev_line.strip().startswith("except ") and (
+                    not bad_line.strip() or bad_line.strip().startswith("#")
+                ):
                     indent = " " * (len(prev_line) - len(prev_line.lstrip()) + 4)
-                    lines.insert(diagnosis.failing_line - 1, f"{indent}print(f'Error: {{exc}}', file=sys.stderr)")
+                    lines.insert(
+                        diagnosis.failing_line - 1,
+                        f"{indent}print(f'Error: {{exc}}', file=sys.stderr)",
+                    )
                     lines.insert(diagnosis.failing_line, f"{indent}return 1")
                     if "__main__" not in current_content:
                         lines.append('\nif __name__ == "__main__":\n    main()\n')
@@ -219,27 +246,34 @@ class RecoveryEngine:
                     fixed_line += "]" * (fixed_line.count("[") - fixed_line.count("]"))
                 if fixed_line.count("{") > fixed_line.count("}"):
                     fixed_line += "}" * (fixed_line.count("{") - fixed_line.count("}"))
-                if (
-                    fixed_line.strip().startswith(("def ", "class ", "if ", "for ", "while ", "elif ", "else", "try", "except", "finally"))
-                    and not fixed_line.strip().endswith(":")
-                ):
+                if fixed_line.strip().startswith(
+                    (
+                        "def ",
+                        "class ",
+                        "if ",
+                        "for ",
+                        "while ",
+                        "elif ",
+                        "else",
+                        "try",
+                        "except",
+                        "finally",
+                    )
+                ) and not fixed_line.strip().endswith(":"):
                     fixed_line += ":"
 
                 lines[diagnosis.failing_line - 1] = fixed_line
-                return RepairPatch(
-                    target_file=target_file,
-                    replacement_snippet="\n".join(lines) + "\n",
-                    explanation=f"Fixed syntax on line {diagnosis.failing_line}",
-                    patch_type="rewrite",
-                )
+                repaired_content = "\n".join(lines) + "\n"
+                if repaired_content != current_content:
+                    return RepairPatch(
+                        target_file=target_file,
+                        replacement_snippet=repaired_content,
+                        explanation=f"Fixed syntax on line {diagnosis.failing_line}",
+                        patch_type="rewrite",
+                    )
 
-        # Default minimal fallback patch
-        return RepairPatch(
-            target_file=target_file,
-            replacement_snippet=current_content,
-            explanation=f"Applied adjustment based on strategy: {diagnosis.suggested_strategy}",
-            patch_type="rewrite",
-        )
+        # No fake repair: if content is unchanged, return None to trigger explicit recovery escalation
+        return None
 
 
 recovery_engine = RecoveryEngine()

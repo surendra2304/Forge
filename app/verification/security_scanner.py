@@ -26,13 +26,14 @@ logger = get_logger("verification.security_scanner")
 
 class SecuritySeverity(str, Enum):
     CRITICAL = "CRITICAL"  # Blocks delivery — must fix
-    HIGH = "HIGH"          # Blocks delivery — must fix
-    MEDIUM = "MEDIUM"      # Warning in report — delivery allowed
-    LOW = "LOW"            # Informational notice
+    HIGH = "HIGH"  # Blocks delivery — must fix
+    MEDIUM = "MEDIUM"  # Warning in report — delivery allowed
+    LOW = "LOW"  # Informational notice
 
 
 class SecurityFinding(BaseModel):
     """Detailed finding from static security analysis."""
+
     check_name: str
     severity: SecuritySeverity
     file_path: str
@@ -45,6 +46,7 @@ class SecurityFinding(BaseModel):
 
 class SecurityScanReport(BaseModel):
     """Aggregated security scan result across a workspace."""
+
     workspace_path: str
     timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
     scanned_files_count: int = 0
@@ -154,7 +156,10 @@ CVE_VULNERABILITY_DB: dict[str, dict[str, Any]] = {
 # Regex patterns for secrets and private tokens
 SECRET_SCAN_PATTERNS = {
     "AWS Access Key ID": (r"AKIA[0-9A-Z]{16}", SecuritySeverity.CRITICAL),
-    "RSA / OpenSSH Private Key": (r"-----BEGIN (?:RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----", SecuritySeverity.CRITICAL),
+    "RSA / OpenSSH Private Key": (
+        r"-----BEGIN (?:RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----",
+        SecuritySeverity.CRITICAL,
+    ),
     "OpenAI API Key": (r"sk-[a-zA-Z0-9]{20,48}", SecuritySeverity.CRITICAL),
     "Anthropic API Key": (r"sk-ant-api[a-zA-Z0-9_-]{20,80}", SecuritySeverity.CRITICAL),
     "GitHub Personal Access Token": (r"gh[pousr]_[0-9a-zA-Z]{36}", SecuritySeverity.CRITICAL),
@@ -163,7 +168,7 @@ SECRET_SCAN_PATTERNS = {
         SecuritySeverity.HIGH,
     ),
     "Database Credentials URI": (
-        r'(?i)(?:postgres|postgresql|mysql|mongodb|redis):\/\/[a-zA-Z0-9_-]+:[a-zA-Z0-9!@#$%^&*()_+=-]+@[a-zA-Z0-9.-]+:[0-9]+',
+        r"(?i)(?:postgres|postgresql|mysql|mongodb|redis):\/\/[a-zA-Z0-9_-]+:[a-zA-Z0-9!@#$%^&*()_+=-]+@[a-zA-Z0-9.-]+:[0-9]+",
         SecuritySeverity.CRITICAL,
     ),
 }
@@ -186,9 +191,25 @@ class OutputSecurityScanner:
 
         # 1. File content scans
         for p in self.workspace_path.rglob("*"):
-            if not p.is_file() or p.name.startswith(".") or "node_modules" in str(p) or ".git" in str(p):
+            if (
+                not p.is_file()
+                or p.name.startswith(".")
+                or "node_modules" in str(p)
+                or ".git" in str(p)
+            ):
                 continue
-            if p.suffix.lower() not in [".py", ".js", ".ts", ".jsx", ".tsx", ".html", ".json", ".yaml", ".yml", ".env"]:
+            if p.suffix.lower() not in [
+                ".py",
+                ".js",
+                ".ts",
+                ".jsx",
+                ".tsx",
+                ".html",
+                ".json",
+                ".yaml",
+                ".yml",
+                ".env",
+            ]:
                 continue
 
             scanned_files += 1
@@ -221,8 +242,8 @@ class OutputSecurityScanner:
         med = sum(1 for f in findings if f.severity == SecuritySeverity.MEDIUM)
         low = sum(1 for f in findings if f.severity == SecuritySeverity.LOW)
 
-        blocks = (crit > 0 or high > 0)
-        passed = (len(findings) == 0 or not blocks)
+        blocks = crit > 0 or high > 0
+        passed = len(findings) == 0 or not blocks
 
         return SecurityScanReport(
             workspace_path=str(self.workspace_path),
@@ -244,7 +265,9 @@ class OutputSecurityScanner:
                 match = re.search(pattern, line)
                 if match:
                     # Redact matching sensitive substring
-                    snippet = f"{line[:match.start()]}***REDACTED***{line[match.end():]}"[:120].strip()
+                    snippet = f"{line[: match.start()]}***REDACTED***{line[match.end() :]}"[
+                        :120
+                    ].strip()
                     findings.append(
                         SecurityFinding(
                             check_name="Hardcoded Secret Detection",
@@ -258,9 +281,11 @@ class OutputSecurityScanner:
                     )
         return findings
 
-    def _scan_python_dangerous_ast(self, path: Path, rel_path: str, content: str) -> list[SecurityFinding]:
+    def _scan_python_dangerous_ast(
+        self, path: Path, rel_path: str, content: str
+    ) -> list[SecurityFinding]:
         """Inspect Python AST for dangerous functions: eval, exec, os.system, shell=True, pickle.loads."""
-        findings = []
+        findings: list[SecurityFinding] = []
         try:
             tree = ast.parse(content, filename=str(path))
         except SyntaxError:
@@ -296,7 +321,11 @@ class OutputSecurityScanner:
                         )
                     )
                 # 3. os.system()
-                elif isinstance(func, ast.Attribute) and func.attr == "system" and getattr(func.value, "id", "") == "os":
+                elif (
+                    isinstance(func, ast.Attribute)
+                    and func.attr == "system"
+                    and getattr(func.value, "id", "") == "os"
+                ):
                     findings.append(
                         SecurityFinding(
                             check_name="Dangerous Function (os.system)",
@@ -309,9 +338,19 @@ class OutputSecurityScanner:
                         )
                     )
                 # 4. subprocess with shell=True
-                elif (isinstance(func, ast.Attribute) and func.attr in ["Popen", "run", "call", "check_call", "check_output"]):
+                elif isinstance(func, ast.Attribute) and func.attr in [
+                    "Popen",
+                    "run",
+                    "call",
+                    "check_call",
+                    "check_output",
+                ]:
                     for kw in node.keywords:
-                        if kw.arg == "shell" and isinstance(kw.value, ast.Constant) and kw.value.value is True:
+                        if (
+                            kw.arg == "shell"
+                            and isinstance(kw.value, ast.Constant)
+                            and kw.value.value is True
+                        ):
                             findings.append(
                                 SecurityFinding(
                                     check_name="Command Injection (subprocess shell=True)",
@@ -324,7 +363,11 @@ class OutputSecurityScanner:
                                 )
                             )
                 # 5. pickle.loads / pickle.load
-                elif (isinstance(func, ast.Attribute) and func.attr in ["loads", "load"] and getattr(func.value, "id", "") == "pickle"):
+                elif (
+                    isinstance(func, ast.Attribute)
+                    and func.attr in ["loads", "load"]
+                    and getattr(func.value, "id", "") == "pickle"
+                ):
                     findings.append(
                         SecurityFinding(
                             check_name="Insecure Deserialization (pickle)",
@@ -337,9 +380,14 @@ class OutputSecurityScanner:
                         )
                     )
                 # 6. yaml.load without Loader=SafeLoader
-                elif (isinstance(func, ast.Attribute) and func.attr == "load" and getattr(func.value, "id", "") == "yaml"):
+                elif (
+                    isinstance(func, ast.Attribute)
+                    and func.attr == "load"
+                    and getattr(func.value, "id", "") == "yaml"
+                ):
                     has_safe_loader = any(
-                        kw.arg == "Loader" and "Safe" in getattr(kw.value, "id", getattr(kw.value, "attr", ""))
+                        kw.arg == "Loader"
+                        and "Safe" in getattr(kw.value, "id", getattr(kw.value, "attr", ""))
                         for kw in node.keywords
                     )
                     if not has_safe_loader:
@@ -356,7 +404,9 @@ class OutputSecurityScanner:
                         )
         return findings
 
-    def _scan_python_injections(self, path: Path, rel_path: str, content: str) -> list[SecurityFinding]:
+    def _scan_python_injections(
+        self, path: Path, rel_path: str, content: str
+    ) -> list[SecurityFinding]:
         """Detect SQL injection string concatenations and format strings in database queries."""
         findings = []
         lines = content.splitlines()
@@ -381,7 +431,11 @@ class OutputSecurityScanner:
                         )
                     )
                 # 2. String concatenation in SQL: "SELECT ... " + var
-                elif re.search(r'["\'].*(?:SELECT|INSERT|UPDATE|DELETE).*["\']\s*\+\s*[a-zA-Z_]', line, re.IGNORECASE):
+                elif re.search(
+                    r'["\'].*(?:SELECT|INSERT|UPDATE|DELETE).*["\']\s*\+\s*[a-zA-Z_]',
+                    line,
+                    re.IGNORECASE,
+                ):
                     findings.append(
                         SecurityFinding(
                             check_name="SQL Injection Pattern (String Concatenation)",
@@ -394,8 +448,13 @@ class OutputSecurityScanner:
                         )
                     )
                 # 3. % or .format() formatting in SQL
-                elif re.search(r'["\'].*(?:SELECT|INSERT|UPDATE|DELETE).*["\']\s*%\s*[a-zA-Z_(]', line, re.IGNORECASE) or \
-                     re.search(r'["\'].*(?:SELECT|INSERT|UPDATE|DELETE).*["\']\.format\(', line, re.IGNORECASE):
+                elif re.search(
+                    r'["\'].*(?:SELECT|INSERT|UPDATE|DELETE).*["\']\s*%\s*[a-zA-Z_(]',
+                    line,
+                    re.IGNORECASE,
+                ) or re.search(
+                    r'["\'].*(?:SELECT|INSERT|UPDATE|DELETE).*["\']\.format\(', line, re.IGNORECASE
+                ):
                     findings.append(
                         SecurityFinding(
                             check_name="SQL Injection Pattern (String Formatting)",
@@ -409,14 +468,18 @@ class OutputSecurityScanner:
                     )
         return findings
 
-    def _scan_python_auth_and_errors(self, path: Path, rel_path: str, content: str) -> list[SecurityFinding]:
+    def _scan_python_auth_and_errors(
+        self, path: Path, rel_path: str, content: str
+    ) -> list[SecurityFinding]:
         """Detect missing authentication on sensitive routes and leaked internal stack traces."""
         findings = []
         lines = content.splitlines()
 
         # Check for stack trace leakage in error responses
         for idx, line in enumerate(lines, start=1):
-            if "traceback.format_exc()" in line and any(k in line for k in ["detail=", "return ", "jsonify", "message="]):
+            if "traceback.format_exc()" in line and any(
+                k in line for k in ["detail=", "return ", "jsonify", "message="]
+            ):
                 findings.append(
                     SecurityFinding(
                         check_name="Information Disclosure (Stack Trace Leak)",
@@ -430,12 +493,26 @@ class OutputSecurityScanner:
                 )
 
         # Check for FastAPI / Flask endpoints missing auth decorators in admin/user routes
-        if "admin" in rel_path.lower() or "secure" in rel_path.lower() or "manage" in rel_path.lower():
+        if (
+            "admin" in rel_path.lower()
+            or "secure" in rel_path.lower()
+            or "manage" in rel_path.lower()
+        ):
             for idx, line in enumerate(lines, start=1):
-                if re.search(r'@(?:app|router)\.(?:post|put|delete|patch)\(', line):
+                if re.search(r"@(?:app|router)\.(?:post|put|delete|patch)\(", line):
                     # Check if next 5 lines contain Depends / auth / token
                     context_window = "\n".join(lines[idx : min(len(lines), idx + 6)])
-                    if not any(k in context_window for k in ["Depends", "auth", "token", "Security", "api_key", "get_current_user"]):
+                    if not any(
+                        k in context_window
+                        for k in [
+                            "Depends",
+                            "auth",
+                            "token",
+                            "Security",
+                            "api_key",
+                            "get_current_user",
+                        ]
+                    ):
                         findings.append(
                             SecurityFinding(
                                 check_name="Authentication Bypass (Missing Auth Check)",
@@ -455,7 +532,7 @@ class OutputSecurityScanner:
         lines = content.splitlines()
 
         for idx, line in enumerate(lines, start=1):
-            if re.search(r'\beval\s*\(', line):
+            if re.search(r"\beval\s*\(", line):
                 findings.append(
                     SecurityFinding(
                         check_name="Dangerous Function (JS eval)",
@@ -467,8 +544,8 @@ class OutputSecurityScanner:
                         fix_suggestion="Avoid dynamic code evaluation; use JSON.parse() or dedicated parser logic.",
                     )
                 )
-            if re.search(r'child_process.*(?:exec|execSync)\s*\(', line):
-                if not re.search(r'execFile', line):
+            if re.search(r"child_process.*(?:exec|execSync)\s*\(", line):
+                if not re.search(r"execFile", line):
                     findings.append(
                         SecurityFinding(
                             check_name="Command Injection (child_process.exec)",
@@ -490,7 +567,9 @@ class OutputSecurityScanner:
         for idx, line in enumerate(lines, start=1):
             if ".innerHTML" in line and "=" in line:
                 # Flag if assigning dynamic variable or template string
-                if re.search(r'\.innerHTML\s*=\s*(?!["\'][\s<a-zA-Z0-9_-]+["\'])[a-zA-Z0-9_$`]', line):
+                if re.search(
+                    r'\.innerHTML\s*=\s*(?!["\'][\s<a-zA-Z0-9_-]+["\'])[a-zA-Z0-9_$`]', line
+                ):
                     findings.append(
                         SecurityFinding(
                             check_name="DOM XSS Pattern (innerHTML)",
@@ -539,7 +618,9 @@ class OutputSecurityScanner:
                     # Check if version is known vulnerable
                     is_vuln = False
                     if version:
-                        is_vuln = self._is_version_less_or_equal(version, vuln["max_vulnerable_version"])
+                        is_vuln = self._is_version_less_or_equal(
+                            version, vuln["max_vulnerable_version"]
+                        )
                     elif "==" in cleaned or "<=" in cleaned:
                         is_vuln = True
 
@@ -567,7 +648,9 @@ class OutputSecurityScanner:
                     clean_ver = ver.replace("^", "").replace("~", "").replace(">=", "").strip()
                     if clean_name in CVE_VULNERABILITY_DB:
                         vuln = CVE_VULNERABILITY_DB[clean_name]
-                        if self._is_version_less_or_equal(clean_ver, vuln["max_vulnerable_version"]):
+                        if self._is_version_less_or_equal(
+                            clean_ver, vuln["max_vulnerable_version"]
+                        ):
                             findings.append(
                                 SecurityFinding(
                                     check_name="Vulnerable Node Dependency (CVE)",
@@ -609,10 +692,14 @@ class OutputSecurityScanner:
 
                 if pkg_name in CVE_VULNERABILITY_DB:
                     vuln = CVE_VULNERABILITY_DB[pkg_name]
-                    if not version or self._is_version_less_or_equal(version, vuln["max_vulnerable_version"]):
+                    if not version or self._is_version_less_or_equal(
+                        version, vuln["max_vulnerable_version"]
+                    ):
                         safe_ver = vuln["safe_version"]
                         new_lines.append(f"{pkg_name}>={safe_ver}")
-                        remediated.append(f"Upgraded {pkg_name} to safe version >={safe_ver} (fixes {vuln['cve']})")
+                        remediated.append(
+                            f"Upgraded {pkg_name} to safe version >={safe_ver} (fixes {vuln['cve']})"
+                        )
                         modified = True
                         continue
                 new_lines.append(line)
@@ -621,7 +708,13 @@ class OutputSecurityScanner:
                 req_file.write_text("\n".join(new_lines) + "\n", encoding="utf-8")
                 # Generate updated requirements.lock
                 lock_file = self.workspace_path / "requirements.lock"
-                lock_lines = [f"{req_line.split('>=')[0]}=={req_line.split('>=')[1]}" if ">=" in req_line else req_line for req_line in new_lines if req_line.strip()]
+                lock_lines = [
+                    f"{req_line.split('>=')[0]}=={req_line.split('>=')[1]}"
+                    if ">=" in req_line
+                    else req_line
+                    for req_line in new_lines
+                    if req_line.strip()
+                ]
                 lock_file.write_text("\n".join(lock_lines) + "\n", encoding="utf-8")
 
         # 2. Remediate Node package.json
@@ -634,12 +727,18 @@ class OutputSecurityScanner:
                     if section in data:
                         for pkg, ver in list(data[section].items()):
                             clean_pkg = pkg.lower()
-                            clean_ver = ver.replace("^", "").replace("~", "").replace(">=", "").strip()
+                            clean_ver = (
+                                ver.replace("^", "").replace("~", "").replace(">=", "").strip()
+                            )
                             if clean_pkg in CVE_VULNERABILITY_DB:
                                 vuln = CVE_VULNERABILITY_DB[clean_pkg]
-                                if self._is_version_less_or_equal(clean_ver, vuln["max_vulnerable_version"]):
+                                if self._is_version_less_or_equal(
+                                    clean_ver, vuln["max_vulnerable_version"]
+                                ):
                                     data[section][pkg] = f"^{vuln['safe_version']}"
-                                    remediated.append(f"Upgraded {pkg} to ^{vuln['safe_version']} (fixes {vuln['cve']})")
+                                    remediated.append(
+                                        f"Upgraded {pkg} to ^{vuln['safe_version']} (fixes {vuln['cve']})"
+                                    )
                                     modified_pkg = True
                 if modified_pkg:
                     pkg_file.write_text(json.dumps(data, indent=2), encoding="utf-8")

@@ -190,7 +190,9 @@ test('TaskService delete task', (t) => {
         provider = DirectProvider(mock_response=mock_developer_code)
         dev_agent = agent_registry.create_agent("developer", provider=provider)
 
-        with patch("app.integrations.ai_universe_client.AIUniverseClient.ask", new_callable=AsyncMock) as mock_ask:
+        with patch(
+            "app.integrations.ai_universe_client.AIUniverseClient.ask", new_callable=AsyncMock
+        ) as mock_ask:
             mock_ask.return_value = AIUniverseResponse(
                 answer=mock_developer_code,
                 confidence=0.95,

@@ -40,7 +40,9 @@ class TemplateAnalytics:
     """Tracks per-template utilization, pass rates, latency, and recommendations."""
 
     def __init__(self):
-        self._stats: dict[str, TemplateStats] = defaultdict(lambda: TemplateStats(template_id="unknown"))
+        self._stats: dict[str, TemplateStats] = defaultdict(
+            lambda: TemplateStats(template_id="unknown")
+        )
         self._seed_default_analytics()
 
     def _seed_default_analytics(self):

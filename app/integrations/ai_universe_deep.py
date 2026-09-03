@@ -30,6 +30,7 @@ class SpecializedAgentRole(str, Enum):
 
 class CodeReviewResult(BaseModel):
     """Result from multi-agent debate code review."""
+
     original_code: str
     refined_code: str | None = None
     applied_auto_fix: bool = False
@@ -40,6 +41,7 @@ class CodeReviewResult(BaseModel):
 
 class AIUniverseUsageStats(BaseModel):
     """Token and call consumption stats for a task."""
+
     task_id: str
     total_calls: int = 0
     estimated_input_tokens: int = 0
@@ -71,7 +73,7 @@ class DeepAIUniverseIntegration:
         out_tokens = max(1, len(response_text) // 4)
         stats.estimated_input_tokens += in_tokens
         stats.estimated_output_tokens += out_tokens
-        stats.total_estimated_tokens += (in_tokens + out_tokens)
+        stats.total_estimated_tokens += in_tokens + out_tokens
 
     def get_usage(self, task_id: str) -> AIUniverseUsageStats:
         """Retrieve token and call statistics for task."""
@@ -125,7 +127,9 @@ class DeepAIUniverseIntegration:
             # Check confidence tier
             if res.confidence >= 0.80 and res.answer and len(res.answer.strip()) > 20:
                 refined = self._clean_code(res.answer)
-                logger.info(f"AI-Universe debate code review applied auto-fix for '{filename}' (confidence={res.confidence:.2f})")
+                logger.info(
+                    f"AI-Universe debate code review applied auto-fix for '{filename}' (confidence={res.confidence:.2f})"
+                )
                 return CodeReviewResult(
                     original_code=code,
                     refined_code=refined,
@@ -135,7 +139,9 @@ class DeepAIUniverseIntegration:
                     review_run_id=res.run_id,
                 )
             elif 0.50 <= res.confidence < 0.80:
-                logger.info(f"AI-Universe debate code review logged suggestions for '{filename}' (confidence={res.confidence:.2f})")
+                logger.info(
+                    f"AI-Universe debate code review logged suggestions for '{filename}' (confidence={res.confidence:.2f})"
+                )
                 return CodeReviewResult(
                     original_code=code,
                     refined_code=None,
@@ -145,7 +151,9 @@ class DeepAIUniverseIntegration:
                     review_run_id=res.run_id,
                 )
             else:
-                logger.debug(f"AI-Universe debate review low confidence ({res.confidence:.2f}); retaining original code.")
+                logger.debug(
+                    f"AI-Universe debate review low confidence ({res.confidence:.2f}); retaining original code."
+                )
                 return CodeReviewResult(
                     original_code=code,
                     confidence=res.confidence,
@@ -153,7 +161,9 @@ class DeepAIUniverseIntegration:
                     review_run_id=res.run_id,
                 )
         except Exception as e:
-            logger.warning(f"AI Universe debate code review failed ({e}). Proceeding with original code.")
+            logger.warning(
+                f"AI Universe debate code review failed ({e}). Proceeding with original code."
+            )
             return CodeReviewResult(original_code=code, confidence=0.0)
 
     def _clean_code(self, text: str) -> str:

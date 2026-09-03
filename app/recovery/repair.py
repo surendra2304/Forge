@@ -13,6 +13,7 @@ logger = get_logger("recovery.repair")
 
 class RepairPatch(BaseModel):
     """A surgical repair patch to fix a diagnosed failure."""
+
     target_file: str
     original_snippet: str | None = None
     replacement_snippet: str
@@ -49,7 +50,9 @@ class PatchApplicator:
                     replacement_content=patch.replacement_snippet,
                     role=role,
                 )
-                logger.info(f"Applied surgical patch (edit) to {patch.target_file} in task {task_id}")
+                logger.info(
+                    f"Applied surgical patch (edit) to {patch.target_file} in task {task_id}"
+                )
                 return True
 
             # Fallback: rewrite file content

@@ -42,7 +42,9 @@ def test_language_detector():
     assert framework == TargetFramework.REACT
 
     # Fullstack detection
-    lang, framework = LanguageDetector.detect("Create a fullstack web app with React frontend and FastAPI backend")
+    lang, framework = LanguageDetector.detect(
+        "Create a fullstack web app with React frontend and FastAPI backend"
+    )
     assert lang == TargetLanguage.FULLSTACK
 
 
@@ -118,7 +120,10 @@ def test_language_dependency_manager(tmp_path: Path):
 
     # Test Node.js package.json and lockfile
     pkg_file = tmp_path / "package.json"
-    pkg_file.write_text('{"name": "test-pkg", "scripts": {"test": "jest"}, "dependencies": {"express": "^4.19.2"}}', encoding="utf-8")
+    pkg_file.write_text(
+        '{"name": "test-pkg", "scripts": {"test": "jest"}, "dependencies": {"express": "^4.19.2"}}',
+        encoding="utf-8",
+    )
     node_res = dep_mgr.inspect_node_dependencies()
     assert node_res.is_valid
 
@@ -130,7 +135,10 @@ def test_language_dependency_manager(tmp_path: Path):
 def test_polyglot_verifier(tmp_path: Path):
     # Setup valid JS file
     js_file = tmp_path / "server.js"
-    js_file.write_text("import express from 'express';\nconst app = express();\nexport default app;\n", encoding="utf-8")
+    js_file.write_text(
+        "import express from 'express';\nconst app = express();\nexport default app;\n",
+        encoding="utf-8",
+    )
 
     verifier = PolyglotLanguageVerifier(tmp_path)
     res_syntax = verifier.verify_node_syntax_and_imports()

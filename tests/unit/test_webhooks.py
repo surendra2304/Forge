@@ -59,7 +59,9 @@ async def test_webhook_dispatch_retry_and_graceful_fail():
 async def test_task_creation_with_webhook_url():
     await db_manager.init_db()
 
-    with patch.object(webhook_dispatcher, "dispatch_event", new_callable=AsyncMock) as mock_dispatch:
+    with patch.object(
+        webhook_dispatcher, "dispatch_event", new_callable=AsyncMock
+    ) as mock_dispatch:
         mock_dispatch.return_value = True
 
         transport = ASGITransport(app=app)

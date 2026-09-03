@@ -161,6 +161,7 @@ document.addEventListener("DOMContentLoaded", () => {
         "app.js": js_content,
         "README.md": "# Static Web Application\n",
     }
+
     async def mock_ask_impl(question: str, mode: str = "auto"):
         for fname, code in responses.items():
             if fname in question:
@@ -168,7 +169,9 @@ document.addEventListener("DOMContentLoaded", () => {
         return AIUniverseResponse(answer=html_content, confidence=0.95, run_id="run_default")
 
     # 4. Autonomous DAG Execution
-    with patch("app.integrations.ai_universe_client.AIUniverseClient.ask", side_effect=mock_ask_impl):
+    with patch(
+        "app.integrations.ai_universe_client.AIUniverseClient.ask", side_effect=mock_ask_impl
+    ):
         task = await orchestrator.run_task(task_id, max_iterations=10)
         assert task.state == TaskState.COMPLETED
 

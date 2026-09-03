@@ -36,7 +36,9 @@ class PlannerEngine:
         Project -> Requirements -> [Codebase Analysis] -> Architecture -> Implementation -> Integration -> Verification -> Security -> Release.
         """
         req_list = requirements or []
-        logger.info(f"Synthesizing plan for task '{task_id}' (existing_codebase={has_existing_codebase}): {goal[:80]}...")
+        logger.info(
+            f"Synthesizing plan for task '{task_id}' (existing_codebase={has_existing_codebase}): {goal[:80]}..."
+        )
 
         # 1. Project Root
         root = TaskTreeNode(
@@ -64,7 +66,10 @@ class PlannerEngine:
 
         # Check if existing codebase onboarding / analysis is required
         combined_text = f"{goal} {' '.join(req_list)}".lower()
-        if has_existing_codebase or any(k in combined_text for k in ["existing codebase", "modify repo", "refactor repo", "onboarding", "codebase"]):
+        if has_existing_codebase or any(
+            k in combined_text
+            for k in ["existing codebase", "modify repo", "refactor repo", "onboarding", "codebase"]
+        ):
             node_analysis = TaskTreeNode(
                 id=str(uuid4()),
                 title="Codebase Analysis & Project Context Mapping",
@@ -90,9 +95,19 @@ class PlannerEngine:
         children.append(node_arch)
 
         # Check for full-stack frontend/backend parallel division
-        is_fullstack = (
-            any(k in combined_text for k in ["full-stack", "fullstack", "react", "frontend", "ui", "web dashboard", "weather dashboard"])
-            and any(k in combined_text for k in ["fastapi", "backend", "api", "sqlite", "server", "rest"])
+        is_fullstack = any(
+            k in combined_text
+            for k in [
+                "full-stack",
+                "fullstack",
+                "react",
+                "frontend",
+                "ui",
+                "web dashboard",
+                "weather dashboard",
+            ]
+        ) and any(
+            k in combined_text for k in ["fastapi", "backend", "api", "sqlite", "server", "rest"]
         )
 
         if is_fullstack:

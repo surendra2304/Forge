@@ -52,10 +52,21 @@ async def test_parallel_wave_dependency_scheduling(temp_dir: Path):
     nid_be = f"{task_id}_be"
     nid_integ = f"{task_id}_integ"
 
-    node_req = TaskNode(id=nid_req, title="Requirements Spec", status=TaskState.COMPLETED, assigned_agent="planner")
-    node_fe = TaskNode(id=nid_fe, title="Frontend UI Synthesis", dependencies=[nid_req], assigned_agent="frontend")
-    node_be = TaskNode(id=nid_be, title="Backend API Synthesis", dependencies=[nid_req], assigned_agent="backend")
-    node_integ = TaskNode(id=nid_integ, title="Full-Stack Integration", dependencies=[nid_fe, nid_be], assigned_agent="developer")
+    node_req = TaskNode(
+        id=nid_req, title="Requirements Spec", status=TaskState.COMPLETED, assigned_agent="planner"
+    )
+    node_fe = TaskNode(
+        id=nid_fe, title="Frontend UI Synthesis", dependencies=[nid_req], assigned_agent="frontend"
+    )
+    node_be = TaskNode(
+        id=nid_be, title="Backend API Synthesis", dependencies=[nid_req], assigned_agent="backend"
+    )
+    node_integ = TaskNode(
+        id=nid_integ,
+        title="Full-Stack Integration",
+        dependencies=[nid_fe, nid_be],
+        assigned_agent="developer",
+    )
 
     graph = TaskGraph(
         id=task_id,
@@ -89,7 +100,9 @@ async def test_parallel_wave_dependency_scheduling(temp_dir: Path):
 
     from app.integrations.ai_universe_client import AIUniverseResponse
 
-    with patch("app.integrations.ai_universe_client.AIUniverseClient.ask", new_callable=AsyncMock) as mock_ask:
+    with patch(
+        "app.integrations.ai_universe_client.AIUniverseClient.ask", new_callable=AsyncMock
+    ) as mock_ask:
         mock_ask.return_value = AIUniverseResponse(
             answer="def handle(): return True\n",
             confidence=0.95,

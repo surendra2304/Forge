@@ -16,7 +16,10 @@ logger = get_logger("agents.parser")
 
 class ExtractedFile(BaseModel):
     """Represents a source file or artifact extracted from an LLM response."""
-    relative_path: str = Field(..., description="Target relative file path within workspace project root")
+
+    relative_path: str = Field(
+        ..., description="Target relative file path within workspace project root"
+    )
     content: str = Field(..., description="Complete text content of the file")
     language: str | None = Field(default=None, description="Syntax highlighting language tag")
 
@@ -41,7 +44,12 @@ class LLMResponseParser:
 
         # Normalize unicode hyphens and dashes (e.g. \u2011, \u2013, \u2014) to standard ASCII '-'
         text = response_text.replace("\u2011", "-").replace("\u2013", "-").replace("\u2014", "-")
-        text = text.replace("\u2018", "'").replace("\u2019", "'").replace("\u201c", '"').replace("\u201d", '"')
+        text = (
+            text.replace("\u2018", "'")
+            .replace("\u2019", "'")
+            .replace("\u201c", '"')
+            .replace("\u201d", '"')
+        )
         text = text.strip()
         extracted: list[ExtractedFile] = []
         seen_paths: set[str] = set()
@@ -57,19 +65,16 @@ class LLMResponseParser:
             if not file_path or not content or not content.strip():
                 return False
             lower_path = file_path.lower()
-            if (
-                lower_path in [
-                    "path/to/file.py",
-                    "path/to/file.ext",
-                    "path/to/file.js",
-                    "relative/path/to/file.py",
-                    "relative/path/to/file.ext",
-                    "relative/path/to/file.js",
-                    "path/to/component.js",
-                    "path/to/component.tsx",
-                ]
-                or lower_path.startswith(("path/to/", "relative/path/to/"))
-            ):
+            if lower_path in [
+                "path/to/file.py",
+                "path/to/file.ext",
+                "path/to/file.js",
+                "relative/path/to/file.py",
+                "relative/path/to/file.ext",
+                "relative/path/to/file.js",
+                "path/to/component.js",
+                "path/to/component.tsx",
+            ] or lower_path.startswith(("path/to/", "relative/path/to/")):
                 return False
 
             stripped_content = content.strip()
@@ -96,7 +101,9 @@ class LLMResponseParser:
             file_path = _normalize_path(m.group(1))
             file_content = m.group(2)
             # If content is wrapped in a markdown code fence inside the XML, unwrap it
-            fence_match = re.search(r"^```[a-zA-Z0-9_-]*\s*\n([\s\S]*?)\n```$", file_content.strip())
+            fence_match = re.search(
+                r"^```[a-zA-Z0-9_-]*\s*\n([\s\S]*?)\n```$", file_content.strip()
+            )
             if fence_match:
                 file_content = fence_match.group(1)
 
@@ -125,7 +132,9 @@ class LLMResponseParser:
             file_content = m.group(3)
 
             if _is_valid_file(file_path, file_content) and file_path not in seen_paths:
-                extracted.append(ExtractedFile(relative_path=file_path, content=file_content, language=lang))
+                extracted.append(
+                    ExtractedFile(relative_path=file_path, content=file_content, language=lang)
+                )
                 seen_paths.add(file_path)
 
         if extracted:
@@ -146,7 +155,9 @@ class LLMResponseParser:
             file_content = m.group(3)
 
             if _is_valid_file(file_path, file_content) and file_path not in seen_paths:
-                extracted.append(ExtractedFile(relative_path=file_path, content=file_content, language=lang))
+                extracted.append(
+                    ExtractedFile(relative_path=file_path, content=file_content, language=lang)
+                )
                 seen_paths.add(file_path)
 
         if extracted:
@@ -161,12 +172,17 @@ class LLMResponseParser:
             if generic_code_blocks:
                 # Filter valid code blocks
                 valid_blocks = [
-                    (lang, block) for lang, block in generic_code_blocks if _is_valid_file(default_filename, block)
+                    (lang, block)
+                    for lang, block in generic_code_blocks
+                    if _is_valid_file(default_filename, block)
                 ]
                 if valid_blocks:
                     largest_lang, largest_block = max(valid_blocks, key=lambda b: len(b[1]))
                     norm_default = _normalize_path(default_filename)
-                    if _is_valid_file(norm_default, largest_block) and norm_default not in seen_paths:
+                    if (
+                        _is_valid_file(norm_default, largest_block)
+                        and norm_default not in seen_paths
+                    ):
                         extracted.append(
                             ExtractedFile(
                                 relative_path=norm_default,

@@ -18,6 +18,7 @@ class ProposalStatus(str, Enum):
 
 class ImprovementProposal(BaseModel):
     """Structured self-improvement proposal generated from failure pattern mining."""
+
     id: str = Field(default_factory=lambda: f"prop_{uuid4().hex[:8]}")
     title: str
     description: str
@@ -32,6 +33,7 @@ class ImprovementProposal(BaseModel):
 
 class SelfImprovementReport(BaseModel):
     """Aggregate report on historical failure analysis and active improvement proposals."""
+
     analysis_period_days: int = 7
     total_tasks_analyzed: int = 0
     total_failures_identified: int = 0

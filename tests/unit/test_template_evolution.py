@@ -9,7 +9,9 @@ def test_template_evolution_scoring_and_promotion():
     engine = TemplateEvolutionEngine()
 
     engine.register_variant("fastapi_v1", "api", "from fastapi import FastAPI\napp = FastAPI()")
-    engine.register_variant("fastapi_v2", "api", "from fastapi import FastAPI, APIRouter\napp = FastAPI()")
+    engine.register_variant(
+        "fastapi_v2", "api", "from fastapi import FastAPI, APIRouter\napp = FastAPI()"
+    )
 
     # Record 4 successes for v2, 1 failure
     for _ in range(4):

@@ -64,7 +64,7 @@ def run_untrusted(user_input):
 
     assert report.blocks_delivery is True
     assert report.critical_count >= 2  # eval, exec, subprocess shell=True
-    assert report.high_count >= 2      # os.system, pickle
+    assert report.high_count >= 2  # os.system, pickle
 
     findings_checks = [f.check_name for f in report.findings]
     assert any("eval" in c for c in findings_checks)
@@ -103,7 +103,7 @@ function displayUser(data) {
 
     assert report.blocks_delivery is True
     assert report.critical_count >= 2  # SQL injections
-    assert report.high_count >= 1      # DOM XSS
+    assert report.high_count >= 1  # DOM XSS
 
     finding_checks = [f.check_name for f in report.findings]
     assert any("SQL Injection" in c for c in finding_checks)

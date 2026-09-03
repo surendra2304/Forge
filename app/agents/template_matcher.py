@@ -25,7 +25,14 @@ class TemplateMatchResult(BaseModel):
 # Keyword weights for semantic matching
 TEMPLATE_INTENT_RULES: dict[str, dict[str, Any]] = {
     "portfolio-web": {
-        "keywords": ["portfolio", "resume", "personal website", "showcase", "developer page", "bio"],
+        "keywords": [
+            "portfolio",
+            "resume",
+            "personal website",
+            "showcase",
+            "developer page",
+            "bio",
+        ],
         "min_score": 0.85,
     },
     "blog-web": {
@@ -33,7 +40,15 @@ TEMPLATE_INTENT_RULES: dict[str, dict[str, Any]] = {
         "min_score": 0.90,
     },
     "ecommerce-web": {
-        "keywords": ["ecommerce", "e-commerce", "storefront", "shopping cart", "checkout", "products catalog", "store"],
+        "keywords": [
+            "ecommerce",
+            "e-commerce",
+            "storefront",
+            "shopping cart",
+            "checkout",
+            "products catalog",
+            "store",
+        ],
         "min_score": 0.85,
     },
     "saas-landing": {
@@ -41,15 +56,37 @@ TEMPLATE_INTENT_RULES: dict[str, dict[str, Any]] = {
         "min_score": 0.85,
     },
     "admin-dashboard": {
-        "keywords": ["dashboard", "admin panel", "analytics dashboard", "control panel", "metrics view"],
+        "keywords": [
+            "dashboard",
+            "admin panel",
+            "analytics dashboard",
+            "control panel",
+            "metrics view",
+        ],
         "min_score": 0.85,
     },
     "fastapi-crud": {
-        "keywords": ["rest api", "crud", "fastapi", "endpoints", "users api", "items api", "backend service"],
+        "keywords": [
+            "rest api",
+            "crud",
+            "fastapi",
+            "endpoints",
+            "users api",
+            "items api",
+            "backend service",
+        ],
         "min_score": 0.85,
     },
     "auth-service": {
-        "keywords": ["auth", "jwt", "login", "authentication", "user registration", "oauth", "passwords"],
+        "keywords": [
+            "auth",
+            "jwt",
+            "login",
+            "authentication",
+            "user registration",
+            "oauth",
+            "passwords",
+        ],
         "min_score": 0.88,
     },
     "webhook-handler": {
@@ -99,7 +136,11 @@ class SmartTemplateMatcher:
         best_reason = "No matching template found; generating codebase from scratch."
 
         for t_id, rule in TEMPLATE_INTENT_RULES.items():
-            matched_keywords = [kw for kw in rule["keywords"] if re.search(r"\b" + re.escape(kw) + r"\b", combined_text)]
+            matched_keywords = [
+                kw
+                for kw in rule["keywords"]
+                if re.search(r"\b" + re.escape(kw) + r"\b", combined_text)
+            ]
             if matched_keywords:
                 # Score based on keyword count and specificity
                 score = min(0.98, rule["min_score"] + (0.03 * (len(matched_keywords) - 1)))
@@ -130,5 +171,7 @@ class SmartTemplateMatcher:
             confidence=round(best_score, 2),
             reasoning=best_reason,
             use_hybrid_scaffold=False,
-            customization_hints=["Generate all project files dynamically via standard AI synthesis pipeline."],
+            customization_hints=[
+                "Generate all project files dynamically via standard AI synthesis pipeline."
+            ],
         )

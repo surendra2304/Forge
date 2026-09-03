@@ -115,7 +115,9 @@ class ContextManager:
             {"node_id": node_id, "role": role_name, "result": result}
         )
 
-    def get_recent_terminal_logs(self, task_id: str, max_entries: int = 3, max_tokens: int = 1500) -> str:
+    def get_recent_terminal_logs(
+        self, task_id: str, max_entries: int = 3, max_tokens: int = 1500
+    ) -> str:
         """Retrieve recent terminal logs formatted and summarized for prompt context."""
         logs = self._terminal_logs.get(task_id, [])
         if not logs:
@@ -190,7 +192,9 @@ class ContextManager:
             term_logs = self.get_recent_terminal_logs(task_id, max_tokens=token_limit // 2)
             context_payload["terminal_logs"] = term_logs
             if "error" in base_context:
-                context_payload["error"] = self.summarize_text(str(base_context["error"]), max_tokens=800)
+                context_payload["error"] = self.summarize_text(
+                    str(base_context["error"]), max_tokens=800
+                )
 
         elif role_name in ["code_reviewer", "security_reviewer"]:
             diffs = self.get_recent_diffs(task_id, max_tokens=token_limit // 2)
@@ -206,7 +210,9 @@ class ContextManager:
                 if tokens_used > token_limit * 0.75:
                     break
                 try:
-                    content = engine.fs.read_file(task_id=task_id, relative_path=fpath, role=role_name)
+                    content = engine.fs.read_file(
+                        task_id=task_id, relative_path=fpath, role=role_name
+                    )
                     condensed = self.summarize_text(content, max_tokens=600)
                     key_files_content[fpath] = condensed
                     tokens_used += self.estimate_tokens(condensed)

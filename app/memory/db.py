@@ -120,7 +120,9 @@ class DatabaseManager:
         async with self.connection() as conn:
             await conn.executescript(SCHEMA_SQL)
             try:
-                await conn.execute("ALTER TABLE tasks ADD COLUMN metadata TEXT NOT NULL DEFAULT '{}';")
+                await conn.execute(
+                    "ALTER TABLE tasks ADD COLUMN metadata TEXT NOT NULL DEFAULT '{}';"
+                )
             except Exception:
                 pass
             await conn.commit()

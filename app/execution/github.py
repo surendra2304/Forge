@@ -70,7 +70,9 @@ class GitHubTool:
             command=f"git checkout -B {branch_name}",
             role=role,
         )
-        logger.info(f"[Task {task_id}] Created and checked out branch '{branch_name}' (exit={cmd_res.exit_code})")
+        logger.info(
+            f"[Task {task_id}] Created and checked out branch '{branch_name}' (exit={cmd_res.exit_code})"
+        )
         return {
             "status": "success" if cmd_res.exit_code == 0 else "failed",
             "branch_name": branch_name,
@@ -116,7 +118,11 @@ class GitHubTool:
                 "message": "No GitHub repository specified (GITHUB_REPO not configured).",
             }
 
-        remote_url = f"https://x-access-token:{gh_token}@github.com/{target_repo}.git" if gh_token else f"https://github.com/{target_repo}.git"
+        remote_url = (
+            f"https://x-access-token:{gh_token}@github.com/{target_repo}.git"
+            if gh_token
+            else f"https://github.com/{target_repo}.git"
+        )
 
         # Set or update remote origin
         await self.terminal.run_command(
@@ -186,7 +192,9 @@ class GitHubTool:
                 response = await client.post(api_url, json=payload, headers=headers)
                 if response.status_code in [200, 201]:
                     data = response.json()
-                    logger.info(f"Successfully opened GitHub Pull Request #{data.get('number')} at {data.get('html_url')}")
+                    logger.info(
+                        f"Successfully opened GitHub Pull Request #{data.get('number')} at {data.get('html_url')}"
+                    )
                     return PullRequestResult(
                         pr_number=data.get("number", 1),
                         html_url=data.get("html_url", f"https://github.com/{target_repo}/pull/1"),
@@ -197,7 +205,9 @@ class GitHubTool:
                         state=data.get("state", "open"),
                     )
                 else:
-                    logger.error(f"GitHub API error creating PR ({response.status_code}): {response.text}")
+                    logger.error(
+                        f"GitHub API error creating PR ({response.status_code}): {response.text}"
+                    )
                     return PullRequestResult(
                         pr_number=1,
                         html_url=f"https://github.com/{target_repo}/pull/1",

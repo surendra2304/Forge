@@ -52,7 +52,12 @@ def get_orchestrator(store: StateStore = Depends(get_state_store)) -> Orchestrat
     return OrchestratorCore(store=store)
 
 
-@tasks_router.post("", response_model=TaskResponse, status_code=status.HTTP_201_CREATED, summary="Submit Engineering Task")
+@tasks_router.post(
+    "",
+    response_model=TaskResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Submit Engineering Task",
+)
 async def create_task(
     request: TaskCreateRequest,
     orchestrator: OrchestratorCore = Depends(get_orchestrator),
@@ -96,13 +101,15 @@ async def create_task(
         )
 
     # Broadcast task creation via WebSocket
-    await ws_manager.broadcast_global({
-        "event": "task.created",
-        "task_id": task.id,
-        "goal": task.goal,
-        "state": task.state.value,
-        "metadata": task.metadata,
-    })
+    await ws_manager.broadcast_global(
+        {
+            "event": "task.created",
+            "task_id": task.id,
+            "goal": task.goal,
+            "state": task.state.value,
+            "metadata": task.metadata,
+        }
+    )
 
     return TaskResponse(
         id=task.id,
@@ -125,7 +132,9 @@ async def create_task(
 async def list_tasks(
     status: TaskState | None = Query(default=None, description="Filter by lifecycle state"),
     limit: int = Query(default=50, ge=1, le=500, description="Max tasks to return"),
-    since_timestamp: datetime | None = Query(default=None, description="Filter tasks updated after timestamp"),
+    since_timestamp: datetime | None = Query(
+        default=None, description="Filter tasks updated after timestamp"
+    ),
     include_archived: bool = Query(default=False, description="Include soft-archived tasks"),
     store: StateStore = Depends(get_state_store),
 ) -> list[TaskSummaryResponse]:
@@ -169,7 +178,9 @@ async def get_task(
     """Retrieve fine-grained task status, current DAG stage, and dynamic ETA estimation."""
     task = await store.get_task(task_id)
     if not task:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Task '{task_id}' not found.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"Task '{task_id}' not found."
+        )
 
     paths = workspace_manager.get_workspace_paths(task_id)
     workspace_dirs = {}
@@ -226,12 +237,18 @@ async def get_task(
     )
 
 
-@tasks_router.get("/{task_id}/logs", response_model=TaskLogsResponse, summary="Get Structured Execution Logs")
+@tasks_router.get(
+    "/{task_id}/logs", response_model=TaskLogsResponse, summary="Get Structured Execution Logs"
+)
 async def get_task_logs(
     task_id: str,
-    level: str | None = Query(default=None, description="Filter log level (DEBUG, INFO, WARNING, ERROR)"),
+    level: str | None = Query(
+        default=None, description="Filter log level (DEBUG, INFO, WARNING, ERROR)"
+    ),
     tail_lines: int = Query(default=100, ge=1, le=1000, description="Number of recent log lines"),
-    since_timestamp: str | None = Query(default=None, description="Filter log lines since ISO timestamp"),
+    since_timestamp: str | None = Query(
+        default=None, description="Filter log lines since ISO timestamp"
+    ),
     store: StateStore = Depends(get_state_store),
 ) -> TaskLogsResponse:
     """Retrieve structured execution and build logs from task sandbox."""
@@ -255,17 +272,21 @@ async def get_task_logs(
                     entry_level = "DEBUG"
                 elif "WARNING" in line.upper() or "WARN" in line.upper():
                     entry_level = "WARNING"
-                elif "ERROR" in line.upper() or "FAIL" in line.upper() or "EXCEPTION" in line.upper():
+                elif (
+                    "ERROR" in line.upper() or "FAIL" in line.upper() or "EXCEPTION" in line.upper()
+                ):
                     entry_level = "ERROR"
 
                 if level and entry_level != level.upper():
                     continue
 
-                entries.append(LogEntry(
-                    timestamp=None,
-                    level=entry_level,
-                    message=line,
-                ))
+                entries.append(
+                    LogEntry(
+                        timestamp=None,
+                        level=entry_level,
+                        message=line,
+                    )
+                )
         except Exception:
             pass
 
@@ -277,7 +298,9 @@ async def get_task_logs(
     )
 
 
-@tasks_router.get("/{task_id}/inspect", response_model=TaskInspectResponse, summary="Deep Task Inspection")
+@tasks_router.get(
+    "/{task_id}/inspect", response_model=TaskInspectResponse, summary="Deep Task Inspection"
+)
 async def inspect_task(
     task_id: str,
     store: StateStore = Depends(get_state_store),
@@ -285,7 +308,9 @@ async def inspect_task(
     """Perform deep inspection of files, verification breakdown, dependencies, and artifacts."""
     task = await store.get_task(task_id)
     if not task:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Task '{task_id}' not found.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"Task '{task_id}' not found."
+        )
 
     paths = workspace_manager.get_workspace_paths(task_id)
     files_created: list[FileInspection] = []
@@ -301,11 +326,13 @@ async def inspect_task(
                     try:
                         content = f.read_text(encoding="utf-8", errors="ignore")
                         lines = len(content.splitlines())
-                        files_created.append(FileInspection(
-                            path=str(f.relative_to(paths.project)),
-                            size_bytes=f.stat().st_size,
-                            lines_count=lines,
-                        ))
+                        files_created.append(
+                            FileInspection(
+                                path=str(f.relative_to(paths.project)),
+                                size_bytes=f.stat().st_size,
+                                lines_count=lines,
+                            )
+                        )
                     except Exception:
                         pass
 
@@ -342,7 +369,11 @@ async def inspect_task(
     )
 
 
-@tasks_router.get("/{task_id}/artifacts", response_model=list[ArtifactResponse], summary="List Downloadable Artifacts")
+@tasks_router.get(
+    "/{task_id}/artifacts",
+    response_model=list[ArtifactResponse],
+    summary="List Downloadable Artifacts",
+)
 async def list_task_artifacts(
     task_id: str,
     store: StateStore = Depends(get_state_store),
@@ -379,11 +410,15 @@ async def download_task_artifact(
     """Download a specific artifact file (e.g. completion report, screenshot)."""
     paths = workspace_manager.get_workspace_paths(task_id)
     if not paths or not paths.artifacts.exists():
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Artifacts directory not found.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Artifacts directory not found."
+        )
 
     artifact_file = paths.artifacts / filename
     if not artifact_file.exists() or not artifact_file.is_file():
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Artifact '{filename}' not found.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"Artifact '{filename}' not found."
+        )
 
     mime, _ = mimetypes.guess_type(filename)
     return FileResponse(
@@ -393,7 +428,9 @@ async def download_task_artifact(
     )
 
 
-@tasks_router.post("/{task_id}/cancel", response_model=TaskActionResponse, summary="Cancel Running Task")
+@tasks_router.post(
+    "/{task_id}/cancel", response_model=TaskActionResponse, summary="Cancel Running Task"
+)
 async def cancel_task(
     task_id: str,
     request: TaskActionRequest | None = None,
@@ -403,7 +440,9 @@ async def cancel_task(
     """Gracefully cancel a running task and cleanup background resources."""
     task = await store.get_task(task_id)
     if not task:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Task '{task_id}' not found.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"Task '{task_id}' not found."
+        )
 
     prev_state = task.state
     reason = request.reason if request else "Cancelled via FRIDAY management API"
@@ -420,18 +459,23 @@ async def cancel_task(
         if tracker:
             await tracker.complete_task(success=False, error=reason)
 
-        await ws_manager.broadcast_to_task(task_id, {
-            "event": "task.cancelled",
-            "task_id": task_id,
-            "previous_state": prev_state.value,
-            "current_state": TaskState.CANCELLED.value,
-            "reason": reason,
-        })
-        await ws_manager.broadcast_global({
-            "event": "task.cancelled",
-            "task_id": task_id,
-            "reason": reason,
-        })
+        await ws_manager.broadcast_to_task(
+            task_id,
+            {
+                "event": "task.cancelled",
+                "task_id": task_id,
+                "previous_state": prev_state.value,
+                "current_state": TaskState.CANCELLED.value,
+                "reason": reason,
+            },
+        )
+        await ws_manager.broadcast_global(
+            {
+                "event": "task.cancelled",
+                "task_id": task_id,
+                "reason": reason,
+            }
+        )
 
         webhook_url = task.metadata.get("webhook_url")
         if webhook_url:
@@ -461,7 +505,9 @@ async def archive_task(
     """Soft-archive a task while preserving all sandbox files on disk."""
     task = await store.get_task(task_id)
     if not task:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Task '{task_id}' not found.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"Task '{task_id}' not found."
+        )
 
     task.metadata["archived"] = True
     task.metadata["archived_at"] = datetime.now(UTC).isoformat()
@@ -474,5 +520,3 @@ async def archive_task(
         "archived": True,
         "message": f"Task '{task_id}' has been archived and removed from active task listings.",
     }
-
-

@@ -28,14 +28,18 @@ class LanguageDetector:
     """Classifies software requirements and goals into target language and framework."""
 
     @classmethod
-    def detect(cls, goal: str, requirements: list[str] | None = None) -> tuple[TargetLanguage, TargetFramework]:
+    def detect(
+        cls, goal: str, requirements: list[str] | None = None
+    ) -> tuple[TargetLanguage, TargetFramework]:
         combined_text = f"{goal} {' '.join(requirements or [])}".lower()
 
         # Check for full-stack composite indicators
-        is_fullstack = ("frontend" in combined_text and "backend" in combined_text) or \
-                       ("react" in combined_text and "fastapi" in combined_text) or \
-                       ("next.js" in combined_text and "express" in combined_text) or \
-                       ("full stack" in combined_text or "fullstack" in combined_text)
+        is_fullstack = (
+            ("frontend" in combined_text and "backend" in combined_text)
+            or ("react" in combined_text and "fastapi" in combined_text)
+            or ("next.js" in combined_text and "express" in combined_text)
+            or ("full stack" in combined_text or "fullstack" in combined_text)
+        )
         if is_fullstack:
             return TargetLanguage.FULLSTACK, TargetFramework.REACT
 
@@ -51,7 +55,12 @@ class LanguageDetector:
         if "vue" in combined_text or "vue.js" in combined_text or "vuejs" in combined_text:
             return TargetLanguage.JAVASCRIPT, TargetFramework.VUE
 
-        if "express" in combined_text or "express.js" in combined_text or "node.js" in combined_text or "nodejs" in combined_text:
+        if (
+            "express" in combined_text
+            or "express.js" in combined_text
+            or "node.js" in combined_text
+            or "nodejs" in combined_text
+        ):
             if "typescript" in combined_text:
                 return TargetLanguage.TYPESCRIPT, TargetFramework.EXPRESS
             return TargetLanguage.JAVASCRIPT, TargetFramework.EXPRESS
@@ -68,7 +77,12 @@ class LanguageDetector:
         if "cli" in combined_text or "command line" in combined_text or "argparse" in combined_text:
             return TargetLanguage.PYTHON, TargetFramework.CLI
 
-        if "html" in combined_text or "landing page" in combined_text or "portfolio" in combined_text or "website" in combined_text:
+        if (
+            "html" in combined_text
+            or "landing page" in combined_text
+            or "portfolio" in combined_text
+            or "website" in combined_text
+        ):
             return TargetLanguage.PYTHON, TargetFramework.STATIC_WEB
 
         # Default fallback

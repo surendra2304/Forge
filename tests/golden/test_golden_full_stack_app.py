@@ -292,14 +292,27 @@ document.addEventListener("DOMContentLoaded", () => {
             "requirements.txt": "fastapi\nuvicorn\nrequests\n",
             "README.md": "# Full-Stack Weather Dashboard\n",
         }
+
         async def mock_ask_impl(question: str, mode: str = "auto"):
-            for fname in ["test_main.py", "main.py", "index.html", "style.css", "app.js", "requirements.txt", "README.md"]:
+            for fname in [
+                "test_main.py",
+                "main.py",
+                "index.html",
+                "style.css",
+                "app.js",
+                "requirements.txt",
+                "README.md",
+            ]:
                 if fname in question:
-                    return AIUniverseResponse(answer=responses[fname], confidence=0.95, run_id=f"run_{fname}")
+                    return AIUniverseResponse(
+                        answer=responses[fname], confidence=0.95, run_id=f"run_{fname}"
+                    )
             return AIUniverseResponse(answer=backend_code, confidence=0.95, run_id="run_default")
 
         # 4. Autonomous DAG Execution
-        with patch("app.integrations.ai_universe_client.AIUniverseClient.ask", side_effect=mock_ask_impl):
+        with patch(
+            "app.integrations.ai_universe_client.AIUniverseClient.ask", side_effect=mock_ask_impl
+        ):
             task = await orchestrator.run_task(task_id, max_iterations=12)
             assert task.state == TaskState.COMPLETED
             assert task.progress_percentage == 100

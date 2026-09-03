@@ -30,7 +30,9 @@ class Settings(BaseSettings):
     # Provider Defaults
     default_provider: str = Field(
         default="direct",
-        validation_alias=AliasChoices("DEFAULT_PROVIDER", "FORGE_DEFAULT_PROVIDER", "default_provider"),
+        validation_alias=AliasChoices(
+            "DEFAULT_PROVIDER", "FORGE_DEFAULT_PROVIDER", "default_provider"
+        ),
         description="Default model provider: openai, anthropic, direct, or mock",
     )
     default_model: str = Field(
@@ -40,7 +42,9 @@ class Settings(BaseSettings):
     )
     model_temperature: float = Field(
         default=0.2,
-        validation_alias=AliasChoices("MODEL_TEMPERATURE", "FORGE_MODEL_TEMPERATURE", "model_temperature"),
+        validation_alias=AliasChoices(
+            "MODEL_TEMPERATURE", "FORGE_MODEL_TEMPERATURE", "model_temperature"
+        ),
         description="Default generation temperature",
     )
 
@@ -87,7 +91,9 @@ class Settings(BaseSettings):
     )
     ai_universe_api_key: str | None = Field(
         default="inference_api",
-        validation_alias=AliasChoices("INFERENCE_API_KEY", "AI_UNIVERSE_API_KEY", "ai_universe_api_key"),
+        validation_alias=AliasChoices(
+            "INFERENCE_API_KEY", "AI_UNIVERSE_API_KEY", "ai_universe_api_key"
+        ),
         description="API Key for Inference REST API authentication",
     )
     intelx_url: str = Field(
@@ -107,7 +113,9 @@ class Settings(BaseSettings):
     )
     futuris_api_key: str | None = Field(
         default="futuris_api",
-        validation_alias=AliasChoices("FUTURIS_API_KEY", "FORGE_FUTURIS_API_KEY", "futuris_api_key"),
+        validation_alias=AliasChoices(
+            "FUTURIS_API_KEY", "FORGE_FUTURIS_API_KEY", "futuris_api_key"
+        ),
         description="API Key for Futuris API authentication",
     )
     cortex_url: str = Field(
@@ -121,8 +129,6 @@ class Settings(BaseSettings):
         description="API Key for Cortex API authentication",
     )
 
-
-
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
@@ -132,7 +138,12 @@ class Settings(BaseSettings):
 
     def ensure_directories(self) -> None:
         """Create runtime directories if they do not exist."""
-        for path in [self.data_dir, self.database_path.parent, self.workspaces_dir, self.artifacts_dir]:
+        for path in [
+            self.data_dir,
+            self.database_path.parent,
+            self.workspaces_dir,
+            self.artifacts_dir,
+        ]:
             abs_path = self.base_dir / path if not path.is_absolute() else path
             abs_path.mkdir(parents=True, exist_ok=True)
 

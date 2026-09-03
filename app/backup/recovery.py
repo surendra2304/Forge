@@ -53,12 +53,16 @@ class BackupManager:
                     await src_conn.backup(dst_conn)
             size = target_path.stat().st_size
             logger.info(f"Database backup created: {target_path.name} ({size} bytes)")
-            return BackupManifest(backup_path=str(target_path), backup_type="sqlite", size_bytes=size)
+            return BackupManifest(
+                backup_path=str(target_path), backup_type="sqlite", size_bytes=size
+            )
         except Exception as e:
             logger.warning(f"aiosqlite backup failed ({e}), falling back to direct copy.")
             shutil.copy2(src_path, target_path)
             size = target_path.stat().st_size
-            return BackupManifest(backup_path=str(target_path), backup_type="sqlite", size_bytes=size)
+            return BackupManifest(
+                backup_path=str(target_path), backup_type="sqlite", size_bytes=size
+            )
 
     def backup_workspace_metadata(self, task_id: str, metadata: dict[str, Any]) -> BackupManifest:
         """Create a JSON metadata snapshot for a workspace."""

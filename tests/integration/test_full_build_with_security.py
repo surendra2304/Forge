@@ -62,7 +62,9 @@ def test_create_and_read_item():
         (ws / "test_main.py").write_text(test_py, encoding="utf-8")
 
         # 3. Requirements file
-        (ws / "requirements.txt").write_text("fastapi>=0.110.0\npydantic>=2.6.0\npytest>=8.0.0\n", encoding="utf-8")
+        (ws / "requirements.txt").write_text(
+            "fastapi>=0.110.0\npydantic>=2.6.0\npytest>=8.0.0\n", encoding="utf-8"
+        )
 
         yield ws
 

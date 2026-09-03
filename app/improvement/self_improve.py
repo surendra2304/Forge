@@ -111,7 +111,6 @@ class SelfImprovementEngine:
             self.proposals[prop.id] = prop
             new_proposals.append(prop)
 
-
         return SelfImprovementReport(
             analysis_period_days=days,
             total_tasks_analyzed=len(recent_tasks),

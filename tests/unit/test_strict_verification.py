@@ -37,7 +37,10 @@ async def test_developer_role_flags_fallback_stub_on_ai_universe_failure(temp_en
 
     developer = DeveloperRole()
 
-    with patch("app.integrations.ai_universe_client.AIUniverseClient.ask", side_effect=RuntimeError("AI Universe offline")):
+    with patch(
+        "app.integrations.ai_universe_client.AIUniverseClient.ask",
+        side_effect=RuntimeError("AI Universe offline"),
+    ):
         context = {
             "goal": "Build a static portfolio website",
             "file_manifest": ["index.html", "style.css"],
@@ -76,7 +79,10 @@ async def test_orchestrator_sets_failed_state_when_fallback_stub_occurs(tmp_path
     orchestrator = OrchestratorCore(store=store, wm=wm, engine=engine)
 
     # Force AI Universe to fail so Developer falls back
-    with patch("app.integrations.ai_universe_client.AIUniverseClient.ask", side_effect=RuntimeError("AI Universe offline")):
+    with patch(
+        "app.integrations.ai_universe_client.AIUniverseClient.ask",
+        side_effect=RuntimeError("AI Universe offline"),
+    ):
         task, _ = await orchestrator.intake_and_plan(
             goal="Build a FastAPI backend service with SQLite database",
         )

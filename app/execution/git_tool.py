@@ -140,7 +140,9 @@ class GitTool:
         logger.info(f"Created git checkpoint tag '{tag_name}' (sha={sha[:8]}) in task {task_id}")
         return tag_name
 
-    async def tag_release(self, task_id: str, tag_name: str = "v1.0-forge-delivery", role: str = "release_engineer") -> str:
+    async def tag_release(
+        self, task_id: str, tag_name: str = "v1.0-forge-delivery", role: str = "release_engineer"
+    ) -> str:
         """Create a final tagged release checkpoint before delivery."""
         self.pm.check_permission(role, ToolPermission.GIT_WRITE)
         await self.init_repo(task_id, role=role)

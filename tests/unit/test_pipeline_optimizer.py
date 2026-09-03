@@ -55,7 +55,11 @@ def test_incremental_diff():
     optimizer = PipelineOptimizer()
     manifest = ["main.py", "style.css", "index.html"]
     prev_files = {"main.py": "print('hello')", "style.css": "body { margin: 0; }"}
-    new_files = {"main.py": "print('hello')", "style.css": "body { margin: 10px; }", "index.html": "<h1>New</h1>"}
+    new_files = {
+        "main.py": "print('hello')",
+        "style.css": "body { margin: 10px; }",
+        "index.html": "<h1>New</h1>",
+    }
 
     changed = optimizer.compute_incremental_diff(manifest, prev_files, new_files)
     assert "style.css" in changed

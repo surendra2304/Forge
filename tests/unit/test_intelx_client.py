@@ -97,7 +97,9 @@ def test_format_research_context_for_prompt(intelx_client: IntelXTechClient):
     assert "[S:304]" in formatted
 
 
-def test_research_backed_template_proposal_generation(research_manager: ResearchBackedTemplatesManager):
+def test_research_backed_template_proposal_generation(
+    research_manager: ResearchBackedTemplatesManager,
+):
     """Test generating self-improvement proposals from research results."""
     finding = IntelXResearchFinding(
         id="S:999",

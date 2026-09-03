@@ -20,7 +20,9 @@ class PerformanceVerifier:
     def __init__(self, workspace_path: Path):
         self.workspace_path = workspace_path
 
-    def verify_api_endpoint_latency(self, test_latencies_ms: list[float] | None = None) -> VerificationCheck:
+    def verify_api_endpoint_latency(
+        self, test_latencies_ms: list[float] | None = None
+    ) -> VerificationCheck:
         """Verify API response times (simple endpoints must be <500ms)."""
         # If real execution metrics provided, use them; otherwise evaluate static endpoint structure
         latencies = test_latencies_ms or [45.2, 78.1, 110.5]
@@ -32,10 +34,14 @@ class PerformanceVerifier:
 
         if max_latency >= 500.0:
             status = "fail"
-            fix_suggestions.append(f"Optimize endpoint bottleneck: maximum latency observed was {max_latency:.1f}ms (threshold is 500ms).")
+            fix_suggestions.append(
+                f"Optimize endpoint bottleneck: maximum latency observed was {max_latency:.1f}ms (threshold is 500ms)."
+            )
         elif avg_latency > 250.0:
             status = "warn"
-            fix_suggestions.append(f"Average latency ({avg_latency:.1f}ms) is elevated. Consider caching responses or indexing database queries.")
+            fix_suggestions.append(
+                f"Average latency ({avg_latency:.1f}ms) is elevated. Consider caching responses or indexing database queries."
+            )
 
         return VerificationCheck(
             name="API Endpoint Latency Verification",
@@ -59,25 +65,34 @@ class PerformanceVerifier:
                 lines = content.splitlines()
                 for idx, line in enumerate(lines, start=1):
                     # Check for DB execution inside for/while loops
-                    if re.search(r"(?:await\s+)?(?:conn|db|session|cursor|client)\.(?:execute|query|filter|get|fetch|scalars)\(", line):
+                    if re.search(
+                        r"(?:await\s+)?(?:conn|db|session|cursor|client)\.(?:execute|query|filter|get|fetch|scalars)\(",
+                        line,
+                    ):
                         # Look back for enclosing loop
                         enclosing_loop = False
                         indent = len(line) - len(line.lstrip())
                         for prev_line in reversed(lines[max(0, idx - 15) : idx - 1]):
                             prev_indent = len(prev_line) - len(prev_line.lstrip())
-                            if prev_indent < indent and re.search(r"^\s*(?:for|while)\s+", prev_line):
+                            if prev_indent < indent and re.search(
+                                r"^\s*(?:for|while)\s+", prev_line
+                            ):
                                 enclosing_loop = True
                                 break
                         if enclosing_loop:
-                            n_plus_one_suspects.append({
-                                "file": py_file.name,
-                                "line": idx,
-                                "snippet": line.strip()[:80],
-                            })
+                            n_plus_one_suspects.append(
+                                {
+                                    "file": py_file.name,
+                                    "line": idx,
+                                    "snippet": line.strip()[:80],
+                                }
+                            )
             except Exception as e:
                 logger.debug(f"N+1 query parse error in {py_file}: {e}")
 
-        status = "fail" if len(n_plus_one_suspects) > 2 else ("warn" if n_plus_one_suspects else "pass")
+        status = (
+            "fail" if len(n_plus_one_suspects) > 2 else ("warn" if n_plus_one_suspects else "pass")
+        )
         return VerificationCheck(
             name="Database N+1 Query Detection",
             category="performance",
@@ -89,7 +104,9 @@ class PerformanceVerifier:
             fix_suggestions=[
                 f"Replace loop query in {v['file']} (line {v['line']}) with a bulk batch query (e.g. IN (...) clause or JOIN)."
                 for v in n_plus_one_suspects[:3]
-            ] if n_plus_one_suspects else [],
+            ]
+            if n_plus_one_suspects
+            else [],
         )
 
     def verify_web_asset_sizes_and_load_budget(self) -> VerificationCheck:
@@ -110,7 +127,18 @@ class PerformanceVerifier:
         for p in self.workspace_path.rglob("*"):
             if not p.is_file() or p.name.startswith(".") or "node_modules" in str(p):
                 continue
-            if p.suffix.lower() in [".html", ".css", ".js", ".png", ".jpg", ".jpeg", ".svg", ".webp", ".gif", ".wasm"]:
+            if p.suffix.lower() in [
+                ".html",
+                ".css",
+                ".js",
+                ".png",
+                ".jpg",
+                ".jpeg",
+                ".svg",
+                ".webp",
+                ".gif",
+                ".wasm",
+            ]:
                 total_bytes += p.stat().st_size
                 asset_count += 1
 
@@ -119,7 +147,9 @@ class PerformanceVerifier:
         # Check render blocking resources in HTML
         for html_file in html_files:
             try:
-                soup = BeautifulSoup(html_file.read_text(encoding="utf-8", errors="ignore"), "html.parser")
+                soup = BeautifulSoup(
+                    html_file.read_text(encoding="utf-8", errors="ignore"), "html.parser"
+                )
                 head = soup.find("head")
                 if head:
                     scripts = head.find_all("script")
@@ -127,11 +157,13 @@ class PerformanceVerifier:
                         src = script.get("src")
                         has_defer_or_async = script.has_attr("defer") or script.has_attr("async")
                         if src and not has_defer_or_async:
-                            render_blocking.append({
-                                "file": html_file.name,
-                                "script_src": src,
-                                "issue": "Script in <head> without async or defer attribute blocks DOM rendering.",
-                            })
+                            render_blocking.append(
+                                {
+                                    "file": html_file.name,
+                                    "script_src": src,
+                                    "issue": "Script in <head> without async or defer attribute blocks DOM rendering.",
+                                }
+                            )
             except Exception:
                 pass
 
@@ -140,16 +172,22 @@ class PerformanceVerifier:
 
         if total_mb > 2.0:
             status = "warn"
-            fix_suggestions.append(f"Total asset size ({total_mb}MB) exceeds 2.0MB recommended budget. Compress images and minify bundles.")
+            fix_suggestions.append(
+                f"Total asset size ({total_mb}MB) exceeds 2.0MB recommended budget. Compress images and minify bundles."
+            )
         if asset_count > 30:
             status = "warn"
-            fix_suggestions.append(f"Total HTTP asset count ({asset_count}) exceeds recommended limit of 30 requests.")
+            fix_suggestions.append(
+                f"Total HTTP asset count ({asset_count}) exceeds recommended limit of 30 requests."
+            )
         if render_blocking:
             status = "warn"
-            fix_suggestions.extend([
-                f"Add 'defer' or 'async' to {rb['script_src']} in {rb['file']}."
-                for rb in render_blocking[:3]
-            ])
+            fix_suggestions.extend(
+                [
+                    f"Add 'defer' or 'async' to {rb['script_src']} in {rb['file']}."
+                    for rb in render_blocking[:3]
+                ]
+            )
 
         return VerificationCheck(
             name="Web Asset Budget & Render-Blocking Verification",

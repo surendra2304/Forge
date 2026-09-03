@@ -87,20 +87,26 @@ async def test_task_lifecycle_pause_resume_cancel(async_client: AsyncClient):
     task_id = create_res.json()["id"]
 
     # Pause task (creates checkpoint & transitions to BLOCKED)
-    pause_res = await async_client.post(f"/tasks/{task_id}/pause", json={"reason": "Audit checkpoint needed"})
+    pause_res = await async_client.post(
+        f"/tasks/{task_id}/pause", json={"reason": "Audit checkpoint needed"}
+    )
     assert pause_res.status_code == 200
     pause_data = pause_res.json()
     assert pause_data["current_state"] == "BLOCKED"
     assert pause_data["checkpoint_id"] is not None
 
     # Resume task (transitions to RUNNING)
-    resume_res = await async_client.post(f"/tasks/{task_id}/resume", json={"reason": "Audit complete"})
+    resume_res = await async_client.post(
+        f"/tasks/{task_id}/resume", json={"reason": "Audit complete"}
+    )
     assert resume_res.status_code == 200
     resume_data = resume_res.json()
     assert resume_data["current_state"] == "RUNNING"
 
     # Cancel task
-    cancel_res = await async_client.post(f"/tasks/{task_id}/cancel", json={"reason": "User terminated task"})
+    cancel_res = await async_client.post(
+        f"/tasks/{task_id}/cancel", json={"reason": "User terminated task"}
+    )
     assert cancel_res.status_code == 200
     cancel_data = cancel_res.json()
     assert cancel_data["current_state"] == "CANCELLED"

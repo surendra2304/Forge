@@ -110,7 +110,9 @@ h1 {
                 )
         return AIUniverseResponse(answer="/* generic */", confidence=0.85, run_id="run_fallback")
 
-    with patch("app.integrations.ai_universe_client.AIUniverseClient.ask", side_effect=mock_ask_impl) as mock_ask:
+    with patch(
+        "app.integrations.ai_universe_client.AIUniverseClient.ask", side_effect=mock_ask_impl
+    ) as mock_ask:
         context = {
             "goal": "Build a responsive web application",
             "file_manifest": ["index.html", "style.css", "app.js"],

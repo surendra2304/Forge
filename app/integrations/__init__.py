@@ -33,5 +33,3 @@ __all__ = [
     "get_futuris_client",
     "get_intelx_client",
 ]
-
-

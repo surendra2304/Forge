@@ -88,7 +88,7 @@ async def test_process_manager_tool(execution_context):
     info = await proc_tool.start_process(
         task_id=task_id,
         process_id="server_1",
-        command="python -c \"import time; time.sleep(10)\"",
+        command='python -c "import time; time.sleep(10)"',
         role="developer",
     )
     assert info.is_running is True

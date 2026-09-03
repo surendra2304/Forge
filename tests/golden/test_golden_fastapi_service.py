@@ -178,14 +178,19 @@ def test_expense_crud_lifecycle():
             "main.py": app_code,
             "README.md": "# Expense Tracker API\n",
         }
+
         async def mock_ask_impl(question: str, mode: str = "auto"):
             for fname in ["test_main.py", "main.py", "README.md"]:
                 if fname in question:
-                    return AIUniverseResponse(answer=responses[fname], confidence=0.95, run_id=f"run_{fname}")
+                    return AIUniverseResponse(
+                        answer=responses[fname], confidence=0.95, run_id=f"run_{fname}"
+                    )
             return AIUniverseResponse(answer=app_code, confidence=0.95, run_id="run_default")
 
         # 4. Autonomous DAG Execution
-        with patch("app.integrations.ai_universe_client.AIUniverseClient.ask", side_effect=mock_ask_impl):
+        with patch(
+            "app.integrations.ai_universe_client.AIUniverseClient.ask", side_effect=mock_ask_impl
+        ):
             task = await orchestrator.run_task(task_id, max_iterations=10)
             assert task.state == TaskState.COMPLETED
 
@@ -218,6 +223,7 @@ def test_expense_crud_lifecycle():
     finally:
         if task_id:
             import shutil
+
             ws_dir = wm.get_task_workspace_dir(task_id)
             if ws_dir.exists():
                 shutil.rmtree(ws_dir, ignore_errors=True)

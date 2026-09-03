@@ -132,6 +132,12 @@ class OrchestratorCore:
             has_existing_codebase=has_existing_codebase,
         )
         dag = ExecutableTaskDAG.from_tree(tree)
+        dag_errors = dag.validate()
+        if dag_errors:
+            error_msg = f"Planning failed due to invalid DAG: {'; '.join(dag_errors)}"
+            logger.error(error_msg)
+            raise ValueError(error_msg)
+
         saved_graph = await self.store.save_task_graph(dag.graph)
 
         await self.store.record_event(
@@ -166,7 +172,9 @@ class OrchestratorCore:
 
         # Ensure task is marked RUNNING
         if task.state != TaskState.RUNNING:
-            task = await self.lifecycle.transition(task_id, TaskState.RUNNING, reason="Executing ready DAG wave")
+            task = await self.lifecycle.transition(
+                task_id, TaskState.RUNNING, reason="Executing ready DAG wave"
+            )
 
         graph = await self.store.get_latest_task_graph_for_project(task_id)
         if not graph:
@@ -190,7 +198,11 @@ class OrchestratorCore:
 
                 if not has_fallback_stub:
                     for n in dag.graph.nodes.values():
-                        if n.result and isinstance(n.result, dict) and n.result.get("fallback_stub"):
+                        if (
+                            n.result
+                            and isinstance(n.result, dict)
+                            and n.result.get("fallback_stub")
+                        ):
                             has_fallback_stub = True
                             break
 
@@ -207,22 +219,28 @@ class OrchestratorCore:
                         payload={"reason": fallback_reason, "fallback_stub": True},
                     )
                 else:
-                    task = await self.lifecycle.transition(task_id, TaskState.COMPLETED, progress_percentage=100)
+                    task = await self.lifecycle.transition(
+                        task_id, TaskState.COMPLETED, progress_percentage=100
+                    )
                     await self.store.record_event(task_id=task_id, event_type="task.completed")
             return task, []
 
         # Execute all ready nodes concurrently in parallel wave
-        async def _execute_single_node(node) -> tuple[str, bool, dict[str, Any] | None, str | None, str]:
+        async def _execute_single_node(
+            node,
+        ) -> tuple[str, bool, dict[str, Any] | None, str | None, str]:
             role_name = node.assigned_agent or "developer"
             agent = self.registry.create_agent(role_name)
             dag.mark_running(node.id)
 
-            logger.info(f"[Parallel Wave] Dispatching node '{node.title}' to specialist agent '{role_name}' in task {task_id}")
+            logger.info(
+                f"[Parallel Wave] Dispatching node '{node.title}' to specialist agent '{role_name}' in task {task_id}"
+            )
             context = self.context_manager.build_agent_context(
                 task_id=task_id,
                 role_name=role_name,
                 node_title=node.title,
-                base_context={"goal": task.goal, "metadata": node.metadata},
+                base_context={"goal": task.goal if task else "", "metadata": node.metadata},
                 engine=self.engine,
             )
 
@@ -297,7 +315,9 @@ class OrchestratorCore:
 
         if dag.is_completed():
             has_fallback_stub = False
-            fallback_reason = "TASK FAILED: Fell back to stub generation. Please check API keys and try again."
+            fallback_reason = (
+                "TASK FAILED: Fell back to stub generation. Please check API keys and try again."
+            )
             try:
                 paths = self.wm.get_workspace_paths(task_id)
                 if paths and (paths.state / "FALLBACK_STUB.json").exists():
@@ -324,10 +344,16 @@ class OrchestratorCore:
                     payload={"reason": fallback_reason, "fallback_stub": True},
                 )
             else:
-                task = await self.lifecycle.transition(task_id, TaskState.COMPLETED, progress_percentage=100)
+                task = await self.lifecycle.transition(
+                    task_id, TaskState.COMPLETED, progress_percentage=100
+                )
                 await self.store.record_event(task_id=task_id, event_type="task.completed")
         else:
-            task = await self.store.update_task_state(task_id, state=task.state, progress_percentage=progress)
+            updated_task = await self.store.update_task_state(
+                task_id, state=task.state, progress_percentage=progress
+            )
+            if updated_task:
+                task = updated_task
 
         return task, executed_nodes
 
@@ -339,7 +365,12 @@ class OrchestratorCore:
         while iterations < max_iterations:
             iterations += 1
             task, executed = await self.step_task(task_id)
-            if task.state in [TaskState.COMPLETED, TaskState.FAILED, TaskState.CANCELLED, TaskState.BLOCKED]:
+            if task.state in [
+                TaskState.COMPLETED,
+                TaskState.FAILED,
+                TaskState.CANCELLED,
+                TaskState.BLOCKED,
+            ]:
                 break
             if not executed:
                 break

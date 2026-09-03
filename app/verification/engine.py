@@ -90,7 +90,9 @@ class VerificationEngine:
 
         report_json = json.dumps(report.model_dump(mode="json"), indent=2)
         self.wm.save_artifact(task_id, "baseline_report.json", report_json)
-        logger.info(f"Baseline captured for task '{task_id}': {passed_count}/{len(evidence_list)} checks passed")
+        logger.info(
+            f"Baseline captured for task '{task_id}': {passed_count}/{len(evidence_list)} checks passed"
+        )
         return report
 
     async def verify_task(
@@ -102,7 +104,9 @@ class VerificationEngine:
         Run the complete battery of verification checks for a task workspace.
         Enforces regression awareness if a baseline report exists.
         """
-        logger.info(f"Initiating verification battery for task '{task_id}' with {len(self.checkers)} checkers")
+        logger.info(
+            f"Initiating verification battery for task '{task_id}' with {len(self.checkers)} checkers"
+        )
         evidence_list: list[VerificationEvidence] = []
 
         # Load baseline report from artifacts if not explicitly passed
@@ -135,20 +139,24 @@ class VerificationEngine:
                     )
                 )
 
-        # Evaluate Regression Guard against baseline
+        # Evaluate Regression Guard across all check categories against baseline
         baseline_comparison = None
         if baseline_report:
             from app.verification.evidence import CheckCategory
-            baseline_test_ev = next((e for e in baseline_report.evidence if e.category == CheckCategory.TEST), None)
-            current_test_ev = next((e for e in evidence_list if e.category == CheckCategory.TEST), None)
 
-            has_regression = False
-            regression_reason = ""
+            regressions = []
 
-            if baseline_test_ev and baseline_test_ev.passed:
-                if current_test_ev and not current_test_ev.passed:
-                    has_regression = True
-                    regression_reason = f"Test suite passed in baseline ({baseline_test_ev.command}) but failed post-modification."
+            # Map baseline checks by check_name
+            baseline_map = {e.check_name: e for e in baseline_report.evidence}
+            for ev in evidence_list:
+                base_ev = baseline_map.get(ev.check_name)
+                if base_ev and base_ev.passed and not ev.passed:
+                    regressions.append(
+                        f"Check '{ev.check_name}' [{ev.category.value}] passed in baseline but failed post-modification (exit={ev.exit_code})."
+                    )
+
+            has_regression = len(regressions) > 0
+            regression_reason = "; ".join(regressions) if has_regression else ""
 
             baseline_comparison = {
                 "baseline_all_passed": baseline_report.all_passed,
@@ -159,7 +167,9 @@ class VerificationEngine:
             }
 
             if has_regression:
-                logger.warning(f"[Task {task_id}] Regression detected: {regression_reason}")
+                logger.warning(
+                    f"[Task {task_id}] Regressions detected against baseline: {regression_reason}"
+                )
                 evidence_list.append(
                     VerificationEvidence(
                         check_name="Baseline Regression Guard",

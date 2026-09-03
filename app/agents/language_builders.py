@@ -118,7 +118,9 @@ class JavaScriptBuilder(BaseLanguageBuilder):
         created_files = []
 
         files = {
-            "package.json": EXPRESS_PACKAGE_JSON.replace("{{app_name}}", "forge-express-app").replace("{{description}}", goal),
+            "package.json": EXPRESS_PACKAGE_JSON.replace(
+                "{{app_name}}", "forge-express-app"
+            ).replace("{{description}}", goal),
             "src/server.js": EXPRESS_SERVER_JS,
             "src/routes/api.js": EXPRESS_ROUTES_API_JS,
             "src/middleware/errorHandler.js": EXPRESS_ERROR_HANDLER_JS,
@@ -161,8 +163,12 @@ class TypeScriptBuilder(BaseLanguageBuilder):
         files = {
             "package.json": NEXTJS_PACKAGE_JSON.replace("{{app_name}}", "forge-nextjs-app"),
             "tsconfig.json": NEXTJS_TSCONFIG_JSON,
-            "app/layout.tsx": NEXTJS_LAYOUT_TSX.replace("{{app_title}}", "FORGE Next App").replace("{{description}}", goal),
-            "app/page.tsx": NEXTJS_PAGE_TSX.replace("{{app_title}}", "FORGE Next App").replace("{{description}}", goal),
+            "app/layout.tsx": NEXTJS_LAYOUT_TSX.replace("{{app_title}}", "FORGE Next App").replace(
+                "{{description}}", goal
+            ),
+            "app/page.tsx": NEXTJS_PAGE_TSX.replace("{{app_title}}", "FORGE Next App").replace(
+                "{{description}}", goal
+            ),
             "app/globals.css": "body { margin: 0; font-family: sans-serif; }\n",
             "app/api/health/route.ts": NEXTJS_API_ROUTE_TS.replace("{{app_name}}", "forge-app"),
             "README.md": f"# {goal}\n\nGenerated autonomously by Project FORGE.\n\n## Usage\n```bash\nnpm install\nnpm run dev\n```\n",
@@ -190,7 +196,11 @@ class FullStackBuilder(BaseLanguageBuilder):
                 "contracts/api_contract.json",
                 "README.md",
             ],
-            verification_checks=["dual_engine_verification", "contract_integrity", "browser_integration"],
+            verification_checks=[
+                "dual_engine_verification",
+                "contract_integrity",
+                "browser_integration",
+            ],
             template_hints={"frontend": "React", "backend": "FastAPI", "contract": "OpenAPI/JSON"},
         )
 
@@ -214,9 +224,13 @@ class FullStackBuilder(BaseLanguageBuilder):
 
         react_files = {
             "package.json": REACT_PACKAGE_JSON.replace("{{app_name}}", "forge-frontend"),
-            "src/Counter.tsx": REACT_COMPONENT_TSX.replace("{{component_name}}", "Counter").replace("{{component_name_lower}}", "counter"),
+            "src/Counter.tsx": REACT_COMPONENT_TSX.replace("{{component_name}}", "Counter").replace(
+                "{{component_name_lower}}", "counter"
+            ),
             "src/Counter.css": REACT_COMPONENT_CSS.replace("{{component_name_lower}}", "counter"),
-            "src/Counter.test.tsx": REACT_COMPONENT_TEST_TSX.replace("{{component_name}}", "Counter"),
+            "src/Counter.test.tsx": REACT_COMPONENT_TEST_TSX.replace(
+                "{{component_name}}", "Counter"
+            ),
         }
 
         for rel_path, content in react_files.items():

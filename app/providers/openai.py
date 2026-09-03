@@ -94,10 +94,7 @@ class OpenAIProvider(BaseModelProvider):
         total_tokens = prompt_tokens + completion_tokens
 
         pricing = OPENAI_MODEL_PRICING.get(self.model_name, (0.0025, 0.010))
-        cost = (
-            (prompt_tokens / 1000.0) * pricing[0]
-            + (completion_tokens / 1000.0) * pricing[1]
-        )
+        cost = (prompt_tokens / 1000.0) * pricing[0] + (completion_tokens / 1000.0) * pricing[1]
 
         return UsageEstimate(
             prompt_tokens=prompt_tokens,
@@ -109,10 +106,7 @@ class OpenAIProvider(BaseModelProvider):
     def _calculate_actual_cost(self, prompt_tokens: int, completion_tokens: int) -> float:
         """Compute USD cost from actual token counts."""
         pricing = OPENAI_MODEL_PRICING.get(self.model_name, (0.0025, 0.010))
-        cost = (
-            (prompt_tokens / 1000.0) * pricing[0]
-            + (completion_tokens / 1000.0) * pricing[1]
-        )
+        cost = (prompt_tokens / 1000.0) * pricing[0] + (completion_tokens / 1000.0) * pricing[1]
         return round(cost, 6)
 
     def capabilities(self) -> ProviderCapabilities:
@@ -166,7 +160,13 @@ class OpenAIProvider(BaseModelProvider):
         while True:
             try:
                 return await api_func(*args, **kwargs)
-            except (TimeoutError, openai.RateLimitError, openai.APITimeoutError, openai.APIConnectionError, openai.InternalServerError) as e:
+            except (
+                TimeoutError,
+                openai.RateLimitError,
+                openai.APITimeoutError,
+                openai.APIConnectionError,
+                openai.InternalServerError,
+            ) as e:
                 retries += 1
                 if retries > self.max_retries:
                     logger.error(f"OpenAI request failed after {self.max_retries} retries: {e}")
@@ -316,7 +316,9 @@ class OpenAIProvider(BaseModelProvider):
                 if parsed is not None and isinstance(parsed, response_model):
                     return parsed
             except Exception as parse_err:
-                logger.debug(f"Native beta parse failed or unsupported: {parse_err}. Falling back to JSON extraction.")
+                logger.debug(
+                    f"Native beta parse failed or unsupported: {parse_err}. Falling back to JSON extraction."
+                )
 
         # 2. Schema-guided JSON fallback with self-healing extraction
         schema_json = json.dumps(response_model.model_json_schema(), indent=2)
@@ -332,7 +334,9 @@ class OpenAIProvider(BaseModelProvider):
                     prompt=augmented_prompt,
                     system_prompt=system_prompt,
                     temperature=temperature,
-                    response_format={"type": "json_object"} if "gpt-4" in self.model_name or "gpt-3.5" in self.model_name else None,
+                    response_format={"type": "json_object"}
+                    if "gpt-4" in self.model_name or "gpt-3.5" in self.model_name
+                    else None,
                     **kwargs,
                 )
                 parsed_dict = self._extract_json(response.content)
@@ -344,7 +348,9 @@ class OpenAIProvider(BaseModelProvider):
                     augmented_prompt += f"\n\nPrevious response failed with error: {e}. Please fix and return ONLY valid JSON."
                     await asyncio.sleep(0.5)
 
-        raise ValueError(f"Failed to generate valid structured output for {response_model.__name__}: {last_error}")
+        raise ValueError(
+            f"Failed to generate valid structured output for {response_model.__name__}: {last_error}"
+        )
 
     def _extract_json(self, text: str) -> dict[str, Any]:
         """Extract JSON object from string with regex tolerance for markdown codeblocks."""

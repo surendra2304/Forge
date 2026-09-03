@@ -50,7 +50,11 @@ async def test_performance_sanity_checker(tmp_path: Path):
     task_id = "test_perf_task_01"
     wm.create_workspace(task_id)
 
-    wm.write_project_file(task_id, "index.html", "<html><head><title>App</title></head><body><h1>Hello</h1></body></html>")
+    wm.write_project_file(
+        task_id,
+        "index.html",
+        "<html><head><title>App</title></head><body><h1>Hello</h1></body></html>",
+    )
     checker = PerformanceSanityChecker()
     ev = await checker.run_check(task_id, engine)
     assert ev.passed is True

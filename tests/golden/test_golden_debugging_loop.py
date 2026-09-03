@@ -45,7 +45,9 @@ async def test_golden_benchmark_automated_debugging_loop(temp_dir: Path):
     verifier = VerificationEngine(engine=engine, wm=wm)
     orchestrator = OrchestratorCore(store=store, wm=wm, engine=engine)
 
-    goal = "Create a robust Metrics Aggregator with statistical calculation functions and unit tests"
+    goal = (
+        "Create a robust Metrics Aggregator with statistical calculation functions and unit tests"
+    )
     requirements = [
         "Compute mean, median, standard deviation, and percentiles for series data",
         "Include unit tests asserting correct mathematical results",
@@ -109,7 +111,9 @@ def test_compute_variance_and_std():
 
         wm.write_project_file(task_id, "main.py", broken_code)
         wm.write_project_file(task_id, "test_main.py", test_code)
-        wm.write_project_file(task_id, "README.md", "# Metrics Aggregator\nStatistical calculation utility.\n")
+        wm.write_project_file(
+            task_id, "README.md", "# Metrics Aggregator\nStatistical calculation utility.\n"
+        )
 
         # 3. Initial Verification: Must detect failure and produce failed evidence
         initial_report = await verifier.verify_task(task_id)

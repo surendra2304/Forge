@@ -109,8 +109,46 @@ class ExecutableTaskDAG:
         completed = sum(1 for n in self.graph.nodes.values() if n.status == TaskState.COMPLETED)
         return int((completed / len(self.graph.nodes)) * 100)
 
+    def validate(self) -> list[str]:
+        """Validate DAG: detect self-dependencies, missing dependencies, and cycles."""
+        errors: list[str] = []
+        for node in self.graph.nodes.values():
+            for dep in node.dependencies:
+                if dep == node.id:
+                    errors.append(f"Self dependency detected on node '{node.id}'")
+                elif dep not in self.graph.nodes:
+                    errors.append(f"Missing dependency on node '{node.id}': '{dep}' not in graph")
+
+        in_degree: dict[str, int] = {nid: 0 for nid in self.graph.nodes}
+        for node in self.graph.nodes.values():
+            for dep in node.dependencies:
+                if dep in in_degree:
+                    in_degree[node.id] += 1
+
+        queue = deque([nid for nid, deg in in_degree.items() if deg == 0])
+        seen = 0
+        while queue:
+            curr = queue.popleft()
+            seen += 1
+            for edge in self.graph.edges:
+                if edge.source == curr:
+                    in_degree[edge.target] -= 1
+                    if in_degree[edge.target] == 0:
+                        queue.append(edge.target)
+
+        if seen != len(self.graph.nodes):
+            errors.append(
+                f"Dependency cycle detected in graph: processed {seen}/{len(self.graph.nodes)} nodes"
+            )
+
+        return errors
+
     def topological_sort(self) -> list[str]:
-        """Return topological ordering of node IDs."""
+        """Return topological ordering of node IDs or raise ValueError if cycle detected."""
+        errors = self.validate()
+        if errors:
+            raise ValueError("; ".join(errors))
+
         in_degree: dict[str, int] = {nid: 0 for nid in self.graph.nodes}
         for node in self.graph.nodes.values():
             for dep in node.dependencies:
@@ -128,5 +166,10 @@ class ExecutableTaskDAG:
                     in_degree[edge.target] -= 1
                     if in_degree[edge.target] == 0:
                         queue.append(edge.target)
+
+        if len(ordered) != len(self.graph.nodes):
+            raise ValueError(
+                f"Graph contains dependency cycles: ordered {len(ordered)}/{len(self.graph.nodes)} nodes"
+            )
 
         return ordered

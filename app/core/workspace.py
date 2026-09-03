@@ -16,6 +16,7 @@ logger = get_logger("core.workspace")
 
 class WorkspacePaths(BaseModel):
     """Encapsulates all standard subdirectories of an isolated task workspace."""
+
     root: Path
     project: Path
     artifacts: Path
@@ -66,11 +67,18 @@ class WorkspaceManager:
         """
         import subprocess
 
-        root_dir = (
-            custom_base
-            if custom_base
-            else self.get_task_workspace_dir(task_id)
-        )
+        if custom_base:
+            base_workspaces = (self.settings.base_dir / self.settings.workspaces_dir).resolve()
+            resolved_custom = Path(custom_base).resolve()
+            try:
+                resolved_custom.relative_to(base_workspaces)
+            except ValueError as exc:
+                raise ValueError(
+                    f"Custom workspace base '{custom_base}' escapes trusted workspaces root '{base_workspaces}'"
+                ) from exc
+            root_dir = resolved_custom
+        else:
+            root_dir = self.get_task_workspace_dir(task_id).resolve()
 
         subdirs = {
             "project": root_dir / "project",
@@ -103,12 +111,16 @@ class WorkspaceManager:
                 raise RuntimeError(f"Git clone failed for '{repo_url}': {e.stderr}") from e
         elif local_path:
             src_path = Path(local_path).resolve()
-            logger.info(f"Copying local codebase from '{src_path}' into task workspace {task_id}...")
+            logger.info(
+                f"Copying local codebase from '{src_path}' into task workspace {task_id}..."
+            )
             if not src_path.exists():
                 raise FileNotFoundError(f"Local codebase path does not exist: {src_path}")
             subdirs["project"].mkdir(parents=True, exist_ok=True)
             shutil.copytree(src_path, subdirs["project"], dirs_exist_ok=True)
-            logger.info(f"Successfully copied local codebase from '{src_path}' into {subdirs['project']}")
+            logger.info(
+                f"Successfully copied local codebase from '{src_path}' into {subdirs['project']}"
+            )
         else:
             subdirs["project"].mkdir(parents=True, exist_ok=True)
 
@@ -152,11 +164,18 @@ class WorkspaceManager:
     def write_project_file(self, task_id: str, relative_path: str, content: str) -> Path:
         """Safely write a file inside the task's project directory."""
         paths = self.get_workspace_paths(task_id) or self.create_workspace(task_id)
-        target = (paths.project / relative_path).resolve()
+        project_root = paths.project.resolve()
+        target = (
+            project_root / relative_path
+            if not Path(relative_path).is_absolute()
+            else Path(relative_path)
+        ).resolve()
 
         # Prevent directory traversal outside project dir
-        if not str(target).startswith(str(paths.project.resolve())):
-            raise ValueError(f"Path traversal detected: {relative_path}")
+        try:
+            target.relative_to(project_root)
+        except ValueError as exc:
+            raise ValueError(f"Path traversal detected: {relative_path}") from exc
 
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(content, encoding="utf-8")
@@ -167,18 +186,34 @@ class WorkspaceManager:
         paths = self.get_workspace_paths(task_id)
         if not paths:
             return None
-        target = (paths.project / relative_path).resolve()
-        if not str(target).startswith(str(paths.project.resolve())) or not target.exists():
+        project_root = paths.project.resolve()
+        target = (
+            project_root / relative_path
+            if not Path(relative_path).is_absolute()
+            else Path(relative_path)
+        ).resolve()
+        try:
+            target.relative_to(project_root)
+        except ValueError:
+            return None
+        if not target.exists() or not target.is_file():
             return None
         return target.read_text(encoding="utf-8")
 
     def save_artifact(self, task_id: str, artifact_name: str, content: bytes | str) -> Path:
         """Save a generated artifact to the task's artifacts directory."""
         paths = self.get_workspace_paths(task_id) or self.create_workspace(task_id)
-        target = (paths.artifacts / artifact_name).resolve()
+        artifacts_root = paths.artifacts.resolve()
+        target = (
+            artifacts_root / artifact_name
+            if not Path(artifact_name).is_absolute()
+            else Path(artifact_name)
+        ).resolve()
 
-        if not str(target).startswith(str(paths.artifacts.resolve())):
-            raise ValueError(f"Invalid artifact path: {artifact_name}")
+        try:
+            target.relative_to(artifacts_root)
+        except ValueError as exc:
+            raise ValueError(f"Invalid artifact path: {artifact_name}") from exc
 
         target.parent.mkdir(parents=True, exist_ok=True)
         if isinstance(content, str):
@@ -196,7 +231,18 @@ class WorkspaceManager:
 
     def cleanup_workspace(self, task_id: str) -> bool:
         """Safely remove a task workspace directory."""
-        root_dir = self.get_task_workspace_dir(task_id)
+        base_workspaces = (self.settings.base_dir / self.settings.workspaces_dir).resolve()
+        root_dir = self.get_task_workspace_dir(task_id).resolve()
+        try:
+            root_dir.relative_to(base_workspaces)
+        except ValueError as exc:
+            raise ValueError(
+                f"Refusing to clean up workspace '{root_dir}' outside trusted workspaces root '{base_workspaces}'"
+            ) from exc
+
+        if root_dir == base_workspaces:
+            raise ValueError("Refusing to delete entire workspaces root directory.")
+
         if root_dir.exists():
             shutil.rmtree(root_dir, ignore_errors=True)
             logger.info(f"Cleaned up workspace at {root_dir}")

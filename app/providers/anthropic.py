@@ -62,7 +62,9 @@ class AnthropicProvider(BaseModelProvider):
         **kwargs,
     ):
         settings = get_settings()
-        resolved_model = model_name or settings.anthropic_default_model or "claude-3-5-sonnet-20241022"
+        resolved_model = (
+            model_name or settings.anthropic_default_model or "claude-3-5-sonnet-20241022"
+        )
         super().__init__(model_name=resolved_model, **kwargs)
 
         self.api_key = api_key or settings.anthropic_api_key
@@ -88,10 +90,7 @@ class AnthropicProvider(BaseModelProvider):
         total_tokens = prompt_tokens + completion_tokens
 
         pricing = ANTHROPIC_MODEL_PRICING.get(self.model_name, (0.003, 0.015))
-        cost = (
-            (prompt_tokens / 1000.0) * pricing[0]
-            + (completion_tokens / 1000.0) * pricing[1]
-        )
+        cost = (prompt_tokens / 1000.0) * pricing[0] + (completion_tokens / 1000.0) * pricing[1]
 
         return UsageEstimate(
             prompt_tokens=prompt_tokens,
@@ -103,10 +102,7 @@ class AnthropicProvider(BaseModelProvider):
     def _calculate_actual_cost(self, prompt_tokens: int, completion_tokens: int) -> float:
         """Compute USD cost from actual token counts."""
         pricing = ANTHROPIC_MODEL_PRICING.get(self.model_name, (0.003, 0.015))
-        cost = (
-            (prompt_tokens / 1000.0) * pricing[0]
-            + (completion_tokens / 1000.0) * pricing[1]
-        )
+        cost = (prompt_tokens / 1000.0) * pricing[0] + (completion_tokens / 1000.0) * pricing[1]
         return round(cost, 6)
 
     def capabilities(self) -> ProviderCapabilities:
@@ -165,7 +161,13 @@ class AnthropicProvider(BaseModelProvider):
         while True:
             try:
                 return await api_func(*args, **kwargs)
-            except (TimeoutError, anthropic.RateLimitError, anthropic.APITimeoutError, anthropic.APIConnectionError, anthropic.InternalServerError) as e:
+            except (
+                TimeoutError,
+                anthropic.RateLimitError,
+                anthropic.APITimeoutError,
+                anthropic.APIConnectionError,
+                anthropic.InternalServerError,
+            ) as e:
                 retries += 1
                 if retries > self.max_retries:
                     logger.error(f"Anthropic request failed after {self.max_retries} retries: {e}")
@@ -215,9 +217,7 @@ class AnthropicProvider(BaseModelProvider):
         if system_prompt:
             request_kwargs["system"] = system_prompt
 
-        response = await self._execute_with_retry(
-            self.client.messages.create, **request_kwargs
-        )
+        response = await self._execute_with_retry(self.client.messages.create, **request_kwargs)
 
         content = self._extract_text_content(response)
         finish_reason = getattr(response, "stop_reason", "stop") or "stop"
@@ -316,17 +316,24 @@ class AnthropicProvider(BaseModelProvider):
             if system_prompt:
                 request_kwargs["system"] = system_prompt
 
-            response = await self._execute_with_retry(
-                self.client.messages.create, **request_kwargs
-            )
+            response = await self._execute_with_retry(self.client.messages.create, **request_kwargs)
 
             for block in response.content:
-                if getattr(block, "type", None) == "tool_use" and getattr(block, "name", None) == tool_name:
+                if (
+                    getattr(block, "type", None) == "tool_use"
+                    and getattr(block, "name", None) == tool_name
+                ):
                     return response_model.model_validate(block.input)
-                if isinstance(block, dict) and block.get("type") == "tool_use" and block.get("name") == tool_name:
+                if (
+                    isinstance(block, dict)
+                    and block.get("type") == "tool_use"
+                    and block.get("name") == tool_name
+                ):
                     return response_model.model_validate(block.get("input", {}))
         except Exception as tool_err:
-            logger.debug(f"Anthropic tool calling for structured output failed: {tool_err}. Falling back to prompt JSON extraction.")
+            logger.debug(
+                f"Anthropic tool calling for structured output failed: {tool_err}. Falling back to prompt JSON extraction."
+            )
 
         # 2. Schema-guided JSON fallback
         schema_json = json.dumps(response_model.model_json_schema(), indent=2)
@@ -348,12 +355,18 @@ class AnthropicProvider(BaseModelProvider):
                 return response_model.model_validate(parsed_dict)
             except (json.JSONDecodeError, ValidationError) as e:
                 last_error = e
-                logger.warning(f"Anthropic structured output attempt {attempt + 1} validation failed: {e}")
+                logger.warning(
+                    f"Anthropic structured output attempt {attempt + 1} validation failed: {e}"
+                )
                 if attempt < self.max_retries:
-                    augmented_prompt += f"\n\nPrevious response was invalid: {e}. Return ONLY valid JSON."
+                    augmented_prompt += (
+                        f"\n\nPrevious response was invalid: {e}. Return ONLY valid JSON."
+                    )
                     await asyncio.sleep(0.5)
 
-        raise ValueError(f"Failed to generate valid structured output for {response_model.__name__}: {last_error}")
+        raise ValueError(
+            f"Failed to generate valid structured output for {response_model.__name__}: {last_error}"
+        )
 
     def _extract_json(self, text: str) -> dict[str, Any]:
         """Extract JSON object from string with regex tolerance for markdown codeblocks."""

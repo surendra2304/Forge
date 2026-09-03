@@ -16,6 +16,7 @@ from app.memory.models import TaskState
 
 class PipelineStage(str, Enum):
     """The 8 canonical stages of the FORGE engineering tree."""
+
     PROJECT = "Project"
     REQUIREMENTS = "Requirements"
     ARCHITECTURE = "Architecture"
@@ -34,22 +35,32 @@ class TreeNodeType(str, Enum):
 
 class TaskTreeNode(BaseModel):
     """A node inside the hierarchical planning tree."""
+
     id: str = Field(default_factory=lambda: str(uuid4()))
     title: str = Field(..., description="Short node summary")
-    description: str = Field(default="", description="Detailed step instructions or acceptance criteria")
+    description: str = Field(
+        default="", description="Detailed step instructions or acceptance criteria"
+    )
     stage: PipelineStage = Field(..., description="Pipeline stage classification")
     node_type: TreeNodeType = Field(default=TreeNodeType.TASK)
     assigned_role: str = Field(default="developer", description="Specialist agent role assigned")
-    dependencies: list[str] = Field(default_factory=list, description="IDs of prerequisite tree nodes")
-    children: list["TaskTreeNode"] = Field(default_factory=list, description="Sub-tasks or nested items")
+    dependencies: list[str] = Field(
+        default_factory=list, description="IDs of prerequisite tree nodes"
+    )
+    children: list["TaskTreeNode"] = Field(
+        default_factory=list, description="Sub-tasks or nested items"
+    )
     status: TaskState = Field(default=TaskState.PENDING)
-    verification_gate_criteria: str | None = Field(default=None, description="Criteria if this is a gate")
+    verification_gate_criteria: str | None = Field(
+        default=None, description="Criteria if this is a gate"
+    )
     result_data: dict[str, Any] | None = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 class HierarchicalTaskTree(BaseModel):
     """Complete 8-stage tree representation of an engineering project."""
+
     project_id: str
     goal: str
     root: TaskTreeNode

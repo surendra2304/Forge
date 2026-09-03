@@ -36,7 +36,11 @@ def test_template_variable_rendering():
     registry = TemplateRegistry()
     files = registry.render_template(
         "portfolio-web",
-        {"project_name": "Alice Portfolio", "author": "Alice Dev", "description": "Senior Engineer"},
+        {
+            "project_name": "Alice Portfolio",
+            "author": "Alice Dev",
+            "description": "Senior Engineer",
+        },
     )
     assert "index.html" in files
     assert "Alice Portfolio" in files["index.html"]
@@ -49,7 +53,9 @@ def test_template_analytics():
     analytics = TemplateAnalytics()
     analytics.record_usage("fastapi-crud", success=True, duration_seconds=10.0)
     analytics.record_usage("fastapi-crud", success=True, duration_seconds=20.0)
-    analytics.record_usage("fastapi-crud", success=False, duration_seconds=15.0, error_reason="Missing dependency")
+    analytics.record_usage(
+        "fastapi-crud", success=False, duration_seconds=15.0, error_reason="Missing dependency"
+    )
 
     stats = analytics.get_stats("fastapi-crud")
     assert stats.usage_count >= 3
@@ -77,7 +83,9 @@ def test_smart_template_matcher():
     assert res_ecom.matched_template_id == "ecommerce-web"
 
     # Test fallback
-    res_scratch = SmartTemplateMatcher.match_goal("Synthesize an esoteric quantum hypergraph compiler")
+    res_scratch = SmartTemplateMatcher.match_goal(
+        "Synthesize an esoteric quantum hypergraph compiler"
+    )
     assert res_scratch.use_hybrid_scaffold is False
 
 

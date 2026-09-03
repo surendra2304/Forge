@@ -17,6 +17,7 @@ logger = get_logger("analytics.task_analytics")
 
 class AnalyticsSummary(BaseModel):
     """Overall aggregate metrics for FORGE task execution."""
+
     total_tasks: int = 0
     completed_tasks: int = 0
     failed_tasks: int = 0
@@ -28,6 +29,7 @@ class AnalyticsSummary(BaseModel):
 
 class TypePerformance(BaseModel):
     """Performance metrics segmented by project category."""
+
     project_type: str
     total_tasks: int = 0
     completed_tasks: int = 0
@@ -39,6 +41,7 @@ class TypePerformance(BaseModel):
 
 class FailureAnalysis(BaseModel):
     """Distribution of failure classes and root causes."""
+
     total_failures: int = 0
     failure_types: dict[str, int] = Field(default_factory=dict)
     recent_failure_reasons: list[dict[str, Any]] = Field(default_factory=list)
@@ -54,9 +57,14 @@ class TaskAnalyticsService:
     def _infer_project_type(self, goal: str) -> str:
         """Categorize task goal into project type."""
         g = goal.lower()
-        if any(k in g for k in ["website", "landing", "html", "portfolio", "css", "frontend", "dashboard"]):
+        if any(
+            k in g
+            for k in ["website", "landing", "html", "portfolio", "css", "frontend", "dashboard"]
+        ):
             return "website"
-        elif any(k in g for k in ["fastapi", "rest api", "backend", "database", "sqlite", "service"]):
+        elif any(
+            k in g for k in ["fastapi", "rest api", "backend", "database", "sqlite", "service"]
+        ):
             return "api"
         elif any(k in g for k in ["cli", "command-line", "terminal", "todo"]):
             return "cli"
@@ -170,12 +178,14 @@ class TaskAnalyticsService:
             else:
                 distribution["other"] += 1
 
-            recent_reasons.append({
-                "task_id": t.id,
-                "goal": t.goal,
-                "error": msg,
-                "failed_at": t.updated_at.isoformat() if t.updated_at else None,
-            })
+            recent_reasons.append(
+                {
+                    "task_id": t.id,
+                    "goal": t.goal,
+                    "error": msg,
+                    "failed_at": t.updated_at.isoformat() if t.updated_at else None,
+                }
+            )
 
         return FailureAnalysis(
             total_failures=len(failed_tasks),

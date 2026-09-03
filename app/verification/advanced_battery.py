@@ -18,6 +18,7 @@ logger = get_logger("verification.advanced_battery")
 
 class VerificationCheck(BaseModel):
     """Standardized outcome for an individual verification check."""
+
     name: str
     category: str  # security, quality, performance, browser
     status: str = "pass"  # pass, fail, warn
@@ -41,7 +42,7 @@ SECRET_PATTERNS = {
     "OpenAI API Key": r"sk-[a-zA-Z0-9]{20,48}",
     "GitHub Token": r"gh[pousr]_[0-9a-zA-Z]{36}",
     "Generic Hardcoded Password": r'(?i)(?:password|passwd|pwd|secret|api_key|apikey)\s*=\s*["\'](?!default|test|placeholder|sample|none|changeme|[a-z0-9_-]{0,4}["\'])[a-zA-Z0-9!@#$%^&*()_+=-]{8,}["\']',
-    "Database Connection String": r'(?i)(?:postgres|postgresql|mysql|mongodb|redis):\/\/[a-zA-Z0-9_-]+:[a-zA-Z0-9!@#$%^&*()_+=-]+@[a-zA-Z0-9.-]+:[0-9]+',
+    "Database Connection String": r"(?i)(?:postgres|postgresql|mysql|mongodb|redis):\/\/[a-zA-Z0-9_-]+:[a-zA-Z0-9!@#$%^&*()_+=-]+@[a-zA-Z0-9.-]+:[0-9]+",
 }
 
 
@@ -56,9 +57,24 @@ class AdvancedSecurityVerifier:
         found_secrets: list[dict[str, Any]] = []
 
         for p in self.workspace_path.rglob("*"):
-            if not p.is_file() or p.name.startswith(".") or "node_modules" in str(p) or ".git" in str(p):
+            if (
+                not p.is_file()
+                or p.name.startswith(".")
+                or "node_modules" in str(p)
+                or ".git" in str(p)
+            ):
                 continue
-            if p.suffix.lower() not in [".py", ".js", ".ts", ".json", ".env", ".yaml", ".yml", ".html", ".md"]:
+            if p.suffix.lower() not in [
+                ".py",
+                ".js",
+                ".ts",
+                ".json",
+                ".env",
+                ".yaml",
+                ".yml",
+                ".html",
+                ".md",
+            ]:
                 continue
 
             try:
@@ -67,12 +83,16 @@ class AdvancedSecurityVerifier:
                     for secret_name, pattern in SECRET_PATTERNS.items():
                         match = re.search(pattern, line)
                         if match:
-                            found_secrets.append({
-                                "file": p.name,
-                                "line": line_idx,
-                                "type": secret_name,
-                                "snippet": f"{line[:match.start()]}***REDACTED***{line[match.end():]}"[:100],
-                            })
+                            found_secrets.append(
+                                {
+                                    "file": p.name,
+                                    "line": line_idx,
+                                    "type": secret_name,
+                                    "snippet": f"{line[: match.start()]}***REDACTED***{line[match.end() :]}"[
+                                        :100
+                                    ],
+                                }
+                            )
             except Exception as e:
                 logger.debug(f"Could not read file {p}: {e}")
 
@@ -84,7 +104,7 @@ class AdvancedSecurityVerifier:
                 evidence={"secrets_found_count": len(found_secrets), "violations": found_secrets},
                 fix_suggestions=[
                     "Extract hardcoded credentials into environment variables accessed via os.getenv() or a .env file.",
-                    "Use secret management or configuration injection instead of committing plaintext tokens."
+                    "Use secret management or configuration injection instead of committing plaintext tokens.",
                 ],
             )
 
@@ -92,7 +112,9 @@ class AdvancedSecurityVerifier:
             name="Hardcoded Secrets Scan",
             category="security",
             status="pass",
-            evidence={"scanned_files": sum(1 for _ in self.workspace_path.rglob("*") if _.is_file())},
+            evidence={
+                "scanned_files": sum(1 for _ in self.workspace_path.rglob("*") if _.is_file())
+            },
         )
 
     def scan_dangerous_functions(self) -> VerificationCheck:
@@ -106,33 +128,47 @@ class AdvancedSecurityVerifier:
                     # Check eval() / exec()
                     if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
                         if node.func.id in ["eval", "exec"]:
-                            violations.append({
-                                "file": py_file.name,
-                                "line": getattr(node, "lineno", 0),
-                                "dangerous_call": node.func.id,
-                                "reason": f"Arbitrary code execution risk via {node.func.id}()",
-                            })
+                            violations.append(
+                                {
+                                    "file": py_file.name,
+                                    "line": getattr(node, "lineno", 0),
+                                    "dangerous_call": node.func.id,
+                                    "reason": f"Arbitrary code execution risk via {node.func.id}()",
+                                }
+                            )
 
                     # Check os.system()
                     elif isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
-                        if node.func.attr == "system" and isinstance(node.func.value, ast.Name) and node.func.value.id == "os":
-                            violations.append({
-                                "file": py_file.name,
-                                "line": getattr(node, "lineno", 0),
-                                "dangerous_call": "os.system",
-                                "reason": "Shell injection vulnerability via os.system()",
-                            })
+                        if (
+                            node.func.attr == "system"
+                            and isinstance(node.func.value, ast.Name)
+                            and node.func.value.id == "os"
+                        ):
+                            violations.append(
+                                {
+                                    "file": py_file.name,
+                                    "line": getattr(node, "lineno", 0),
+                                    "dangerous_call": "os.system",
+                                    "reason": "Shell injection vulnerability via os.system()",
+                                }
+                            )
 
                         # Check subprocess.Popen/run with shell=True
                         elif node.func.attr in ["Popen", "run", "call", "check_output"]:
                             for keyword in node.keywords:
-                                if keyword.arg == "shell" and isinstance(keyword.value, ast.Constant) and keyword.value.value is True:
-                                    violations.append({
-                                        "file": py_file.name,
-                                        "line": getattr(node, "lineno", 0),
-                                        "dangerous_call": f"subprocess.{node.func.attr}(..., shell=True)",
-                                        "reason": "Shell execution risk with shell=True",
-                                    })
+                                if (
+                                    keyword.arg == "shell"
+                                    and isinstance(keyword.value, ast.Constant)
+                                    and keyword.value.value is True
+                                ):
+                                    violations.append(
+                                        {
+                                            "file": py_file.name,
+                                            "line": getattr(node, "lineno", 0),
+                                            "dangerous_call": f"subprocess.{node.func.attr}(..., shell=True)",
+                                            "reason": "Shell execution risk with shell=True",
+                                        }
+                                    )
             except Exception as e:
                 logger.debug(f"AST parse error in {py_file}: {e}")
 
@@ -144,7 +180,7 @@ class AdvancedSecurityVerifier:
                 evidence={"dangerous_calls_count": len(violations), "violations": violations},
                 fix_suggestions=[
                     "Replace eval() or exec() with ast.literal_eval() or structured parsers (e.g. json.loads).",
-                    "Replace os.system() and subprocess(..., shell=True) with subprocess.run(['cmd', 'arg1'], shell=False)."
+                    "Replace os.system() and subprocess(..., shell=True) with subprocess.run(['cmd', 'arg1'], shell=False).",
                 ],
             )
 
@@ -173,19 +209,23 @@ class AdvancedSecurityVerifier:
 
                 if pkg_name in KNOWN_VULNERABLE_PACKAGES:
                     cve_info = KNOWN_VULNERABLE_PACKAGES[pkg_name]
-                    vulnerabilities.append({
-                        "package": pkg_name,
-                        "installed_version": version or "unspecified",
-                        "cve": cve_info["cve"],
-                        "severity": cve_info["severity"],
-                        "max_vulnerable_version": cve_info["max_vulnerable_version"],
-                    })
+                    vulnerabilities.append(
+                        {
+                            "package": pkg_name,
+                            "installed_version": version or "unspecified",
+                            "cve": cve_info["cve"],
+                            "severity": cve_info["severity"],
+                            "max_vulnerable_version": cve_info["max_vulnerable_version"],
+                        }
+                    )
 
         if vulnerabilities:
             return VerificationCheck(
                 name="Dependency Vulnerability Scan",
                 category="security",
-                status="warn" if all(v["severity"] != "CRITICAL" for v in vulnerabilities) else "fail",
+                status="warn"
+                if all(v["severity"] != "CRITICAL" for v in vulnerabilities)
+                else "fail",
                 evidence={"vulnerable_dependencies": vulnerabilities},
                 fix_suggestions=[
                     f"Upgrade package {v['package']} beyond version {v['max_vulnerable_version']} to patch {v['cve']}."
@@ -213,16 +253,24 @@ class AdvancedSecurityVerifier:
                     if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
                         # Check if function has router decorator: @router.get/post/put/delete or @app.get/post
                         has_route_decorator = any(
-                            (isinstance(d, ast.Call) and isinstance(d.func, ast.Attribute) and d.func.attr in ["get", "post", "put", "delete", "patch"])
+                            (
+                                isinstance(d, ast.Call)
+                                and isinstance(d.func, ast.Attribute)
+                                and d.func.attr in ["get", "post", "put", "delete", "patch"]
+                            )
                             for d in node.decorator_list
                         )
                         if has_route_decorator:
                             endpoint_count += 1
                             # Check if arguments have type annotations or Pydantic models
                             has_validation = any(
-                                arg.annotation is not None for arg in node.args.args if arg.arg not in ["self", "cls", "request"]
+                                arg.annotation is not None
+                                for arg in node.args.args
+                                if arg.arg not in ["self", "cls", "request"]
                             )
-                            if has_validation or not [a for a in node.args.args if a.arg not in ["self", "cls", "request"]]:
+                            if has_validation or not [
+                                a for a in node.args.args if a.arg not in ["self", "cls", "request"]
+                            ]:
                                 validated_endpoint_count += 1
             except Exception as e:
                 logger.debug(f"Error checking input validation in {py_file}: {e}")
@@ -263,6 +311,7 @@ class AdvancedSecurityVerifier:
 
 class VerificationManifest(BaseModel):
     """Complete consolidated verification manifest with per-check details."""
+
     workspace_path: str
     overall_status: str  # pass, fail, warn
     total_checks: int
@@ -299,7 +348,11 @@ class AdvancedVerificationEngine:
         # Convert detailed scanner findings into VerificationChecks
         if sec_report.findings:
             for finding in sec_report.findings:
-                status = "fail" if finding.severity in [SecuritySeverity.CRITICAL, SecuritySeverity.HIGH] else "warn"
+                status = (
+                    "fail"
+                    if finding.severity in [SecuritySeverity.CRITICAL, SecuritySeverity.HIGH]
+                    else "warn"
+                )
                 checks.append(
                     VerificationCheck(
                         name=f"[{finding.severity.value}] {finding.check_name}",
@@ -321,7 +374,10 @@ class AdvancedVerificationEngine:
                     name="Pre-Verification Output Security Scanner",
                     category="security",
                     status="pass",
-                    evidence={"scanned_files": sec_report.scanned_files_count, "vulnerabilities_found": 0},
+                    evidence={
+                        "scanned_files": sec_report.scanned_files_count,
+                        "vulnerabilities_found": 0,
+                    },
                 )
             )
 
@@ -353,4 +409,3 @@ class AdvancedVerificationEngine:
         )
         manifest.save_to_workspace(workspace_path)
         return manifest
-

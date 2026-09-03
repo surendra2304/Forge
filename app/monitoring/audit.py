@@ -17,6 +17,7 @@ logger = get_logger("monitoring.audit")
 
 class AuditEvent(BaseModel):
     """Structured audit log entry for critical system events."""
+
     event_type: str  # task_submitted, task_cancelled, proposal_applied, backup_created
     timestamp: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
     task_id: str | None = None

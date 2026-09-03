@@ -15,6 +15,7 @@ class TemplateEngine:
     @classmethod
     def render(cls, template_text: str, context: dict[str, Any]) -> str:
         """Replace {{variable}} placeholders with values from context."""
+
         def replacer(match: re.Match) -> str:
             key = match.group(1).strip()
             val = context.get(key)

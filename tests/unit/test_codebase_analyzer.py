@@ -27,7 +27,9 @@ async def test_codebase_analyzer_manifest_and_summary_generation(temp_dir: Path)
     # Scaffold existing codebase files
     wm.write_project_file(task_id, "package.json", '{"name": "analytics-ui", "version": "1.0.0"}')
     wm.write_project_file(task_id, "requirements.txt", "fastapi>=0.100.0\nuvicorn>=0.22.0\n")
-    wm.write_project_file(task_id, "README.md", "# Analytics Service\nFull-stack telemetry tracker.\n")
+    wm.write_project_file(
+        task_id, "README.md", "# Analytics Service\nFull-stack telemetry tracker.\n"
+    )
     wm.write_project_file(task_id, "main.py", 'print("Analytics Service Running")')
 
     mock_summary_output = """

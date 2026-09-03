@@ -26,6 +26,7 @@ class ProviderTier(str, Enum):
 
 class ProviderChainResult(BaseModel):
     """Result of file synthesis through the fallback chain."""
+
     filename: str
     code: str
     tier_used: ProviderTier
@@ -60,7 +61,9 @@ class ProviderChain:
             ai_res = await self.primary_client.ask(question=prompt, mode="auto")
             if ai_res and ai_res.confidence >= 0.70 and ai_res.answer and ai_res.answer.strip():
                 clean_code = self._clean_markdown_fences(ai_res.answer, filename)
-                logger.info(f"File '{filename}' synthesized via AI-Universe (confidence={ai_res.confidence:.2f})")
+                logger.info(
+                    f"File '{filename}' synthesized via AI-Universe (confidence={ai_res.confidence:.2f})"
+                )
                 return ProviderChainResult(
                     filename=filename,
                     code=clean_code,
@@ -71,9 +74,13 @@ class ProviderChain:
                 )
             else:
                 conf = ai_res.confidence if ai_res else 0.0
-                logger.warning(f"AI Universe returned low confidence ({conf:.2f}) for '{filename}'. Falling back to Tier 2.")
+                logger.warning(
+                    f"AI Universe returned low confidence ({conf:.2f}) for '{filename}'. Falling back to Tier 2."
+                )
         except Exception as e:
-            logger.warning(f"AI Universe call failed for '{filename}' ({e}). Falling back to Tier 2.")
+            logger.warning(
+                f"AI Universe call failed for '{filename}' ({e}). Falling back to Tier 2."
+            )
 
         # --- Tier 2: Direct / Configured LLM Provider ---
         if self.fallback_provider:
@@ -86,18 +93,20 @@ class ProviderChain:
                 )
                 llm_res = await self.fallback_provider.generate(llm_prompt)
                 if llm_res and llm_res.content and "### File:" in llm_res.content:
-                    clean_code = self._extract_file_content(llm_res.content, filename)
-                    if clean_code:
+                    extracted_code = self._extract_file_content(llm_res.content, filename)
+                    if extracted_code:
                         logger.info(f"File '{filename}' synthesized via Direct/LLM Provider.")
                         return ProviderChainResult(
                             filename=filename,
-                            code=clean_code,
+                            code=extracted_code,
                             tier_used=ProviderTier.DIRECT,
                             confidence=0.85,
                             reason="Direct/LLM Provider synthesis",
                         )
             except Exception as e:
-                logger.warning(f"Direct Provider call failed for '{filename}' ({e}). Falling back to Tier 3.")
+                logger.warning(
+                    f"Direct Provider call failed for '{filename}' ({e}). Falling back to Tier 3."
+                )
 
         # --- Tier 3: Deterministic Template Synthesis ---
         builder = detect_project_type(goal, requirements)
@@ -109,7 +118,7 @@ class ProviderChain:
             if filename.endswith(".py"):
                 template_code = f'"""\n{goal}\n"""\n\ndef main():\n    print("Executing {filename}")\n    return 0\n\nif __name__ == "__main__":\n    main()\n'
             elif filename.endswith(".html"):
-                template_code = f'<!DOCTYPE html>\n<html><head><title>{goal}</title></head><body><h1>{goal}</h1></body></html>'
+                template_code = f"<!DOCTYPE html>\n<html><head><title>{goal}</title></head><body><h1>{goal}</h1></body></html>"
             elif filename.endswith(".css"):
                 template_code = "body { font-family: sans-serif; margin: 0; padding: 2rem; }\n"
             elif filename.endswith(".js"):
@@ -140,7 +149,9 @@ class ProviderChain:
 
     def _extract_file_content(self, text: str, filename: str) -> str | None:
         """Extract delimited content from LLM output."""
-        pattern = rf"###\s*File:\s*{re.escape(filename)}[\s\S]*?```[a-zA-Z0-9_\-]*\r?\n([\s\S]*?)```"
+        pattern = (
+            rf"###\s*File:\s*{re.escape(filename)}[\s\S]*?```[a-zA-Z0-9_\-]*\r?\n([\s\S]*?)```"
+        )
         match = re.search(pattern, text)
         if match:
             return match.group(1).strip()
@@ -177,7 +188,5 @@ class ProviderChain:
             "direct_percentage": direct_pct,
             "template_percentage": template_pct,
             "summary": summary,
-            "tier_breakdown": {
-                r.filename: r.tier_used.value for r in results
-            },
+            "tier_breakdown": {r.filename: r.tier_used.value for r in results},
         }

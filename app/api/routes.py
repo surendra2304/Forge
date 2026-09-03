@@ -44,6 +44,7 @@ router = APIRouter()
 
 # --- Dependencies ---
 
+
 def get_state_store() -> StateStore:
     return StateStore(db_manager)
 
@@ -65,6 +66,7 @@ def get_workspace_manager() -> WorkspaceManager:
 
 
 # --- System & Diagnostics ---
+
 
 @router.get("/health", response_model=HealthResponse, summary="System Health & Diagnostic Check")
 async def health_check(
@@ -96,7 +98,9 @@ async def health_check(
     )
 
 
-@router.get("/capabilities", response_model=EngineCapabilitiesResponse, summary="Get FORGE Capabilities")
+@router.get(
+    "/capabilities", response_model=EngineCapabilitiesResponse, summary="Get FORGE Capabilities"
+)
 async def get_capabilities(
     settings: Settings = Depends(get_settings),
     provider: BaseModelProvider = Depends(get_default_provider),
@@ -118,13 +122,16 @@ async def get_capabilities(
     )
 
 
-@router.get("/agents", response_model=list[AgentCapability], summary="List Engineering Agent Capabilities")
+@router.get(
+    "/agents", response_model=list[AgentCapability], summary="List Engineering Agent Capabilities"
+)
 async def list_agents() -> list[AgentCapability]:
     """Return available engineering agent personas and their tool/task specializations."""
     return agent_registry.list_all()
 
 
 # --- Task Operations ---
+
 
 @router.post(
     "/tasks",
@@ -167,7 +174,9 @@ async def create_task(
     )
 
 
-@router.get("/tasks/{task_id}", response_model=TaskDetailResponse, summary="Inspect Task Progress & State")
+@router.get(
+    "/tasks/{task_id}", response_model=TaskDetailResponse, summary="Inspect Task Progress & State"
+)
 async def get_task(
     task_id: str,
     store: StateStore = Depends(get_state_store),
@@ -175,9 +184,13 @@ async def get_task(
     """Retrieve full task status, progress, budget consumed, and workspace paths."""
     task = await store.get_task(task_id)
     if not task:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Task '{task_id}' not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"Task '{task_id}' not found"
+        )
 
-    ws_paths = workspace_manager.get_workspace_paths(task_id) or workspace_manager.create_workspace(task_id)
+    ws_paths = workspace_manager.get_workspace_paths(task_id) or workspace_manager.create_workspace(
+        task_id
+    )
     checkpoints = await store.list_checkpoints(task_id)
     latest_cp = checkpoints[-1] if checkpoints else None
 
@@ -200,7 +213,9 @@ async def get_task(
     )
 
 
-@router.post("/tasks/{task_id}/pause", response_model=TaskActionResponse, summary="Pause Running Task")
+@router.post(
+    "/tasks/{task_id}/pause", response_model=TaskActionResponse, summary="Pause Running Task"
+)
 async def pause_task(
     task_id: str,
     action: TaskActionRequest | None = None,
@@ -210,7 +225,9 @@ async def pause_task(
     """Pause task execution and create a recoverable checkpoint."""
     task = await store.get_task(task_id)
     if not task:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Task '{task_id}' not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"Task '{task_id}' not found"
+        )
 
     reason = action.reason if action and action.reason else "User requested pause"
     prev_state = task.state
@@ -228,7 +245,9 @@ async def pause_task(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 
-@router.post("/tasks/{task_id}/resume", response_model=TaskActionResponse, summary="Resume Paused Task")
+@router.post(
+    "/tasks/{task_id}/resume", response_model=TaskActionResponse, summary="Resume Paused Task"
+)
 async def resume_task(
     task_id: str,
     action: TaskActionRequest | None = None,
@@ -238,7 +257,9 @@ async def resume_task(
     """Resume task execution from its most recent checkpoint."""
     task = await store.get_task(task_id)
     if not task:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Task '{task_id}' not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"Task '{task_id}' not found"
+        )
 
     reason = action.reason if action and action.reason else "User requested resume"
     prev_state = task.state
@@ -266,7 +287,9 @@ async def cancel_task(
     """Cancel task execution and mark as CANCELLED."""
     task = await store.get_task(task_id)
     if not task:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Task '{task_id}' not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"Task '{task_id}' not found"
+        )
 
     reason = action.reason if action and action.reason else "User requested cancel"
     prev_state = task.state
@@ -284,6 +307,7 @@ async def cancel_task(
 
 
 # --- Runs / Audit Events ---
+
 
 @router.get("/runs/{run_id}", response_model=RunAuditResponse, summary="Get Run Audit Trail")
 async def get_run_audit_trail(
@@ -308,7 +332,11 @@ async def get_run_audit_trail(
     )
 
 
-@router.get("/tasks/{task_id}/timeline", response_model=TimelineResponse, summary="Get Structured Chronological Task Timeline")
+@router.get(
+    "/tasks/{task_id}/timeline",
+    response_model=TimelineResponse,
+    summary="Get Structured Chronological Task Timeline",
+)
 async def get_task_timeline(
     task_id: str,
     store: StateStore = Depends(get_state_store),
@@ -319,7 +347,9 @@ async def get_task_timeline(
     """
     task = await store.get_task(task_id)
     if not task:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Task '{task_id}' not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"Task '{task_id}' not found"
+        )
 
     events = await store.get_audit_trail(task_id)
     timeline_events: list[TimelineEvent] = []
@@ -339,7 +369,23 @@ async def get_task_timeline(
                 agent_id=payload.get("agent_id", payload.get("agent", "orchestrator")),
                 provider_model=payload.get("provider_model", "direct-model"),
                 action=e.event_type,
-                inputs=payload.get("inputs", {k: v for k, v in payload.items() if k not in ["stage", "run_id", "agent_id", "provider_model", "result", "duration_ms", "checkpoint_id"]}),
+                inputs=payload.get(
+                    "inputs",
+                    {
+                        k: v
+                        for k, v in payload.items()
+                        if k
+                        not in [
+                            "stage",
+                            "run_id",
+                            "agent_id",
+                            "provider_model",
+                            "result",
+                            "duration_ms",
+                            "checkpoint_id",
+                        ]
+                    },
+                ),
                 result=payload.get("result"),
                 duration_ms=payload.get("duration_ms", 0.0),
                 checkpoint_id=payload.get("checkpoint_id"),
@@ -357,7 +403,10 @@ async def get_task_timeline(
 
 # --- Artifacts ---
 
-@router.get("/artifacts/{artifact_id}", response_model=ArtifactResponse, summary="Get Artifact Metadata")
+
+@router.get(
+    "/artifacts/{artifact_id}", response_model=ArtifactResponse, summary="Get Artifact Metadata"
+)
 async def get_artifact(
     artifact_id: str,
     store: StateStore = Depends(get_state_store),
@@ -365,7 +414,9 @@ async def get_artifact(
     """Retrieve metadata and filesystem path for an engineering artifact."""
     artifact = await store.get_artifact(artifact_id)
     if not artifact:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Artifact '{artifact_id}' not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"Artifact '{artifact_id}' not found"
+        )
 
     return ArtifactResponse(
         id=artifact.id,
@@ -381,10 +432,13 @@ async def get_artifact(
 
 # --- Project Workspace Routes (Legacy Support) ---
 
+
 class ProjectCreateRequest(BaseModel):
     name: str = Field(..., description="Project name", min_length=1, max_length=100)
     description: str | None = Field(default=None, description="Project goal or context")
-    config: dict[str, Any] = Field(default_factory=dict, description="Custom project configurations")
+    config: dict[str, Any] = Field(
+        default_factory=dict, description="Custom project configurations"
+    )
 
 
 @router.post(
@@ -404,7 +458,9 @@ async def create_project(
     workspace_dir.mkdir(parents=True, exist_ok=True)
     (workspace_dir / "src").mkdir(exist_ok=True)
     (workspace_dir / "tests").mkdir(exist_ok=True)
-    (workspace_dir / ".forge").write_text(f"project_id: {project_id}\nname: {request.name}\n", encoding="utf-8")
+    (workspace_dir / ".forge").write_text(
+        f"project_id: {project_id}\nname: {request.name}\n", encoding="utf-8"
+    )
 
     project = ProjectWorkspace(
         id=project_id,
@@ -422,8 +478,13 @@ async def list_projects(store: StateStore = Depends(get_state_store)) -> list[Pr
 
 
 @router.get("/projects/{project_id}", response_model=ProjectWorkspace, summary="Get Project by ID")
-async def get_project(project_id: str, store: StateStore = Depends(get_state_store)) -> ProjectWorkspace:
+async def get_project(
+    project_id: str, store: StateStore = Depends(get_state_store)
+) -> ProjectWorkspace:
     project = await store.get_project(project_id)
     if not project:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Project with ID '{project_id}' not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Project with ID '{project_id}' not found",
+        )
     return project

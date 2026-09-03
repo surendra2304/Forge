@@ -69,7 +69,9 @@ async def test_task_lifecycle_api():
         assert res_arts.status_code == 200
 
         # 7. Cancel Task
-        res_cancel = await client.post(f"/api/tasks/{task_id}/cancel", json={"reason": "Test cancel"})
+        res_cancel = await client.post(
+            f"/api/tasks/{task_id}/cancel", json={"reason": "Test cancel"}
+        )
         assert res_cancel.status_code == 200
         cancel_data = res_cancel.json()
         assert cancel_data["current_state"] == "CANCELLED"

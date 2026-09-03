@@ -25,6 +25,7 @@ class CheckCategory(str, Enum):
 
 class VerificationEvidence(BaseModel):
     """Objective, verifiable artifact of a single verification check."""
+
     check_name: str = Field(..., description="Identifier for this check")
     category: CheckCategory = Field(..., description="Check category")
     command: str | None = Field(default=None, description="Command executed if applicable")
@@ -34,19 +35,24 @@ class VerificationEvidence(BaseModel):
     stdout: str = Field(default="", description="Captured stdout")
     stderr: str = Field(default="", description="Captured stderr")
     artifacts_inspected: list[str] = Field(default_factory=list, description="Files verified")
-    issues: list[dict[str, Any]] = Field(default_factory=list, description="Extracted error items or warnings")
+    issues: list[dict[str, Any]] = Field(
+        default_factory=list, description="Extracted error items or warnings"
+    )
     timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 class VerificationReport(BaseModel):
     """Consolidated verification battery report for a task."""
+
     task_id: str
     all_passed: bool
     total_checks: int
     passed_checks: int
     failed_checks: int
     evidence: list[VerificationEvidence] = Field(default_factory=list)
-    baseline_comparison: dict[str, Any] | None = Field(default=None, description="Pre/post baseline regression comparison")
+    baseline_comparison: dict[str, Any] | None = Field(
+        default=None, description="Pre/post baseline regression comparison"
+    )
     timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     @property

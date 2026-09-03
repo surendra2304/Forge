@@ -14,6 +14,7 @@ logger = get_logger("delivery.docs_generator")
 
 class DocQualityReport(BaseModel):
     """Quality and comment coverage assessment for a codebase."""
+
     total_code_lines: int = 0
     total_comment_lines: int = 0
     comment_ratio_percentage: float = 0.0
@@ -33,18 +34,16 @@ class DocumentationGenerator:
         is_cli: bool = False,
     ) -> str:
         """Generate a production-grade README.md for the deliverable."""
-        reqs_str = "\n".join(f"- {r}" for r in (requirements or ["Fully functional autonomous implementation"]))
-        files_str = "\n".join(f"- `{f}`" for f in (files or ["main.py", "test_main.py", "README.md"]))
+        reqs_str = "\n".join(
+            f"- {r}" for r in (requirements or ["Fully functional autonomous implementation"])
+        )
+        files_str = "\n".join(
+            f"- `{f}`" for f in (files or ["main.py", "test_main.py", "README.md"])
+        )
 
         usage_section = ""
         if is_cli:
-            usage_section = (
-                "## Usage\n\n"
-                "Run the CLI tool:\n"
-                "```bash\n"
-                "python main.py --help\n"
-                "```\n"
-            )
+            usage_section = "## Usage\n\nRun the CLI tool:\n```bash\npython main.py --help\n```\n"
         elif is_api:
             usage_section = (
                 "## Usage & API Endpoints\n\n"
@@ -105,7 +104,12 @@ class DocumentationGenerator:
                         s = line.strip()
                         if not s:
                             continue
-                        if s.startswith("#") or s.startswith("//") or s.startswith("/*") or s.startswith("*"):
+                        if (
+                            s.startswith("#")
+                            or s.startswith("//")
+                            or s.startswith("/*")
+                            or s.startswith("*")
+                        ):
                             total_comments += 1
                         else:
                             total_code += 1

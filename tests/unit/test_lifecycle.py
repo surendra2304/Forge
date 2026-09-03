@@ -97,7 +97,9 @@ async def test_lifecycle_pause_resume_checkpoint(state_store: StateStore):
     assert cp.state_data["completed_iterations"] == 42
 
     # Resume task
-    resumed_task, restored_cp = await lifecycle.resume(task_id=task_id, reason="User allocated budget")
+    resumed_task, restored_cp = await lifecycle.resume(
+        task_id=task_id, reason="User allocated budget"
+    )
     assert resumed_task.state == TaskState.RUNNING
     assert restored_cp is not None
     assert restored_cp.id == cp.id

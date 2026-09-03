@@ -2,8 +2,8 @@
 Pytest fixtures and configuration for FORGE test suite.
 """
 
-import asyncio
 import shutil
+import sys
 import tempfile
 from collections.abc import AsyncGenerator
 from pathlib import Path
@@ -12,6 +12,8 @@ import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
 from app.core.config import Settings, get_settings
 from app.core.orchestrator import OrchestratorCore
 from app.core.workspace import WorkspaceManager
@@ -19,14 +21,6 @@ from app.main import create_app
 from app.memory.db import DatabaseManager
 from app.memory.state_store import StateStore
 from app.providers.direct import DirectProvider
-
-
-@pytest.fixture(scope="session")
-def event_loop():
-    """Create an event loop per test session."""
-    loop = asyncio.new_event_loop()
-    yield loop
-    loop.close()
 
 
 @pytest.fixture
@@ -59,19 +53,19 @@ def direct_provider() -> DirectProvider:
 
 
 @pytest_asyncio.fixture
-async def async_client(test_db_manager: DatabaseManager, temp_dir: Path) -> AsyncGenerator[AsyncClient, None]:
+async def async_client(
+    test_db_manager: DatabaseManager, temp_dir: Path
+) -> AsyncGenerator[AsyncClient, None]:
     """Provide an AsyncClient configured with overridden database and workspace paths."""
     from app.api import routes as routes_module
     from app.memory import db as db_module
 
     app = create_app()
 
-    # Override db_manager in modules
     original_manager = db_module.db_manager
     db_module.db_manager = test_db_manager
     routes_module.db_manager = test_db_manager
 
-    # Override settings workspace dir
     def get_test_settings() -> Settings:
         settings = Settings()
         settings.workspaces_dir = temp_dir / "workspaces"

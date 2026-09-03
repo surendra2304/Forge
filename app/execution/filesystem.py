@@ -42,7 +42,9 @@ class FilesystemTool:
         paths = self.wm.get_workspace_paths(task_id) or self.wm.create_workspace(task_id)
         return paths.project
 
-    def list_dir(self, task_id: str, relative_path: str = ".", role: str = "developer") -> list[FileItem]:
+    def list_dir(
+        self, task_id: str, relative_path: str = ".", role: str = "developer"
+    ) -> list[FileItem]:
         """List files and directories within the sandbox project root."""
         self.pm.check_permission(role, ToolPermission.FS_READ)
         root = self._get_project_root(task_id)
@@ -75,7 +77,9 @@ class FilesystemTool:
 
         return target.read_text(encoding="utf-8")
 
-    def create_file(self, task_id: str, relative_path: str, content: str, role: str = "developer") -> str:
+    def create_file(
+        self, task_id: str, relative_path: str, content: str, role: str = "developer"
+    ) -> str:
         """Create a new file inside the task sandbox."""
         self.pm.check_permission(role, ToolPermission.FS_WRITE)
         root = self._get_project_root(task_id)
@@ -111,7 +115,9 @@ class FilesystemTool:
         logger.debug(f"Edited file {relative_path} in task {task_id}")
         return target.relative_to(root).as_posix()
 
-    def move_file(self, task_id: str, source_path: str, dest_path: str, role: str = "developer") -> str:
+    def move_file(
+        self, task_id: str, source_path: str, dest_path: str, role: str = "developer"
+    ) -> str:
         """Move or rename a file within the sandbox."""
         self.pm.check_permission(role, ToolPermission.FS_WRITE)
         root = self._get_project_root(task_id)

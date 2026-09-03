@@ -76,7 +76,9 @@ def test_interchangeable_model_provider_swapping():
     default_provider = agent.provider
     assert default_provider.model_name == "direct-developer"
 
-    new_provider = DirectProvider(model_name="claude-3-opus-mock", mock_response="Custom mock output")
+    new_provider = DirectProvider(
+        model_name="claude-3-opus-mock", mock_response="Custom mock output"
+    )
     agent.set_provider(new_provider)
 
     assert agent.provider.model_name == "claude-3-opus-mock"

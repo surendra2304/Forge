@@ -32,10 +32,10 @@ class SecretRedactor:
     }
 
     TOKEN_PATTERNS = [
-        re.compile(r"sk-[a-zA-Z0-9_\-]{20,}"),          # OpenAI / Anthropic-like keys
-        re.compile(r"ghp_[a-zA-Z0-9]{20,}"),             # GitHub tokens
-        re.compile(r"AIza[0-9A-Za-z\-_]{35}"),           # Google API keys
-        re.compile(r"Bearer\s+[a-zA-Z0-9_\-\.]+", re.IGNORECASE), # Bearer tokens
+        re.compile(r"sk-[a-zA-Z0-9_\-]{20,}"),  # OpenAI / Anthropic-like keys
+        re.compile(r"ghp_[a-zA-Z0-9]{20,}"),  # GitHub tokens
+        re.compile(r"AIza[0-9A-Za-z\-_]{35}"),  # Google API keys
+        re.compile(r"Bearer\s+[a-zA-Z0-9_\-\.]+", re.IGNORECASE),  # Bearer tokens
     ]
 
     @classmethod
@@ -66,6 +66,7 @@ class SecretRedactor:
 
 class StructuredAuditEvent(BaseModel):
     """Rich structured telemetry event adhering to FORGE Master Observability Spec."""
+
     id: str = Field(default_factory=lambda: str(uuid4()))
     task_id: str
     run_id: str = Field(default_factory=lambda: str(uuid4()))
@@ -89,7 +90,7 @@ class EventEmitter:
     async def emit(
         self,
         task_id: str,
-        action: str,
+        action: str = "",
         stage: str = "Execution",
         agent_id: str = "orchestrator",
         provider_model: str = "direct-model",
@@ -98,8 +99,13 @@ class EventEmitter:
         duration_ms: float = 0.0,
         checkpoint_id: str | None = None,
         run_id: str | None = None,
+        **kwargs: Any,
     ) -> StructuredAuditEvent:
         """Create, redact, log, and persist a structured audit event."""
+        if "event_type" in kwargs:
+            action = action or str(kwargs.pop("event_type"))
+        if "payload" in kwargs and inputs is None:
+            inputs = kwargs.pop("payload")
         clean_inputs = SecretRedactor.redact(inputs or {})
         clean_result = SecretRedactor.redact(result or {}) if result is not None else None
 
@@ -116,7 +122,9 @@ class EventEmitter:
             checkpoint_id=checkpoint_id,
         )
 
-        logger.info(f"[Timeline Event] task={task_id} action={action} stage={stage} agent={agent_id}")
+        logger.info(
+            f"[Timeline Event] task={task_id} action={action} stage={stage} agent={agent_id}"
+        )
 
         if self.store:
             # Store in state store

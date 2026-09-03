@@ -24,6 +24,7 @@ logger = get_logger("integrations.futuris")
 
 class SuccessPrediction(BaseModel):
     """Predicted verification pass probability for a candidate template/approach."""
+
     template_name: str
     archetype: str
     predicted_pass_probability: float = Field(..., ge=0.0, le=1.0)
@@ -34,6 +35,7 @@ class SuccessPrediction(BaseModel):
 
 class DurationForecast(BaseModel):
     """Expected build time forecast for a task."""
+
     estimated_duration_seconds: float
     p50_seconds: float
     p90_seconds: float
@@ -43,6 +45,7 @@ class DurationForecast(BaseModel):
 
 class CapacityForecast(BaseModel):
     """Resource capacity check and queueing guidance."""
+
     current_active_tasks: int
     max_capacity: int
     exhaustion_probability: float = Field(..., ge=0.0, le=1.0)
@@ -54,6 +57,7 @@ class CapacityForecast(BaseModel):
 
 class FuturisBuildAssessment(BaseModel):
     """Consolidated predictive assessment for a proposed build task."""
+
     prediction_id: str = Field(default_factory=lambda: f"fut_{os.urandom(4).hex()}")
     goal: str
     success_predictions: list[SuccessPrediction] = Field(default_factory=list)
@@ -77,7 +81,9 @@ class FuturisBuildClient:
         timeout: float = 6.0,
     ):
         settings = get_settings()
-        self.base_url = (base_url or getattr(settings, "futuris_url", "http://localhost:8003")).rstrip("/")
+        self.base_url = str(
+            base_url or getattr(settings, "futuris_url", "http://localhost:8003") or ""
+        ).rstrip("/")
         self.api_key = api_key or getattr(settings, "futuris_api_key", None)
         self.timeout = timeout
         # Internal calibration feedback memory
@@ -102,13 +108,35 @@ class FuturisBuildClient:
         and compute predicted verification pass probability across candidate templates.
         """
         goal_lower = goal.lower()
-        candidates = template_candidates or ["default_scaffold", "modular_service", "minimal_script", "fullstack_app"]
+        candidates = template_candidates or [
+            "default_scaffold",
+            "modular_service",
+            "minimal_script",
+            "fullstack_app",
+        ]
         predictions: list[SuccessPrediction] = []
 
         # Analyze task complexity & characteristics
-        is_complex = any(k in goal_lower for k in ["full-stack", "fullstack", "kafka", "graphql", "real-time", "distributed", "auth", "oauth"])
-        is_api = any(k in goal_lower for k in ["api", "fastapi", "rest", "backend", "endpoint", "crud"])
-        is_web = any(k in goal_lower for k in ["website", "portfolio", "landing", "html", "css", "calculator"])
+        is_complex = any(
+            k in goal_lower
+            for k in [
+                "full-stack",
+                "fullstack",
+                "kafka",
+                "graphql",
+                "real-time",
+                "distributed",
+                "auth",
+                "oauth",
+            ]
+        )
+        is_api = any(
+            k in goal_lower for k in ["api", "fastapi", "rest", "backend", "endpoint", "crud"]
+        )
+        is_web = any(
+            k in goal_lower
+            for k in ["website", "portfolio", "landing", "html", "css", "calculator"]
+        )
 
         for tpl in candidates:
             # Baseline probabilities
@@ -120,7 +148,9 @@ class FuturisBuildClient:
             if "in_memory" in tpl or "minimal" in tpl:
                 if is_complex:
                     base_prob -= 0.15
-                    risks.append("In-memory minimal template may lack persistence required for complex goals")
+                    risks.append(
+                        "In-memory minimal template may lack persistence required for complex goals"
+                    )
                     mitigation = "Upgrade to sqlite/modular service template"
                 else:
                     base_prob += 0.03
@@ -129,13 +159,17 @@ class FuturisBuildClient:
             elif "fullstack" in tpl:
                 if not is_complex and not is_web:
                     base_prob -= 0.05
-                    risks.append("Fullstack boilerplate introduces unnecessary frontend overhead for simple scripts")
+                    risks.append(
+                        "Fullstack boilerplate introduces unnecessary frontend overhead for simple scripts"
+                    )
                 else:
                     base_prob += 0.03
 
             if is_complex:
                 base_prob -= 0.06
-                risks.append("Complex integration points detected; ensure strict input validation and connection pooling")
+                risks.append(
+                    "Complex integration points detected; ensure strict input validation and connection pooling"
+                )
 
             # Clamp probability between 0.50 and 0.99
             final_prob = max(0.50, min(0.99, round(base_prob, 3)))
@@ -167,7 +201,9 @@ class FuturisBuildClient:
         goal_lower = goal.lower()
         complexity = 1.0
 
-        if any(k in goal_lower for k in ["fullstack", "full-stack", "dashboard", "kafka", "graphql"]):
+        if any(
+            k in goal_lower for k in ["fullstack", "full-stack", "dashboard", "kafka", "graphql"]
+        ):
             complexity = 3.2
             files = file_count_estimate or 6
         elif any(k in goal_lower for k in ["fastapi", "rest api", "backend", "database", "crud"]):
@@ -181,7 +217,7 @@ class FuturisBuildClient:
             files = file_count_estimate or 2
 
         # Model synthesis latency: ~4.5s per file * complexity factor
-        est_sec = round(files * 4.5 * (complexity ** 0.5), 1)
+        est_sec = round(files * 4.5 * (complexity**0.5), 1)
         p50 = round(est_sec * 0.85, 1)
         p90 = round(est_sec * 1.35, 1)
 
@@ -281,7 +317,9 @@ class FuturisBuildClient:
             "recorded_at": datetime.now(UTC).isoformat(),
         }
         self.calibration_history.append(record)
-        logger.info(f"Reported build outcome to Futuris calibration engine: id={prediction_id}, passed={passed}")
+        logger.info(
+            f"Reported build outcome to Futuris calibration engine: id={prediction_id}, passed={passed}"
+        )
         return record
 
 

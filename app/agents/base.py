@@ -21,6 +21,7 @@ logger = get_logger("agents.base")
 
 class AgentState(BaseModel):
     """Encapsulates persistent working memory and scratchpad for an agent role."""
+
     role_name: str
     current_node_id: str | None = None
     scratchpad: dict[str, Any] = Field(default_factory=dict)
@@ -57,10 +58,14 @@ class BaseAgent(ABC):
         self.provider = provider
         logger.info(f"Swapped provider on agent '{self.role_name}' to {provider.model_name}")
 
-    async def prompt_model(self, prompt: str, system_override: str | None = None, temperature: float = 0.2) -> ProviderResponse:
+    async def prompt_model(
+        self, prompt: str, system_override: str | None = None, temperature: float = 0.2
+    ) -> ProviderResponse:
         """Query the underlying interchangeable model provider with agent persona context."""
         sys_prompt = system_override or self.system_prompt
-        response = await self.provider.generate(prompt=prompt, system_prompt=sys_prompt, temperature=temperature)
+        response = await self.provider.generate(
+            prompt=prompt, system_prompt=sys_prompt, temperature=temperature
+        )
         self.state.tokens_consumed += response.usage.total_tokens
         self.state.budget_consumed += response.usage.estimated_cost_usd
         self.state.history.append({"prompt": prompt[:200], "response": response.content[:200]})
@@ -78,7 +83,9 @@ class BaseAgent(ABC):
         """
         from app.agents.parser import LLMResponseParser
 
-        extracted = LLMResponseParser.extract_files(response_text, default_filename=default_filename)
+        extracted = LLMResponseParser.extract_files(
+            response_text, default_filename=default_filename
+        )
         written_paths: list[str] = []
 
         for file_item in extracted:
@@ -90,9 +97,13 @@ class BaseAgent(ABC):
                     role=self.role_name,
                 )
                 written_paths.append(rel_path)
-                logger.info(f"Agent '{self.role_name}' applied file '{rel_path}' to workspace in task {task_id}")
+                logger.info(
+                    f"Agent '{self.role_name}' applied file '{rel_path}' to workspace in task {task_id}"
+                )
             except Exception as e:
-                logger.error(f"Failed to write extracted file '{file_item.relative_path}' for agent '{self.role_name}': {e}")
+                logger.error(
+                    f"Failed to write extracted file '{file_item.relative_path}' for agent '{self.role_name}': {e}"
+                )
 
         return written_paths
 
@@ -107,5 +118,7 @@ class BaseAgent(ABC):
             return "Workspace files could not be listed."
 
     @abstractmethod
-    async def execute_step(self, task_id: str, node_title: str, context: dict[str, Any], engine) -> dict[str, Any]:
+    async def execute_step(
+        self, task_id: str, node_title: str, context: dict[str, Any], engine
+    ) -> dict[str, Any]:
         """Execute a unit of work within the task graph."""
