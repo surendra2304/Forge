@@ -3,6 +3,8 @@ Agent Capability Registry and Factory for Project FORGE.
 Registers and instantiates specialist engineering roles with decoupled model providers.
 """
 
+from typing import Any
+
 from pydantic import BaseModel, Field
 
 from app.agents.base import BaseAgent

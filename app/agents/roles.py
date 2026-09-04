@@ -75,52 +75,60 @@ class ArchitectRole(BaseAgent):
 
         # Consult Inference for architecture planning & file manifest
         consensus_info = ""
-        try:
-            from app.integrations.ai_universe_client import get_ai_universe_client
-
-            ai_client = get_ai_universe_client()
-            goal_lower = goal.lower()
-            ptype = (
-                "web"
-                if any(k in goal_lower for k in ["website", "portfolio", "html", "css", "web"])
-                else (
-                    "api" if any(k in goal_lower for k in ["fastapi", "api", "backend"]) else "cli"
-                )
-            )
-
+        has_mock_provider = (
+            hasattr(self.provider, "mock_response") and self.provider.mock_response
+        )
+        if not has_mock_provider:
             try:
-                plan_res = await ai_client.plan_architecture(goal=goal, project_type=ptype)
-                if plan_res and plan_res.get("architecture_spec"):
-                    consensus_info = f"\nArchitecture Plan:\n{plan_res.get('architecture_spec')}\n"
-                    if hasattr(engine, "store") and engine.store:
-                        await engine.store.record_event(
-                            task_id=task_id,
-                            event_type="ai_universe.architecture_planned",
-                            payload={
-                                "confidence": plan_res.get("confidence", 0.95),
-                                "stage": "architecture",
-                            },
-                        )
-            except Exception:
-                ai_res = await ai_client.consult_with_verification(
-                    question=f"Architectural tradeoffs, schemas, and module structure for: {goal}. Stage: {node_title}",
-                    min_confidence=0.70,
-                    use_debate=False,
+                from app.integrations.ai_universe_client import get_ai_universe_client
+
+                ai_client = get_ai_universe_client()
+                goal_lower = goal.lower()
+                ptype = (
+                    "web"
+                    if any(k in goal_lower for k in ["website", "portfolio", "html", "css", "web"])
+                    else (
+                        "api"
+                        if any(k in goal_lower for k in ["fastapi", "api", "backend"])
+                        else "cli"
+                    )
                 )
-                if ai_res:
-                    consensus_info = f"\nExternal Multi-Agent Consensus (Run ID: {ai_res.run_id}):\n{ai_res.answer}\n"
-                    if hasattr(engine, "store") and engine.store:
-                        await engine.store.record_event(
-                            task_id=task_id,
-                            event_type="ai_universe.consulted",
-                            payload={
-                                "run_id": ai_res.run_id,
-                                "confidence": ai_res.confidence,
-                                "stage": "architecture",
-                            },
+
+                try:
+                    plan_res = await ai_client.plan_architecture(goal=goal, project_type=ptype)
+                    if plan_res and plan_res.get("architecture_spec"):
+                        consensus_info = (
+                            f"\nArchitecture Plan:\n{plan_res.get('architecture_spec')}\n"
                         )
-        except Exception:
-            pass
+                        if hasattr(engine, "store") and engine.store:
+                            await engine.store.record_event(
+                                task_id=task_id,
+                                event_type="ai_universe.architecture_planned",
+                                payload={
+                                    "confidence": plan_res.get("confidence", 0.95),
+                                    "stage": "architecture",
+                                },
+                            )
+                except Exception:
+                    ai_res = await ai_client.consult_with_verification(
+                        question=f"Architectural tradeoffs, schemas, and module structure for: {goal}. Stage: {node_title}",
+                        min_confidence=0.70,
+                        use_debate=False,
+                    )
+                    if ai_res:
+                        consensus_info = f"\nExternal Multi-Agent Consensus (Run ID: {ai_res.run_id}):\n{ai_res.answer}\n"
+                        if hasattr(engine, "store") and engine.store:
+                            await engine.store.record_event(
+                                task_id=task_id,
+                                event_type="ai_universe.consulted",
+                                payload={
+                                    "run_id": ai_res.run_id,
+                                    "confidence": ai_res.confidence,
+                                    "stage": "architecture",
+                                },
+                            )
+            except Exception:
+                pass
 
         # Query IntelX for technical research on unfamiliar or complex architectures
         research_info = ""
@@ -400,6 +408,23 @@ class DeveloperRole(BaseAgent):
                 continue
 
             ai_code = None
+            if hasattr(self.provider, "mock_response") and self.provider.mock_response:
+                prompt = (
+                    f"Objective: {goal}\n"
+                    f"Implementation Task: {node_title}\n"
+                    f"{workspace_summary}\n\n"
+                    f"Implement complete code for file: {filename}\n"
+                    f"Output complete implementation delimited by '### File: {filename}'."
+                )
+                resp = await self.prompt_model(prompt)
+                w = self.apply_extracted_files(
+                    task_id=task_id,
+                    response_text=resp.content,
+                    engine=engine,
+                    default_filename=filename,
+                )
+                written.extend(w)
+                continue
             try:
                 from app.integrations.ai_universe_client import get_ai_universe_client
 
