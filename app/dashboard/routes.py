@@ -195,6 +195,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
 """
 
 
+@dashboard_router.get("/", response_class=HTMLResponse, summary="FORGE Web Dashboard")
 @dashboard_router.get("/dashboard", response_class=HTMLResponse, summary="FORGE Web Dashboard")
 async def get_dashboard():
     """Serve the interactive Project FORGE Web Dashboard."""
