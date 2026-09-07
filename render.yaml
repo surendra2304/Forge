@@ -1,0 +1,33 @@
+services:
+  - type: web
+    name: forge-engine
+    env: docker
+    region: singapore
+    plan: free
+    repo: https://github.com/surendra2304/Forge.git
+    branch: main
+    healthCheckPath: /health
+    dockerfilePath: Dockerfile
+    envVars:
+      - key: FORGE_ENV
+        value: production
+      - key: PORT
+        value: "8000"
+      - key: FORGE_API_KEY
+        value: forge_api
+      - key: INFERENCE_URL
+        value: https://inference-3i2b.onrender.com
+      - key: INFERENCE_API_KEY
+        value: inference_api
+      - key: MEMORA_URL
+        value: https://memora-9zr9.onrender.com
+      - key: MEMORA_API_KEY
+        value: memora_api
+      - key: INTELX_URL
+        value: https://intelx-3cz1.onrender.com
+      - key: INTELX_API_KEY
+        value: intelx_api
+      - key: FUTURIS_URL
+        value: https://futuris-x4f4.onrender.com
+      - key: FUTURIS_API_KEY
+        value: futuris_api
