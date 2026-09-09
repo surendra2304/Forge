@@ -638,7 +638,9 @@ class DeveloperRole(BaseAgent):
                     "bolt",
                     "durable",
                     "futuristic",
+                    "cyberpunk",
                     "web studio",
+                    "web_3d",
                 ]
             )
 
@@ -677,11 +679,8 @@ class DeveloperRole(BaseAgent):
                     if filename not in written:
                         written.append(filename)
             else:
-                # Flag that AI Universe code generation failed and local fallback was used
-                fallback_files.append(filename)
-
                 # If this is a modern 3D/web project file, use ForgeWebStudio to produce complete high-fidelity code
-                if file_type in ["html", "css", "js"] and filename in ["index.html", "style.css", "app.js"]:
+                if is_web_3d and file_type in ["html", "css", "js"] and filename in ["index.html", "style.css", "app.js"]:
                     from app.templates.web_studio.generator import ForgeWebStudio
 
                     studio_files = ForgeWebStudio.synthesize_website(goal, enriched_requirements)
@@ -695,6 +694,9 @@ class DeveloperRole(BaseAgent):
                         if s_name not in written:
                             written.append(s_name)
                     continue
+
+                # Flag that AI Universe code generation failed and local stub fallback was used
+                fallback_files.append(filename)
 
                 prompt = (
                     f"Objective: {goal}\n"

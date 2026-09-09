@@ -488,3 +488,32 @@ async def get_project(
             detail=f"Project with ID '{project_id}' not found",
         )
     return project
+
+
+class ForgeInferenceRequest(BaseModel):
+    question: str
+    task_type: str = "code"
+
+
+@router.post("/ask-inference", summary="Ask Inference from Local Forge")
+async def forge_ask_inference(req: ForgeInferenceRequest):
+    """Route question from local Forge to live Inference Gateway."""
+    import httpx, time
+    t0 = time.perf_counter()
+    url = "https://inference-3i2b.onrender.com/v1/agent/assist"
+    payload = {
+        "caller_agent": "forge",
+        "task_type": req.task_type,
+        "prompt": req.question,
+        "fast_lane": True,
+        "no_cache": True,
+    }
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        r = await client.post(url, json=payload)
+        lat = round((time.perf_counter() - t0) * 1000, 2)
+        return {
+            "origin": "LOCAL (Forge :8002)",
+            "status": r.status_code,
+            "latency_ms": lat,
+            "data": r.json() if r.status_code == 200 else {"error": r.text},
+        }

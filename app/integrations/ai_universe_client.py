@@ -100,8 +100,11 @@ class AIUniverseClient:
                         key_evidence=data.get("key_evidence", []),
                         run_id=data.get("run_id", ""),
                     )
-            except (httpx.ConnectTimeout, httpx.ReadTimeout, httpx.HTTPStatusError) as exc:
+            except (httpx.RequestError, httpx.HTTPStatusError) as exc:
                 last_exc = exc
+                logger.warning(
+                    f"AI Universe ask attempt {attempt + 1}/3 failed ({exc}). Retrying..."
+                )
                 if attempt < 2:
                     await asyncio.sleep(2.0 * (attempt + 1))
                     continue
@@ -119,7 +122,7 @@ class AIUniverseClient:
     ) -> AIUniverseResponse:
         """
         Query Inference specialized code generation service: POST /v1/forge/generate-code
-        Includes automatic retry for cloud service spin-up (502/503/timeout).
+        Includes automatic retry for cloud service spin-up (502/503/timeout/DNS).
         """
         from unittest.mock import Mock
 
@@ -162,8 +165,11 @@ class AIUniverseClient:
                         confidence=conf,
                         run_id=data.get("filename", filename),
                     )
-            except (httpx.ConnectTimeout, httpx.ReadTimeout, httpx.HTTPStatusError) as exc:
+            except (httpx.RequestError, httpx.HTTPStatusError) as exc:
                 last_exc = exc
+                logger.warning(
+                    f"Inference generate-code attempt {attempt + 1}/3 for '{filename}' failed ({exc}). Retrying..."
+                )
                 if attempt < 2:
                     await asyncio.sleep(2.0 * (attempt + 1))
                     continue
