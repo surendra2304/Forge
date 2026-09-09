@@ -6,6 +6,7 @@ Implements Build, Lint, TypeCheck, Test, and Runtime smoke checkers.
 import ast
 import time
 from abc import ABC, abstractmethod
+from typing import Any
 
 from app.core.logging import get_logger
 from app.execution.engine import ExecutionEngine
@@ -1134,6 +1135,131 @@ class FeaturePresenceChecker(BaseChecker):
             check_name=self.name,
             category=self.category,
             command="feature_presence_verification(goal, project_files)",
+            exit_code=0 if passed else 1,
+            passed=passed,
+            duration_ms=round(duration_ms, 2),
+            stdout=stdout,
+            stderr=stderr,
+            artifacts_inspected=artifacts_inspected,
+            issues=issues,
+        )
+
+
+class AestheticAndInteractiveChecker(BaseChecker):
+    """
+    Objective verifier checking web deliverables against Lovable/Bolt/Durable standards:
+    - 3D WebGL / Canvas presence
+    - Glassmorphic tokens & CSS variables
+    - Event listener wiring
+    - Zero placeholder text ('Lorem ipsum', 'Project Alpha', etc.)
+    """
+
+    def __init__(self):
+        super().__init__(
+            name="3D Aesthetic & Interactivity Verification",
+            category=CheckCategory.FEATURE,
+        )
+
+    async def run_check(self, task_id: str, engine: ExecutionEngine) -> VerificationEvidence:
+        import re
+        import time
+
+        start_time = time.perf_counter()
+        paths = engine.wm.get_workspace_paths(task_id)
+        if not paths:
+            return VerificationEvidence(
+                check_name=self.name,
+                category=self.category,
+                exit_code=0,
+                passed=True,
+                stdout="No workspace paths found. Skipped.",
+            )
+
+        html_files = list(paths.project.glob("**/*.html"))
+        if not html_files:
+            return VerificationEvidence(
+                check_name=self.name,
+                category=self.category,
+                exit_code=0,
+                passed=True,
+                stdout="No HTML assets detected. Aesthetic verification skipped.",
+            )
+
+        css_files = list(paths.project.glob("**/*.css"))
+        js_files = list(paths.project.glob("**/*.js"))
+
+        html_content = "\n".join(
+            f.read_text(encoding="utf-8", errors="ignore") for f in html_files
+        )
+        css_content = "\n".join(f.read_text(encoding="utf-8", errors="ignore") for f in css_files)
+        js_content = "\n".join(f.read_text(encoding="utf-8", errors="ignore") for f in js_files)
+
+        artifacts_inspected = [
+            str(f.relative_to(paths.project)) for f in html_files + css_files + js_files
+        ]
+        issues: list[dict[str, Any]] = []
+
+        # 1. 3D Canvas / WebGL Check
+        has_canvas = "<canvas" in html_content.lower()
+        if not has_canvas:
+            issues.append(
+                {
+                    "type": "missing_3d_canvas",
+                    "error": "No 3D Canvas element (<canvas>) found in HTML.",
+                }
+            )
+
+        # 2. Glassmorphic Tokens Check
+        has_glass = "backdrop-filter" in css_content.lower() or "blur(" in css_content.lower()
+        has_vars = ":root" in css_content and "--" in css_content
+        if not (has_glass or has_vars):
+            issues.append(
+                {
+                    "type": "missing_glassmorphic_tokens",
+                    "error": "CSS lacks modern design variables or backdrop-filter glassmorphism.",
+                }
+            )
+
+        # 3. Interactivity Check
+        has_events = "addeventlistener" in js_content.lower() or "click" in js_content.lower()
+        if not has_events:
+            issues.append(
+                {
+                    "type": "missing_interactivity",
+                    "error": "No interactive JavaScript event listeners detected.",
+                }
+            )
+
+        # 4. Zero Placeholder Copy Check
+        placeholders = [r"\blorem ipsum\b", r"\bproject alpha\b", r"\bproject beta\b"]
+        for pat in placeholders:
+            if re.search(pat, html_content, re.IGNORECASE):
+                clean_pat = pat.replace(r"\b", "")
+                issues.append(
+                    {
+                        "type": "placeholder_detected",
+                        "error": f"Found dummy placeholder matching '{clean_pat}'.",
+                    }
+                )
+
+        duration_ms = (time.perf_counter() - start_time) * 1000.0
+        passed = len(issues) == 0
+
+        stdout = (
+            f"Aesthetic verification passed: 3D canvas, glassmorphism tokens, interactivity, and zero placeholders verified across {len(artifacts_inspected)} files."
+            if passed
+            else ""
+        )
+        stderr = (
+            "Aesthetic verification issues:\n" + "\n".join(f"- {i['error']}" for i in issues)
+            if not passed
+            else ""
+        )
+
+        return VerificationEvidence(
+            check_name=self.name,
+            category=self.category,
+            command="aesthetic_interactivity_verification",
             exit_code=0 if passed else 1,
             passed=passed,
             duration_ms=round(duration_ms, 2),

@@ -86,7 +86,21 @@ class ArchitectRole(BaseAgent):
                 goal_lower = goal.lower()
                 ptype = (
                     "web"
-                    if any(k in goal_lower for k in ["website", "portfolio", "html", "css", "web"])
+                    if any(
+                        k in goal_lower
+                        for k in [
+                            "website",
+                            "portfolio",
+                            "html",
+                            "css",
+                            "web",
+                            "3d",
+                            "lovable",
+                            "bolt",
+                            "durable",
+                            "futuristic",
+                        ]
+                    )
                     else (
                         "api"
                         if any(k in goal_lower for k in ["fastapi", "api", "backend"])
@@ -366,6 +380,16 @@ class DeveloperRole(BaseAgent):
                     "css",
                     "calculator website",
                     "static",
+                    "3d",
+                    "lovable",
+                    "bolt",
+                    "durable",
+                    "futuristic",
+                    "web app",
+                    "saas",
+                    "e-commerce",
+                    "dashboard",
+                    "showcase",
                 ]
             ):
                 file_manifest = ["index.html", "style.css", "app.js"]
@@ -448,9 +472,10 @@ class DeveloperRole(BaseAgent):
                 if file_type in ["html", "css", "js"]:
                     web_standards = [
                         "World-class, modern aesthetic with glassmorphism, micro-interactions, and vibrant gradients",
-                        "Fully dynamic interactivity: live category filter, interactive project modal preview, animated typing/particle hero, active scroll spy navigation",
-                        "Smooth CSS transitions, keyframe animations, responsive mobile drawer menu, and persistent dark/light theme switch",
-                        "Zero broken external asset dependencies (include embedded inline SVG icons and embedded mock project data in JS)",
+                        "Interactive 3D WebGL Three.js canvas scene or high-performance 60 FPS Canvas particle constellation with mouse parallax",
+                        "Fully dynamic interactivity: live category filter, interactive project modal preview, bento grid layout, and 3D card tilt",
+                        "Smooth CSS transitions, keyframe animations, responsive mobile layout, and persistent dark/light theme switch",
+                        "Zero broken external asset dependencies, zero placeholder text (strictly NO 'Lorem ipsum', NO 'Project Alpha')",
                         "Clean, linked stylesheets and scripts with matching element selectors and IDs",
                     ]
                     for std in web_standards:
@@ -538,8 +563,24 @@ class DeveloperRole(BaseAgent):
                     if filename not in written:
                         written.append(filename)
             else:
-                # Fallback to local LLM / DirectProvider (stub generator)
+                # Fallback to local LLM or ForgeWebStudio procedural synthesizer
                 fallback_files.append(filename)
+
+                if file_type in ["html", "css", "js"] and filename in ["index.html", "style.css", "app.js"]:
+                    from app.templates.web_studio.generator import ForgeWebStudio
+
+                    studio_files = ForgeWebStudio.synthesize_website(goal, enriched_requirements)
+                    if filename in studio_files:
+                        engine.fs.create_file(
+                            task_id=task_id,
+                            relative_path=filename,
+                            content=studio_files[filename],
+                            role=self.role_name,
+                        )
+                        if filename not in written:
+                            written.append(filename)
+                        continue
+
                 prompt = (
                     f"Objective: {goal}\n"
                     f"Task: {node_title}\n"
@@ -629,6 +670,32 @@ class FrontendEngineerRole(BaseAgent):
             response_text=response.content,
             engine=engine,
         )
+
+        if not written and any(
+            k in goal.lower()
+            for k in [
+                "website",
+                "portfolio",
+                "landing page",
+                "3d",
+                "lovable",
+                "bolt",
+                "durable",
+                "web app",
+            ]
+        ):
+            from app.templates.web_studio.generator import ForgeWebStudio
+
+            studio_files = ForgeWebStudio.synthesize_website(goal)
+            for rel_path, content in studio_files.items():
+                if rel_path in ["index.html", "style.css", "app.js"]:
+                    engine.fs.create_file(
+                        task_id=task_id,
+                        relative_path=rel_path,
+                        content=content,
+                        role=self.role_name,
+                    )
+                    written.append(rel_path)
 
         return {
             "status": "success",

@@ -356,9 +356,105 @@ class CodeQualityAnalyzer:
             else [],
         )
 
+    def analyze_web_aesthetic_and_interactivity(self) -> VerificationCheck | None:
+        """
+        Evaluates frontend web projects against Lovable/Bolt/Durable design & interactivity standards:
+        - 3D WebGL / Canvas presence
+        - Glassmorphism design tokens & CSS variables
+        - Dynamic event wiring (theme, modals, filters)
+        - Zero low-effort placeholder strings ('Lorem ipsum', 'Project Alpha', etc.)
+        """
+        html_files = list(self.workspace_path.rglob("*.html"))
+        if not html_files:
+            return None
+
+        css_files = list(self.workspace_path.rglob("*.css"))
+        js_files = list(self.workspace_path.rglob("*.js"))
+
+        html_content = "\n".join(f.read_text(encoding="utf-8", errors="ignore") for f in html_files)
+        css_content = "\n".join(f.read_text(encoding="utf-8", errors="ignore") for f in css_files)
+        js_content = "\n".join(f.read_text(encoding="utf-8", errors="ignore") for f in js_files)
+
+        checks_passed: list[str] = []
+        warnings: list[str] = []
+        failures: list[str] = []
+
+        # 1. 3D Canvas / WebGL Check
+        has_canvas = "<canvas" in html_content.lower()
+        has_3d_engine = (
+            "three" in html_content.lower()
+            or "three" in js_content.lower()
+            or "webgl" in js_content.lower()
+            or "particles" in js_content.lower()
+            or "canvas" in js_content.lower()
+        )
+        if has_canvas and has_3d_engine:
+            checks_passed.append("3D WebGL / Canvas interactive graphics engine detected")
+        elif has_canvas:
+            warnings.append("Canvas element present but 3D / animation engine not fully initialized")
+        else:
+            warnings.append("No 3D Canvas or WebGL visual viewport detected")
+
+        # 2. Glassmorphism & Modern CSS Tokens
+        has_glass = "backdrop-filter" in css_content.lower() or "blur(" in css_content.lower()
+        has_css_vars = ":root" in css_content and "--" in css_content
+        if has_glass and has_css_vars:
+            checks_passed.append("Modern glassmorphism and CSS design tokens present")
+        elif has_css_vars:
+            checks_passed.append("CSS variables defined")
+        else:
+            warnings.append("Missing CSS variables and glassmorphic design tokens")
+
+        # 3. Dynamic Interactivity & Event Handlers
+        has_event_listeners = (
+            "addeventlistener" in js_content.lower()
+            or "onclick" in html_content.lower()
+            or "click" in js_content.lower()
+        )
+        if has_event_listeners:
+            checks_passed.append("Dynamic JavaScript event wiring and interactions present")
+        else:
+            warnings.append("No dynamic JavaScript event listeners detected")
+
+        # 4. Zero Placeholder Text Check
+        placeholder_patterns = [
+            r"\blorem ipsum\b",
+            r"\bproject alpha\b",
+            r"\bproject beta\b",
+            r"\buntitled project\b",
+            r"\bfoo bar\b",
+        ]
+        found_placeholders: list[str] = []
+        for pat in placeholder_patterns:
+            if re.search(pat, html_content, re.IGNORECASE):
+                clean_name = pat.replace(r"\b", "")
+                found_placeholders.append(clean_name)
+
+        if found_placeholders:
+            failures.append(f"Low-effort placeholder copy detected: {', '.join(found_placeholders)}")
+        else:
+            checks_passed.append("Zero placeholder text verified")
+
+        status = "fail" if failures else ("warn" if len(warnings) > 1 else "pass")
+        return VerificationCheck(
+            name="Web Aesthetic & 3D Interactivity Analysis",
+            category="quality",
+            status=status,
+            evidence={
+                "checks_passed": checks_passed,
+                "warnings": warnings,
+                "failures": failures,
+                "canvas_detected": has_canvas,
+                "glassmorphic_tokens": has_glass,
+            },
+            fix_suggestions=[
+                f"Enhance website: {w}" for w in warnings + failures
+            ],
+        )
+
     def run_all(self) -> list[VerificationCheck]:
         """Run all code quality checks."""
-        return [
+        checks = [
             self.analyze_cyclomatic_complexity(),
             self.analyze_function_and_file_lengths(),
             self.analyze_duplicate_code(),
@@ -366,3 +462,7 @@ class CodeQualityAnalyzer:
             self.analyze_naming_conventions(),
             self.analyze_documentation_coverage(),
         ]
+        web_check = self.analyze_web_aesthetic_and_interactivity()
+        if web_check is not None:
+            checks.append(web_check)
+        return checks

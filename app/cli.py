@@ -88,12 +88,28 @@ async def handle_build(
                 "css",
                 "calculator website",
                 "static",
+                "3d",
+                "lovable",
+                "bolt",
+                "durable",
+                "futuristic",
+                "web app",
+                "saas",
+                "e-commerce",
+                "dashboard",
+                "showcase",
             ]
         ) and not any(
             k in goal_lower for k in ["backend", "fastapi", "flask", "api", "database", "sqlite"]
         )
 
-        if not is_static_web:
+        if is_static_web:
+            from app.templates.web_studio.generator import ForgeWebStudio
+
+            studio_files = ForgeWebStudio.synthesize_website(goal, requirements)
+            for rel_path, content in studio_files.items():
+                workspace_manager.write_project_file(task_id, rel_path, content)
+        else:
             workspace_manager.write_project_file(
                 task_id,
                 "main.py",
@@ -124,11 +140,11 @@ async def handle_build(
                 ),
             )
 
-        workspace_manager.write_project_file(
-            task_id,
-            "README.md",
-            f"# {goal}\n\nGenerated autonomously by Project FORGE.\n",
-        )
+            workspace_manager.write_project_file(
+                task_id,
+                "README.md",
+                f"# {goal}\n\nGenerated autonomously by Project FORGE.\n",
+            )
 
         progress.update(
             task_p, advance=30, description="[blue]Executing TaskGraph & Specialist Agents..."

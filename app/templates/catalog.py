@@ -10,51 +10,115 @@ HTML_WEBSITE_BASE = """<!DOCTYPE html>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{title}}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@600;700;800&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 </head>
 <body class="{{body_class}}">
-    <header class="site-header">
+    <!-- Interactive 3D WebGL / Particle Canvas -->
+    <div class="canvas-container">
+        <canvas id="forge-3d-canvas" class="webgl-canvas"></canvas>
+    </div>
+
+    <!-- Background Glow Blobs -->
+    <div class="glow-orb glow-orb-1" aria-hidden="true"></div>
+    <div class="glow-orb glow-orb-2" aria-hidden="true"></div>
+
+    <header class="site-header glass-panel">
         <nav class="navbar" aria-label="Main Navigation">
-            <a href="#" class="nav-brand">{{brand_name}}</a>
+            <a href="#" class="nav-brand">
+                <span class="brand-badge">3D</span>
+                <span class="brand-text">{{brand_name}}</span>
+            </a>
             <div class="nav-links">
-                <a href="#about">About</a>
-                <a href="#projects">Projects</a>
-                <a href="#contact">Contact</a>
+                <a href="#about" class="nav-link">Overview</a>
+                <a href="#showcase" class="nav-link">Showcase</a>
+                <a href="#contact" class="nav-link">Connect</a>
             </div>
-            <button id="theme-toggle" class="btn btn-secondary" aria-label="Toggle Dark Mode">🌓 Toggle Theme</button>
+            <div class="nav-actions">
+                <button id="theme-toggle" class="btn btn-icon" aria-label="Toggle Dark / Light Theme">
+                    <span class="theme-icon">🌓</span>
+                </button>
+                <a href="#showcase" class="btn btn-primary btn-glow">Launch</a>
+            </div>
         </nav>
     </header>
 
     <main id="main-content">
         <section id="hero" class="hero-section">
-            <div class="hero-content">
-                <h1 class="hero-title">{{hero_title}}</h1>
+            <div class="container hero-container">
+                <div class="hero-badge">
+                    <span class="pulse-dot"></span>
+                    <span>Autonomous 3D Experience</span>
+                </div>
+                <h1 class="hero-title gradient-text">{{hero_title}}</h1>
                 <p class="hero-subtitle">{{hero_subtitle}}</p>
                 <div class="hero-actions">
-                    <a href="#projects" class="btn btn-primary">View Projects</a>
-                    <a href="#contact" class="btn btn-outline">Get In Touch</a>
+                    <a href="#showcase" class="btn btn-primary btn-glow">Explore Works</a>
+                    <a href="#contact" class="btn btn-secondary glass-panel">Get in Touch</a>
+                </div>
+                <div class="hero-metrics">
+                    <div class="metric-chip glass-panel">
+                        <span class="metric-val">60 FPS</span>
+                        <span class="metric-label">Interactive 3D</span>
+                    </div>
+                    <div class="metric-chip glass-panel">
+                        <span class="metric-val">100%</span>
+                        <span class="metric-label">Responsive</span>
+                    </div>
+                    <div class="metric-chip glass-panel">
+                        <span class="metric-val">Ultra</span>
+                        <span class="metric-label">Glassmorphic</span>
+                    </div>
                 </div>
             </div>
         </section>
 
         <section id="about" class="section">
             <div class="container">
-                <h2>About</h2>
-                <p>{{about_description}}</p>
+                <div class="section-header">
+                    <h2 class="section-title">Architectural Vision</h2>
+                    <p class="section-subtitle">Engineered for immersion, fluid interactions, and tactile responsiveness.</p>
+                </div>
+                <div class="glass-card about-card">
+                    <p>{{about_description}}</p>
+                </div>
             </div>
         </section>
 
-        <section id="projects" class="section">
+        <section id="showcase" class="section">
             <div class="container">
-                <h2>Projects</h2>
-                <div class="grid cards-grid">
-                    <article class="card">
-                        <h3>Project Alpha</h3>
-                        <p>High performance distributed systems and autonomous tooling.</p>
+                <div class="section-header">
+                    <h2 class="section-title">Featured Showcase</h2>
+                    <p class="section-subtitle">Real-time dynamic filtering and interactive 3D perspective tilt.</p>
+                    <div class="filter-bar">
+                        <button class="filter-btn active" data-filter="all">All</button>
+                        <button class="filter-btn" data-filter="featured">Featured</button>
+                        <button class="filter-btn" data-filter="core">Core</button>
+                    </div>
+                </div>
+                <div class="bento-grid" id="showcase-grid">
+                    <article class="bento-item glass-card tilt-card" data-category="featured">
+                        <div class="bento-badge">Real-Time</div>
+                        <h3 class="bento-title">Autonomous Synthesis</h3>
+                        <p class="bento-desc">Zero-placeholder architecture, automated layout composition, and dynamic 3D rendering.</p>
+                        <div class="bento-meta">
+                            <span class="tech-tag">WebGL</span>
+                            <span class="tech-tag">Three.js</span>
+                            <span class="tech-tag">ES6</span>
+                        </div>
                     </article>
-                    <article class="card">
-                        <h3>Project Beta</h3>
-                        <p>Modern full-stack web applications and microservices.</p>
+                    <article class="bento-item glass-card tilt-card" data-category="core">
+                        <div class="bento-badge">Performance</div>
+                        <h3 class="bento-title">Tactile Glassmorphism</h3>
+                        <p class="bento-desc">Subtle backdrop blur, gradient borders, and hardware-accelerated micro-interactions.</p>
+                        <div class="bento-meta">
+                            <span class="tech-tag">CSS3</span>
+                            <span class="tech-tag">Variables</span>
+                            <span class="tech-tag">Backdrop Filter</span>
+                        </div>
                     </article>
                 </div>
             </div>
@@ -62,57 +126,72 @@ HTML_WEBSITE_BASE = """<!DOCTYPE html>
 
         <section id="contact" class="section">
             <div class="container">
-                <h2>Contact</h2>
-                <form id="contact-form" class="contact-form">
-                    <div class="form-group">
-                        <label for="name">Name</label>
-                        <input type="text" id="name" name="name" required placeholder="Your Name">
-                    </div>
-                    <div class="form-group">
-                        <label for="email">Email</label>
-                        <input type="email" id="email" name="email" required placeholder="Your Email">
-                    </div>
-                    <div class="form-group">
-                        <label for="message">Message</label>
-                        <textarea id="message" name="message" rows="4" required placeholder="Your message..."></textarea>
-                    </div>
-                    <button type="submit" class="btn btn-primary">Send Message</button>
-                </form>
+                <div class="section-header">
+                    <h2 class="section-title">Initiate Contact</h2>
+                    <p class="section-subtitle">Deploy your project or connect with our engineering team.</p>
+                </div>
+                <div class="glass-card contact-card">
+                    <form id="contact-form" class="contact-form">
+                        <div class="form-group">
+                            <label for="name">Name</label>
+                            <input type="text" id="name" name="name" required placeholder="Alex Rivera">
+                        </div>
+                        <div class="form-group">
+                            <label for="email">Email</label>
+                            <input type="email" id="email" name="email" required placeholder="alex@domain.com">
+                        </div>
+                        <div class="form-group">
+                            <label for="message">Message</label>
+                            <textarea id="message" name="message" rows="4" required placeholder="Tell us about your project vision..."></textarea>
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-glow">Transmit Message</button>
+                    </form>
+                </div>
             </div>
         </section>
     </main>
 
-    <footer class="site-footer">
-        <div class="container">
-            <p>&copy; 2026 {{brand_name}}. Built with Project FORGE.</p>
+    <footer class="site-footer glass-panel">
+        <div class="container footer-content">
+            <p>&copy; 2026 {{brand_name}}. Engineered with Project FORGE Studio.</p>
         </div>
     </footer>
 
+    <div id="toast" class="toast-notification" aria-live="polite"></div>
     <script src="app.js"></script>
 </body>
 </html>
 """
 
 CSS_BASE = """:root {
-    --bg-primary: #ffffff;
-    --bg-secondary: #f8f9fa;
-    --text-primary: #1a202c;
-    --text-secondary: #4a5568;
-    --accent-color: #3182ce;
-    --border-color: #e2e8f0;
-    --card-bg: #ffffff;
-    --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    --bg-primary: #0a0e17;
+    --bg-secondary: #111827;
+    --text-primary: #f8fafc;
+    --text-secondary: #94a3b8;
+    --accent-primary: #6366f1;
+    --accent-glow: rgba(99, 102, 241, 0.4);
+    --border-color: rgba(255, 255, 255, 0.1);
+    --card-bg: rgba(17, 24, 39, 0.65);
+    --glass-blur: 16px;
+    --shadow-soft: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
+    --shadow-glow: 0 0 25px rgba(99, 102, 241, 0.35);
+    --radius-sm: 8px;
+    --radius-md: 14px;
+    --radius-lg: 22px;
 }
 
-[data-theme="dark"], body.dark-mode {
-    --bg-primary: #1a202c;
-    --bg-secondary: #2d3748;
-    --text-primary: #f7fafc;
-    --text-secondary: #cbd5e0;
-    --accent-color: #63b3ed;
-    --border-color: #4a5568;
-    --card-bg: #2d3748;
-    --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+[data-theme="light"], body.light-mode {
+    --bg-primary: #f8fafc;
+    --bg-secondary: #ffffff;
+    --text-primary: #0f172a;
+    --text-secondary: #475569;
+    --accent-primary: #4f46e5;
+    --accent-glow: rgba(79, 70, 229, 0.25);
+    --border-color: rgba(0, 0, 0, 0.08);
+    --card-bg: rgba(255, 255, 255, 0.75);
+    --glass-blur: 16px;
+    --shadow-soft: 0 10px 25px -5px rgba(0, 0, 0, 0.08);
+    --shadow-glow: 0 0 20px rgba(79, 70, 229, 0.2);
 }
 
 * {
@@ -121,162 +200,391 @@ CSS_BASE = """:root {
     padding: 0;
 }
 
+html {
+    scroll-behavior: smooth;
+}
+
 body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     background-color: var(--bg-primary);
     color: var(--text-primary);
     line-height: 1.6;
+    overflow-x: hidden;
+    position: relative;
+    min-height: 100vh;
     transition: background-color 0.3s ease, color 0.3s ease;
 }
 
-.container {
-    max-width: 1100px;
-    margin: 0 auto;
-    padding: 0 1.5rem;
+/* 3D Canvas Background */
+.canvas-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 0;
+    pointer-events: none;
 }
 
-/* Header & Navbar */
+.webgl-canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+/* Ambient Glow Blobs */
+.glow-orb {
+    position: fixed;
+    border-radius: 50%;
+    filter: blur(120px);
+    z-index: 0;
+    pointer-events: none;
+    opacity: 0.45;
+}
+
+.glow-orb-1 {
+    top: 5%;
+    left: 15%;
+    width: 380px;
+    height: 380px;
+    background: radial-gradient(circle, var(--accent-primary) 0%, transparent 70%);
+}
+
+.glow-orb-2 {
+    bottom: 10%;
+    right: 10%;
+    width: 450px;
+    height: 450px;
+    background: radial-gradient(circle, #ec4899 0%, transparent 70%);
+}
+
+/* Glassmorphism Classes */
+.glass-panel {
+    background: var(--card-bg);
+    backdrop-filter: blur(var(--glass-blur));
+    -webkit-backdrop-filter: blur(var(--glass-blur));
+    border: 1px solid var(--border-color);
+}
+
+.glass-card {
+    background: var(--card-bg);
+    backdrop-filter: blur(var(--glass-blur));
+    -webkit-backdrop-filter: blur(var(--glass-blur));
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-soft);
+    padding: 1.75rem;
+    transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
+}
+
+.glass-card:hover {
+    transform: translateY(-4px);
+    border-color: rgba(99, 102, 241, 0.4);
+    box-shadow: var(--shadow-glow);
+}
+
+.container {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 0 1.5rem;
+    position: relative;
+    z-index: 1;
+}
+
+/* Site Header */
 .site-header {
-    background-color: var(--bg-secondary);
-    border-bottom: 1px solid var(--border-color);
     position: sticky;
     top: 0;
     z-index: 100;
+    border-bottom: 1px solid var(--border-color);
 }
 
 .navbar {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    max-width: 1100px;
+    max-width: 1180px;
     margin: 0 auto;
     padding: 1rem 1.5rem;
 }
 
 .nav-brand {
-    font-weight: 700;
-    font-size: 1.25rem;
-    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
     text-decoration: none;
+    color: var(--text-primary);
+    font-family: 'Outfit', sans-serif;
+    font-weight: 700;
+    font-size: 1.3rem;
+}
+
+.brand-badge {
+    background: linear-gradient(135deg, var(--accent-primary), #ec4899);
+    color: #fff;
+    font-size: 0.75rem;
+    font-weight: 800;
+    padding: 0.15rem 0.45rem;
+    border-radius: 6px;
+    letter-spacing: 0.05em;
 }
 
 .nav-links {
     display: flex;
-    gap: 1.5rem;
+    gap: 2rem;
 }
 
-.nav-links a {
+.nav-link {
     color: var(--text-secondary);
     text-decoration: none;
     font-weight: 500;
-    transition: color 0.2s;
+    font-size: 0.95rem;
+    transition: color 0.2s ease;
 }
 
-.nav-links a:hover {
-    color: var(--accent-color);
+.nav-link:hover {
+    color: var(--text-primary);
+}
+
+.nav-actions {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
 }
 
 /* Buttons */
 .btn {
-    display: inline-block;
-    padding: 0.6rem 1.2rem;
-    border-radius: 6px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.65rem 1.4rem;
+    border-radius: var(--radius-sm);
     font-weight: 600;
+    font-size: 0.95rem;
     cursor: pointer;
     text-decoration: none;
     border: none;
-    transition: all 0.2s ease;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .btn-primary {
-    background-color: var(--accent-color);
+    background: linear-gradient(135deg, var(--accent-primary) 0%, #8b5cf6 100%);
     color: #ffffff;
 }
 
-.btn-primary:hover {
-    opacity: 0.9;
-    transform: translateY(-1px);
+.btn-glow {
+    box-shadow: 0 0 15px var(--accent-glow);
+}
+
+.btn-glow:hover {
+    box-shadow: 0 0 25px var(--accent-glow);
+    transform: translateY(-2px);
 }
 
 .btn-secondary {
-    background-color: var(--bg-primary);
     color: var(--text-primary);
     border: 1px solid var(--border-color);
 }
 
-.btn-outline {
-    background-color: transparent;
-    color: var(--accent-color);
-    border: 1px solid var(--accent-color);
+.btn-icon {
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    border-radius: 50%;
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
 }
 
 /* Hero Section */
 .hero-section {
-    padding: 4rem 1.5rem;
+    padding: 7rem 0 5rem;
+    position: relative;
+    z-index: 1;
     text-align: center;
-    background: linear-gradient(180deg, var(--bg-secondary) 0%, var(--bg-primary) 100%);
+}
+
+.hero-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.35rem 0.9rem;
+    border-radius: 9999px;
+    background: rgba(99, 102, 241, 0.12);
+    border: 1px solid rgba(99, 102, 241, 0.3);
+    color: #a5b4fc;
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin-bottom: 1.5rem;
+}
+
+.pulse-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: #10b981;
+    box-shadow: 0 0 8px #10b981;
 }
 
 .hero-title {
-    font-size: 2.75rem;
-    margin-bottom: 1rem;
-    color: var(--text-primary);
+    font-family: 'Outfit', sans-serif;
+    font-size: 3.5rem;
+    font-weight: 800;
+    line-height: 1.15;
+    margin-bottom: 1.25rem;
+    letter-spacing: -0.03em;
+}
+
+.gradient-text {
+    background: linear-gradient(135deg, #ffffff 20%, #94a3b8 60%, var(--accent-primary) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
 }
 
 .hero-subtitle {
     font-size: 1.25rem;
     color: var(--text-secondary);
-    max-width: 700px;
-    margin: 0 auto 2rem;
+    max-width: 680px;
+    margin: 0 auto 2.5rem;
 }
 
 .hero-actions {
     display: flex;
     justify-content: center;
-    gap: 1rem;
+    gap: 1.25rem;
+    margin-bottom: 3.5rem;
+}
+
+.hero-metrics {
+    display: flex;
+    justify-content: center;
+    gap: 1.5rem;
+    flex-wrap: wrap;
+}
+
+.metric-chip {
+    padding: 0.75rem 1.5rem;
+    border-radius: var(--radius-md);
+    text-align: center;
+    min-width: 140px;
+}
+
+.metric-val {
+    display: block;
+    font-family: 'Outfit', sans-serif;
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.metric-label {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
 }
 
 /* Sections */
 .section {
-    padding: 3.5rem 0;
+    padding: 5rem 0;
+    position: relative;
+    z-index: 1;
 }
 
-.section h2 {
-    font-size: 2rem;
-    margin-bottom: 1.5rem;
+.section-header {
     text-align: center;
+    margin-bottom: 3rem;
 }
 
-/* Cards Grid */
-.cards-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-    gap: 1.5rem;
+.section-title {
+    font-family: 'Outfit', sans-serif;
+    font-size: 2.25rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+}
+
+.section-subtitle {
+    font-size: 1.05rem;
+    color: var(--text-secondary);
+}
+
+/* Filter Bar */
+.filter-bar {
+    display: flex;
+    justify-content: center;
+    gap: 0.75rem;
     margin-top: 1.5rem;
 }
 
-.card {
-    background-color: var(--card-bg);
+.filter-btn {
+    padding: 0.4rem 1rem;
+    border-radius: 9999px;
     border: 1px solid var(--border-color);
-    border-radius: 8px;
-    padding: 1.5rem;
-    box-shadow: var(--shadow);
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
 }
 
-.card h3 {
-    margin-bottom: 0.75rem;
-    color: var(--text-primary);
+.filter-btn.active, .filter-btn:hover {
+    background: var(--accent-primary);
+    color: #ffffff;
+    border-color: var(--accent-primary);
+}
+
+/* Bento Grid */
+.bento-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 1.75rem;
+}
+
+.bento-item {
+    position: relative;
+    overflow: hidden;
+}
+
+.bento-badge {
+    display: inline-block;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: var(--accent-primary);
+    letter-spacing: 0.05em;
+    margin-bottom: 0.5rem;
+}
+
+.bento-title {
+    font-size: 1.35rem;
+    margin-bottom: 0.5rem;
+}
+
+.bento-desc {
+    color: var(--text-secondary);
+    font-size: 0.95rem;
+    margin-bottom: 1.25rem;
+}
+
+.bento-meta {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.tech-tag {
+    font-size: 0.75rem;
+    padding: 0.2rem 0.6rem;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    color: var(--text-secondary);
 }
 
 /* Forms */
-.contact-form {
+.contact-card {
     max-width: 600px;
     margin: 0 auto;
-    background-color: var(--card-bg);
-    padding: 2rem;
-    border-radius: 8px;
-    border: 1px solid var(--border-color);
-    box-shadow: var(--shadow);
 }
 
 .form-group {
@@ -285,63 +593,202 @@ body {
 
 .form-group label {
     display: block;
-    margin-bottom: 0.5rem;
-    font-weight: 500;
+    margin-bottom: 0.4rem;
+    font-weight: 600;
+    font-size: 0.9rem;
     color: var(--text-secondary);
 }
 
-.form-group input,
-.form-group textarea {
+.form-group input, .form-group textarea {
     width: 100%;
-    padding: 0.75rem;
+    padding: 0.75rem 1rem;
     border: 1px solid var(--border-color);
-    border-radius: 6px;
-    background-color: var(--bg-primary);
+    border-radius: var(--radius-sm);
+    background: rgba(0, 0, 0, 0.2);
     color: var(--text-primary);
     font-family: inherit;
+    font-size: 0.95rem;
+    outline: none;
+    transition: border-color 0.2s ease;
 }
 
-/* Footer */
+.form-group input:focus, .form-group textarea:focus {
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 0 2px var(--accent-glow);
+}
+
+/* Site Footer */
 .site-footer {
-    background-color: var(--bg-secondary);
     border-top: 1px solid var(--border-color);
-    padding: 2rem 0;
+    padding: 2.5rem 0;
     text-align: center;
     color: var(--text-secondary);
-    margin-top: 3rem;
+    font-size: 0.9rem;
+    position: relative;
+    z-index: 1;
+}
+
+/* Toast */
+.toast-notification {
+    position: fixed;
+    bottom: 2rem;
+    right: 2rem;
+    padding: 0.85rem 1.4rem;
+    background: var(--card-bg);
+    backdrop-filter: blur(16px);
+    border: 1px solid var(--accent-primary);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    box-shadow: var(--shadow-glow);
+    z-index: 1000;
+    transform: translateY(120%);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.toast-notification.show {
+    transform: translateY(0);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .hero-title {
+        font-size: 2.5rem;
+    }
+    .nav-links {
+        display: none;
+    }
 }
 """
 
 JS_BASE = """document.addEventListener("DOMContentLoaded", () => {
-    // Theme toggle functionality
+    // 1. Theme Toggle
     const themeToggleBtn = document.getElementById("theme-toggle");
-    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-
-    // Initialize theme from localStorage or system preference
-    const savedTheme = localStorage.getItem("theme");
-    if (savedTheme === "dark" || (!savedTheme && prefersDark)) {
-        document.body.classList.add("dark-mode");
-        document.documentElement.setAttribute("data-theme", "dark");
+    const savedTheme = localStorage.getItem("forge_theme") || "dark";
+    if (savedTheme === "light") {
+        document.body.classList.add("light-mode");
+        document.documentElement.setAttribute("data-theme", "light");
     }
 
     if (themeToggleBtn) {
         themeToggleBtn.addEventListener("click", () => {
-            const isDark = document.body.classList.toggle("dark-mode");
-            document.documentElement.setAttribute("data-theme", isDark ? "dark" : "light");
-            localStorage.setItem("theme", isDark ? "dark" : "light");
+            const isLight = document.body.classList.toggle("light-mode");
+            document.documentElement.setAttribute("data-theme", isLight ? "light" : "dark");
+            localStorage.setItem("forge_theme", isLight ? "light" : "dark");
         });
     }
 
-    // Contact form submission handler
-    const contactForm = document.getElementById("contact-form");
-    if (contactForm) {
-        contactForm.addEventListener("submit", (e) => {
+    // 2. 3D WebGL Three.js Scene with Canvas 2D Fallback
+    const canvas = document.getElementById("forge-3d-canvas");
+    if (canvas && typeof THREE !== "undefined") {
+        try {
+            const scene = new THREE.Scene();
+            const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            const renderer = new THREE.WebGLRenderer({ canvas: canvas, alpha: true, antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+            const geometry = new THREE.IcosahedronGeometry(2.4, 2);
+            const material = new THREE.MeshBasicMaterial({
+                color: 0x6366f1,
+                wireframe: true,
+                transparent: true,
+                opacity: 0.4
+            });
+            const mesh = new THREE.Mesh(geometry, material);
+            scene.add(mesh);
+            camera.position.z = 4.8;
+
+            let mouseX = 0, mouseY = 0;
+            window.addEventListener("mousemove", (e) => {
+                mouseX = (e.clientX / window.innerWidth - 0.5) * 2;
+                mouseY = (e.clientY / window.innerHeight - 0.5) * 2;
+            });
+
+            const animate = () => {
+                requestAnimationFrame(animate);
+                mesh.rotation.x += 0.003;
+                mesh.rotation.y += 0.005;
+                mesh.position.x += (mouseX * 0.5 - mesh.position.x) * 0.05;
+                mesh.position.y += (-mouseY * 0.5 - mesh.position.y) * 0.05;
+                renderer.render(scene, camera);
+            };
+            animate();
+
+            window.addEventListener("resize", () => {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            });
+        } catch (e) {
+            console.warn("Three.js init failed, falling back to 2D particles:", e);
+            init2DParticles(canvas);
+        }
+    } else if (canvas) {
+        init2DParticles(canvas);
+    }
+
+    function init2DParticles(cvs) {
+        const ctx = cvs.getContext("2d");
+        if (!ctx) return;
+        let w = cvs.width = window.innerWidth;
+        let h = cvs.height = window.innerHeight;
+        const particles = Array.from({ length: 45 }, () => ({
+            x: Math.random() * w,
+            y: Math.random() * h,
+            vx: (Math.random() - 0.5) * 0.8,
+            vy: (Math.random() - 0.5) * 0.8,
+            radius: Math.random() * 2 + 1
+        }));
+        const render = () => {
+            ctx.clearRect(0, 0, w, h);
+            ctx.fillStyle = "rgba(99, 102, 241, 0.5)";
+            particles.forEach(p => {
+                p.x += p.vx; p.y += p.vy;
+                if (p.x < 0 || p.x > w) p.vx *= -1;
+                if (p.y < 0 || p.y > h) p.vy *= -1;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+                ctx.fill();
+            });
+            requestAnimationFrame(render);
+        };
+        render();
+        window.addEventListener("resize", () => {
+            w = cvs.width = window.innerWidth;
+            h = cvs.height = window.innerHeight;
+        });
+    }
+
+    // 3. Dynamic Filter Handler
+    const filterButtons = document.querySelectorAll(".filter-btn");
+    const cards = document.querySelectorAll(".bento-item");
+    filterButtons.forEach(btn => {
+        btn.addEventListener("click", () => {
+            filterButtons.forEach(b => b.classList.remove("active"));
+            btn.classList.add("active");
+            const filter = btn.getAttribute("data-filter");
+            cards.forEach(card => {
+                if (filter === "all" || card.getAttribute("data-category") === filter) {
+                    card.style.display = "block";
+                } else {
+                    card.style.display = "none";
+                }
+            });
+        });
+    });
+
+    // 4. Contact Form Handler with Toast
+    const form = document.getElementById("contact-form");
+    const toast = document.getElementById("toast");
+    if (form) {
+        form.addEventListener("submit", (e) => {
             e.preventDefault();
-            const formData = new FormData(contactForm);
-            const data = Object.fromEntries(formData.entries());
-            console.log("Contact form submitted:", data);
-            alert("Thank you for your message! We will get back to you soon.");
-            contactForm.reset();
+            if (toast) {
+                toast.textContent = "Message transmitted successfully!";
+                toast.classList.add("show");
+                setTimeout(() => toast.classList.remove("show"), 3500);
+            }
+            form.reset();
         });
     }
 });

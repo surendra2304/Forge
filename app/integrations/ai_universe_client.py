@@ -116,6 +116,43 @@ class AIUniverseClient:
                 run_id=data.get("filename", filename),
             )
 
+    async def stream_code(
+        self,
+        filename: str,
+        goal: str,
+        file_type: str = "python",
+        requirements: list[str] | None = None,
+        context: dict | None = None,
+    ):
+        """
+        Streams code generation tokens via Inference SSE: POST /v1/forge/stream-code
+        """
+        import json
+
+        url = f"{self.base_url}/v1/forge/stream-code"
+        headers = self._get_headers()
+        payload = {
+            "filename": filename,
+            "file_type": file_type,
+            "requirements": requirements or [],
+            "context": context or {"project_goal": goal},
+        }
+
+        async with httpx.AsyncClient(timeout=self.timeout) as client:
+            async with client.stream("POST", url, json=payload, headers=headers) as response:
+                response.raise_for_status()
+                async for line in response.aiter_lines():
+                    if line.startswith("data: "):
+                        try:
+                            data = json.loads(line[6:])
+                            if data.get("done"):
+                                break
+                            chunk = data.get("chunk", "")
+                            if chunk:
+                                yield chunk
+                        except Exception:
+                            pass
+
     async def plan_architecture(
         self,
         goal: str,

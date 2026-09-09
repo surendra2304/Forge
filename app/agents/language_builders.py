@@ -240,3 +240,41 @@ class FullStackBuilder(BaseLanguageBuilder):
             created_files.append(p)
 
         return created_files
+
+
+class Web3DBuilder(BaseLanguageBuilder):
+    """Builder for futuristic, 3D interactive, glassmorphic websites and web apps (Lovable / Bolt standard)."""
+
+    def file_manifest(self, goal: str) -> BuilderManifest:
+        return BuilderManifest(
+            files_to_generate=[
+                "index.html",
+                "style.css",
+                "app.js",
+                "README.md",
+            ],
+            verification_checks=[
+                "browser_verification",
+                "webgl_canvas_check",
+                "aesthetic_verification",
+                "accessibility",
+            ],
+            template_hints={
+                "engine": "ForgeWebStudio",
+                "render_standard": "Three.js / 3D Canvas / Bento Glassmorphism",
+                "placeholders": "strictly_forbidden",
+            },
+        )
+
+    def scaffold_project(self, goal: str, workspace_path: Path) -> list[Path]:
+        workspace_path.mkdir(parents=True, exist_ok=True)
+        from app.templates.web_studio.generator import ForgeWebStudio
+
+        studio_files = ForgeWebStudio.synthesize_website(goal)
+        created_files = []
+        for rel_path, content in studio_files.items():
+            p = workspace_path / rel_path
+            p.parent.mkdir(parents=True, exist_ok=True)
+            p.write_text(content, encoding="utf-8")
+            created_files.append(p)
+        return created_files

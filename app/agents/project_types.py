@@ -8,11 +8,8 @@ from abc import ABC, abstractmethod
 from enum import Enum
 
 from app.templates.catalog import (
-    CSS_BASE,
     FASTAPI_APP_BASE,
     FASTAPI_TEST_BASE,
-    HTML_WEBSITE_BASE,
-    JS_BASE,
     PYTHON_CLI_BASE,
     PYTHON_CLI_TEST_BASE,
 )
@@ -75,26 +72,9 @@ class WebsiteBuilder(BaseProjectBuilder):
         )
 
     def synthesize_starter_files(self) -> dict[str, str]:
-        brand = "Project FORGE"
-        if "portfolio" in self.goal.lower():
-            brand = "Portfolio"
-        elif "dashboard" in self.goal.lower():
-            brand = "Dashboard"
+        from app.templates.web_studio.generator import ForgeWebStudio
 
-        ctx = {
-            "title": self.goal,
-            "brand_name": brand,
-            "body_class": "theme-adaptive",
-            "hero_title": self.goal,
-            "hero_subtitle": "Synthesized autonomously by Project FORGE with responsive design and theme controls.",
-            "about_description": f"Autonomous project built to satisfy: {self.goal}",
-        }
-        return {
-            "index.html": TemplateEngine.render(HTML_WEBSITE_BASE, ctx),
-            "style.css": CSS_BASE,
-            "app.js": JS_BASE,
-            "README.md": f"# {self.goal}\n\nAutonomously generated responsive static website.\n",
-        }
+        return ForgeWebStudio.synthesize_website(self.goal, self.requirements)
 
 
 class CLIBuilder(BaseProjectBuilder):
