@@ -282,17 +282,7 @@ class ArchitectRole(BaseAgent):
 
         if not manifest_files:
             goal_lower = goal.lower()
-            if any(k in goal_lower for k in ["full-stack", "fullstack", "dashboard"]):
-                manifest_files = [
-                    "main.py",
-                    "test_main.py",
-                    "index.html",
-                    "style.css",
-                    "app.js",
-                    "requirements.txt",
-                    "README.md",
-                ]
-            elif any(
+            is_static_web = any(
                 k in goal_lower
                 for k in [
                     "website",
@@ -303,9 +293,42 @@ class ArchitectRole(BaseAgent):
                     "css",
                     "calculator website",
                     "static",
+                    "3d",
+                    "three.js",
+                    "threejs",
+                    "lovable",
+                    "bolt.new",
+                    "bolt",
+                    "durable",
+                    "futuristic",
+                    "cyberpunk",
+                    "web studio",
+                    "web app",
+                    "saas",
+                    "ecommerce",
+                    "e-commerce",
+                    "store",
+                    "shop",
+                    "showcase",
+                    "dashboard",
                 ]
-            ):
-                manifest_files = ["index.html", "style.css", "app.js"]
+            ) and not any(
+                k in goal_lower
+                for k in ["backend", "fastapi", "flask", "django", "sqlite", "database", "api"]
+            )
+
+            if any(k in goal_lower for k in ["full-stack", "fullstack"]):
+                manifest_files = [
+                    "main.py",
+                    "test_main.py",
+                    "index.html",
+                    "style.css",
+                    "app.js",
+                    "requirements.txt",
+                    "README.md",
+                ]
+            elif is_static_web:
+                manifest_files = ["index.html", "style.css", "app.js", "README.md"]
             elif any(
                 k in goal_lower
                 for k in ["fastapi", "rest api", "backend", "database", "sqlite", "service"]
@@ -381,7 +404,11 @@ def _sanitize_web_asset(filename: str, content: str, goal: str, is_web_3d: bool)
                 clean = re.sub(r"(<body[^>]*>)", r"\1\n    " + h1_tag, clean, count=1, flags=re.IGNORECASE)
         # 3. Ensure 3D canvas if 3D web requested
         if is_web_3d and "<canvas" not in clean.lower():
-            canvas_tag = '<canvas id="webstudio-3d-canvas" class="hero-canvas" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 0;"></canvas>\n'
+            canvas_tag = (
+                '<div class="canvas-wrapper" style="position: relative; width: 100%; max-width: 550px; height: 420px; margin: 2rem auto; border-radius: 1rem; overflow: hidden;">\n'
+                '    <canvas id="webstudio-3d-canvas" style="width: 100%; height: 100%;"></canvas>\n'
+                '</div>\n'
+            )
             if "<main" in clean.lower():
                 clean = re.sub(r"(<main[^>]*>)", r"\1\n        " + canvas_tag, clean, count=1, flags=re.IGNORECASE)
             elif "<body" in clean.lower():
@@ -479,7 +506,7 @@ class DeveloperRole(BaseAgent):
 
         if not file_manifest:
             goal_lower = goal.lower()
-            if any(
+            is_static_web = any(
                 k in goal_lower
                 for k in [
                     "website",
@@ -491,18 +518,31 @@ class DeveloperRole(BaseAgent):
                     "calculator website",
                     "static",
                     "3d",
+                    "three.js",
+                    "threejs",
                     "lovable",
+                    "bolt.new",
                     "bolt",
                     "durable",
                     "futuristic",
+                    "cyberpunk",
+                    "web studio",
                     "web app",
                     "saas",
+                    "ecommerce",
                     "e-commerce",
-                    "dashboard",
+                    "store",
+                    "shop",
                     "showcase",
+                    "dashboard",
                 ]
-            ):
-                file_manifest = ["index.html", "style.css", "app.js"]
+            ) and not any(
+                k in goal_lower
+                for k in ["backend", "fastapi", "flask", "django", "sqlite", "database", "api"]
+            )
+
+            if is_static_web:
+                file_manifest = ["index.html", "style.css", "app.js", "README.md"]
             elif any(k in goal_lower for k in ["full-stack", "fullstack"]):
                 file_manifest = ["main.py", "index.html", "style.css", "app.js"]
             else:
@@ -561,10 +601,41 @@ class DeveloperRole(BaseAgent):
                     )
                     res_list.append(res)
                     production_monitor.record_intelx_query()
-                production_monitor.record_research_informed_build()
-                research_context_str = intelx_client.format_research_context_for_prompt(res_list)
         except Exception:
             pass
+
+        # 1.5. If 3D Web Studio application is requested, execute master procedural synthesis
+        if is_web_3d:
+            from app.templates.web_studio.generator import ForgeWebStudio
+
+            reqs = list(context.get("requirements", []))
+            studio_files = ForgeWebStudio.synthesize_website(goal or node_title, reqs)
+            for s_name, s_content in studio_files.items():
+                if s_name in file_manifest or s_name in ["index.html", "style.css", "app.js"]:
+                    engine.fs.create_file(
+                        task_id=task_id,
+                        relative_path=s_name,
+                        content=s_content,
+                        role=self.role_name,
+                    )
+                    if s_name not in written:
+                        written.append(s_name)
+
+            # Store architectural learning in Memora persistent cognitive memory
+            if memora_client:
+                try:
+                    await memora_client.a_record_fact(
+                        fact_text=f"Built 3D web application for '{goal or node_title}' following Lovable/Bolt standard with 2-Column Split Hero, dedicated Three.js viewport card, and zero text-3D collision.",
+                        agent_name="forge",
+                        category="architecture",
+                        importance=0.98,
+                        entities=["forge", "web_studio", "3d", "lovable", "bolt", "threejs"],
+                    )
+                except Exception:
+                    pass
+
+            # Filter remaining non-web files to process if any
+            file_manifest = [f for f in file_manifest if f not in studio_files]
 
         # 2. Iterate through each implementation file in File Manifest and synthesize code
         for filename in file_manifest:

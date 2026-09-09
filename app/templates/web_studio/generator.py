@@ -212,36 +212,113 @@ class ForgeWebStudio:
     </header>
 
     <main>
-        <!-- 3D Interactive Product Hero Section -->
-        <section class="canvas-container" style="min-height: 80vh; display: flex; align-items: center; justify-content: center; padding: 4rem 1.5rem; text-align: center; position: relative;">
-            <canvas id="webstudio-3d-canvas" class="hero-canvas"></canvas>
+        <!-- 2-Column Split Hero Section (Zero Text-3D Overlap) -->
+        <section class="hero-split-section">
+            <div class="hero-split-container">
+                <!-- Left Column: Copy, Actions, Social Proof -->
+                <div class="hero-copy-col">
+                    <div style="margin-bottom: 1.25rem;">
+                        <span class="pill-badge">
+                            <span style="width: 8px; height: 8px; border-radius: 50%; background: var(--success); display: inline-block; box-shadow: 0 0 10px var(--success);"></span>
+                            3D Interactive Spatial Hardware • Drag to Inspect
+                        </span>
+                    </div>
 
-            <div class="hero-content" style="max-width: 800px; margin: 0 auto; position: relative; z-index: 10;">
-                <div style="margin-bottom: 1.5rem;">
-                    <span class="pill-badge">
-                        <span style="width: 8px; height: 8px; border-radius: 50%; background: var(--success); display: inline-block; box-shadow: 0 0 10px var(--success);"></span>
-                        3D Interactive Hardware Showcase • Drag to Spin
-                    </span>
+                    <h1 class="hero-title">
+                        {blueprint.headline}
+                    </h1>
+
+                    <p class="hero-subheadline">
+                        {blueprint.subheadline}
+                    </p>
+
+                    <div class="hero-cta-group">
+                        <a href="#catalog" class="btn-modern btn-primary">
+                            <span>{blueprint.primary_cta}</span>
+                            <i data-lucide="arrow-down" style="width: 18px; height: 18px;"></i>
+                        </a>
+                        <button id="hero-quick-order-btn" class="btn-modern btn-glass">
+                            <span>Quick Order Flagship</span>
+                            <i data-lucide="zap" style="width: 18px; height: 18px;"></i>
+                        </button>
+                    </div>
+
+                    <div class="hero-trust-band">
+                        <div class="avatar-stack">
+                            <span class="avatar-circle" style="background: #3b82f6;">JD</span>
+                            <span class="avatar-circle" style="background: #8b5cf6;">AR</span>
+                            <span class="avatar-circle" style="background: #ec4899;">MK</span>
+                            <span class="avatar-circle" style="background: #10b981;">ST</span>
+                        </div>
+                        <div class="trust-rating">
+                            <div class="trust-stars">★★★★★</div>
+                            <span class="trust-text">4.9/5 from 1,200+ hardware creators</span>
+                        </div>
+                    </div>
                 </div>
 
-                <h1 style="font-size: clamp(2.5rem, 5.5vw, 4.2rem); margin-bottom: 1.5rem; letter-spacing: -0.03em;">
-                    {blueprint.headline}
-                </h1>
+                <!-- Right Column: Dedicated 3D Holographic Viewport Card -->
+                <div class="hero-stage-col">
+                    <div class="viewport-card tilt-card">
+                        <div class="viewport-header">
+                            <div class="window-dots">
+                                <span class="dot red"></span>
+                                <span class="dot yellow"></span>
+                                <span class="dot green"></span>
+                            </div>
+                            <span class="viewport-title-badge">
+                                <span class="status-dot"></span>
+                                3D Hardware Core • WebGL 60FPS
+                            </span>
+                            <div class="viewport-actions">
+                                <button id="view-mode-wireframe" class="view-pill" title="Toggle Wireframe">Wireframe</button>
+                                <button id="view-mode-rotate" class="view-pill active" title="Toggle 360° Rotation">360°</button>
+                            </div>
+                        </div>
 
-                <p style="font-size: clamp(1.1rem, 2vw, 1.3rem); color: var(--text-secondary); margin-bottom: 2.5rem; max-width: 650px; margin-left: auto; margin-right: auto; line-height: 1.6;">
-                    {blueprint.subheadline}
-                </p>
+                        <div class="canvas-wrapper">
+                            <canvas id="webstudio-3d-canvas"></canvas>
 
-                <div style="display: flex; justify-content: center; gap: 1rem; flex-wrap: wrap;">
-                    <a href="#catalog" class="btn-modern btn-primary">
-                        <span>{blueprint.primary_cta}</span>
-                        <i data-lucide="arrow-down" style="width: 18px; height: 18px;"></i>
-                    </a>
-                    <button id="hero-quick-order-btn" class="btn-modern btn-glass">
-                        <span>Quick Order Flagship</span>
-                        <i data-lucide="zap" style="width: 18px; height: 18px;"></i>
-                    </button>
+                            <div class="viewport-chip chip-top-right">
+                                <i data-lucide="sparkles" style="width: 14px; height: 14px; color: var(--primary);"></i>
+                                <span>PBR Titanium</span>
+                            </div>
+                            <div class="viewport-chip chip-bottom-left">
+                                <i data-lucide="cpu" style="width: 14px; height: 14px; color: var(--secondary);"></i>
+                                <span>Zero-Latency 0.1ms</span>
+                            </div>
+                            <div class="viewport-chip chip-bottom-right">
+                                <span>Drag to Spin ↻</span>
+                            </div>
+                        </div>
+
+                        <div class="viewport-footer">
+                            <div class="model-color-picker">
+                                <span class="color-dot active" data-color="{blueprint.accent_color}" style="background: {blueprint.accent_color};" title="Primary Tint"></span>
+                                <span class="color-dot" data-color="{blueprint.secondary_color}" style="background: {blueprint.secondary_color};" title="Secondary Glow"></span>
+                                <span class="color-dot" data-color="#06b6d4" style="background: #06b6d4;" title="Cyan Pulse"></span>
+                                <span class="color-dot" data-color="#10b981" style="background: #10b981;" title="Emerald Aura"></span>
+                            </div>
+                            <span class="model-stats">4.2k Vertices • Physical Shading</span>
+                        </div>
+                    </div>
                 </div>
+            </div>
+        </section>
+
+        <!-- Tech Stack & Standards Marquee -->
+        <section class="marquee-container" aria-label="Engineered with Industry Standards">
+            <div class="marquee-content">
+                <div class="marquee-item"><i data-lucide="shield-check"></i> MIL-SPEC CERTIFIED</div>
+                <div class="marquee-item"><i data-lucide="cpu"></i> ARM ARCHITECTURE</div>
+                <div class="marquee-item"><i data-lucide="zap"></i> USB-C 40Gbps THUNDERBOLT</div>
+                <div class="marquee-item"><i data-lucide="layers"></i> TITANIUM BILLET 5-AXIS CNC</div>
+                <div class="marquee-item"><i data-lucide="radio"></i> BLUETOOTH LE 5.4 SPATIAL</div>
+                <div class="marquee-item"><i data-lucide="battery-charging"></i> 96H EXTENDED ENDURANCE</div>
+                <div class="marquee-item"><i data-lucide="shield-check"></i> MIL-SPEC CERTIFIED</div>
+                <div class="marquee-item"><i data-lucide="cpu"></i> ARM ARCHITECTURE</div>
+                <div class="marquee-item"><i data-lucide="zap"></i> USB-C 40Gbps THUNDERBOLT</div>
+                <div class="marquee-item"><i data-lucide="layers"></i> TITANIUM BILLET 5-AXIS CNC</div>
             </div>
         </section>
 
@@ -769,36 +846,113 @@ document.addEventListener('DOMContentLoaded', () => {{
     </header>
 
     <main>
-        <!-- 3D AI Neural Core Hero Section -->
-        <section class="canvas-container" style="min-height: 85vh; display: flex; align-items: center; justify-content: center; padding: 4rem 1.5rem; text-align: center; position: relative;">
-            <canvas id="webstudio-3d-canvas" class="hero-canvas"></canvas>
+        <!-- 2-Column Split Hero Section (Zero Text-3D Overlap) -->
+        <section class="hero-split-section">
+            <div class="hero-split-container">
+                <!-- Left Column: Copy, Actions, Social Proof -->
+                <div class="hero-copy-col">
+                    <div style="margin-bottom: 1.25rem;">
+                        <span class="pill-badge">
+                            <span style="width: 8px; height: 8px; border-radius: 50%; background: var(--success); display: inline-block; box-shadow: 0 0 10px var(--success);"></span>
+                            Autonomous Software Intelligence 3.0 • Real-time Neural Engine
+                        </span>
+                    </div>
 
-            <div class="hero-content" style="max-width: 850px; margin: 0 auto; position: relative; z-index: 10;">
-                <div style="margin-bottom: 1.5rem;">
-                    <span class="pill-badge">
-                        <span style="width: 8px; height: 8px; border-radius: 50%; background: var(--success); display: inline-block; box-shadow: 0 0 10px var(--success);"></span>
-                        Autonomous Software Intelligence 3.0
-                    </span>
+                    <h1 class="hero-title">
+                        {blueprint.headline}
+                    </h1>
+
+                    <p class="hero-subheadline">
+                        {blueprint.subheadline}
+                    </p>
+
+                    <div class="hero-cta-group">
+                        <button id="hero-trial-btn" class="btn-modern btn-primary">
+                            <span>{blueprint.primary_cta}</span>
+                            <i data-lucide="sparkles" style="width: 18px; height: 18px;"></i>
+                        </button>
+                        <button id="hero-demo-btn" class="btn-modern btn-glass">
+                            <span>Watch Interactive Demo</span>
+                            <i data-lucide="play-circle" style="width: 18px; height: 18px;"></i>
+                        </button>
+                    </div>
+
+                    <div class="hero-trust-band">
+                        <div class="avatar-stack">
+                            <span class="avatar-circle" style="background: #3b82f6;">TC</span>
+                            <span class="avatar-circle" style="background: #8b5cf6;">EK</span>
+                            <span class="avatar-circle" style="background: #ec4899;">VM</span>
+                            <span class="avatar-circle" style="background: #10b981;">NW</span>
+                        </div>
+                        <div class="trust-rating">
+                            <div class="trust-stars">★★★★★</div>
+                            <span class="trust-text">4.9/5 from 4,500+ engineering organizations</span>
+                        </div>
+                    </div>
                 </div>
 
-                <h1 style="font-size: clamp(2.5rem, 6vw, 4.5rem); margin-bottom: 1.5rem; letter-spacing: -0.03em;">
-                    {blueprint.headline}
-                </h1>
+                <!-- Right Column: Dedicated 3D Holographic Viewport Card -->
+                <div class="hero-stage-col">
+                    <div class="viewport-card tilt-card">
+                        <div class="viewport-header">
+                            <div class="window-dots">
+                                <span class="dot red"></span>
+                                <span class="dot yellow"></span>
+                                <span class="dot green"></span>
+                            </div>
+                            <span class="viewport-title-badge">
+                                <span class="status-dot"></span>
+                                Neural Core • Active Synaptic Matrix
+                            </span>
+                            <div class="viewport-actions">
+                                <button id="view-mode-wireframe" class="view-pill" title="Toggle Wireframe">Wireframe</button>
+                                <button id="view-mode-rotate" class="view-pill active" title="Toggle 360° Rotation">360°</button>
+                            </div>
+                        </div>
 
-                <p style="font-size: clamp(1.1rem, 2vw, 1.35rem); color: var(--text-secondary); margin-bottom: 2.5rem; max-width: 680px; margin-left: auto; margin-right: auto; line-height: 1.6;">
-                    {blueprint.subheadline}
-                </p>
+                        <div class="canvas-wrapper">
+                            <canvas id="webstudio-3d-canvas"></canvas>
 
-                <div style="display: flex; justify-content: center; gap: 1rem; flex-wrap: wrap;">
-                    <button id="hero-trial-btn" class="btn-modern btn-primary">
-                        <span>{blueprint.primary_cta}</span>
-                        <i data-lucide="sparkles" style="width: 18px; height: 18px;"></i>
-                    </button>
-                    <button id="hero-demo-btn" class="btn-modern btn-glass">
-                        <span>Watch Interactive Demo</span>
-                        <i data-lucide="play-circle" style="width: 18px; height: 18px;"></i>
-                    </button>
+                            <div class="viewport-chip chip-top-right">
+                                <i data-lucide="cpu" style="width: 14px; height: 14px; color: var(--primary);"></i>
+                                <span>4.8 PFLOPS Neural</span>
+                            </div>
+                            <div class="viewport-chip chip-bottom-left">
+                                <i data-lucide="zap" style="width: 14px; height: 14px; color: var(--secondary);"></i>
+                                <span>0.12ms Latency</span>
+                            </div>
+                            <div class="viewport-chip chip-bottom-right">
+                                <span>Drag to Spin ↻</span>
+                            </div>
+                        </div>
+
+                        <div class="viewport-footer">
+                            <div class="model-color-picker">
+                                <span class="color-dot active" data-color="{blueprint.accent_color}" style="background: {blueprint.accent_color};" title="Primary Aura"></span>
+                                <span class="color-dot" data-color="{blueprint.secondary_color}" style="background: {blueprint.secondary_color};" title="Secondary Glow"></span>
+                                <span class="color-dot" data-color="#06b6d4" style="background: #06b6d4;" title="Cyan Pulse"></span>
+                                <span class="color-dot" data-color="#ec4899" style="background: #ec4899;" title="Magenta Surge"></span>
+                            </div>
+                            <span class="model-stats">128 Lattice Nodes • Real-Time Pulse</span>
+                        </div>
+                    </div>
                 </div>
+            </div>
+        </section>
+
+        <!-- Enterprise Tech Stack Marquee -->
+        <section class="marquee-container" aria-label="Trusted Enterprise Standards">
+            <div class="marquee-content">
+                <div class="marquee-item"><i data-lucide="shield-check"></i> SOC-2 TYPE II CERTIFIED</div>
+                <div class="marquee-item"><i data-lucide="lock"></i> 256-BIT AES ENCRYPTION</div>
+                <div class="marquee-item"><i data-lucide="cpu"></i> DEDICATED GPU CLUSTERS</div>
+                <div class="marquee-item"><i data-lucide="zap"></i> 99.999% SLA UPTIME</div>
+                <div class="marquee-item"><i data-lucide="git-branch"></i> MULTI-REGION SYNCHRONIZATION</div>
+                <div class="marquee-item"><i data-lucide="database"></i> COMPLIANT DATA RESIDENCY</div>
+                <div class="marquee-item"><i data-lucide="shield-check"></i> SOC-2 TYPE II CERTIFIED</div>
+                <div class="marquee-item"><i data-lucide="lock"></i> 256-BIT AES ENCRYPTION</div>
+                <div class="marquee-item"><i data-lucide="cpu"></i> DEDICATED GPU CLUSTERS</div>
+                <div class="marquee-item"><i data-lucide="zap"></i> 99.999% SLA UPTIME</div>
             </div>
         </section>
 
@@ -1224,23 +1378,113 @@ document.addEventListener('DOMContentLoaded', () => {{
     </header>
 
     <main>
-        <!-- 3D Planetary Telemetry Sphere Hero Section -->
-        <section class="canvas-container" style="min-height: 70vh; display: flex; align-items: center; justify-content: center; padding: 3rem 1.5rem; text-align: center; position: relative;">
-            <canvas id="webstudio-3d-canvas" class="hero-canvas"></canvas>
+        <!-- 2-Column Split Hero Section (Zero Text-3D Overlap) -->
+        <section class="hero-split-section">
+            <div class="hero-split-container">
+                <!-- Left Column: Operations Overview & Status -->
+                <div class="hero-copy-col">
+                    <div style="margin-bottom: 1.25rem;">
+                        <span class="pill-badge">
+                            <span style="width: 8px; height: 8px; border-radius: 50%; background: var(--success); display: inline-block; box-shadow: 0 0 10px var(--success);"></span>
+                            Global Orbital Telemetry Mesh • Live Edge Sensors
+                        </span>
+                    </div>
 
-            <div class="hero-content" style="max-width: 800px; margin: 0 auto; position: relative; z-index: 10;">
-                <div style="margin-bottom: 1rem;">
-                    <span class="pill-badge">
-                        <span style="width: 8px; height: 8px; border-radius: 50%; background: var(--success); display: inline-block;"></span>
-                        Global Orbital Telemetry Mesh
-                    </span>
+                    <h1 class="hero-title">
+                        {blueprint.headline}
+                    </h1>
+
+                    <p class="hero-subheadline">
+                        {blueprint.subheadline}
+                    </p>
+
+                    <div class="hero-cta-group">
+                        <a href="#telemetry-table" class="btn-modern btn-primary">
+                            <span>Inspect Fleet Telemetry</span>
+                            <i data-lucide="arrow-down" style="width: 18px; height: 18px;"></i>
+                        </a>
+                        <button id="quick-diagnostics-btn" class="btn-modern btn-glass">
+                            <span>Run Quick Diagnostics</span>
+                            <i data-lucide="activity" style="width: 18px; height: 18px;"></i>
+                        </button>
+                    </div>
+
+                    <div class="hero-trust-band">
+                        <div class="avatar-stack">
+                            <span class="avatar-circle" style="background: #10b981;">OPS</span>
+                            <span class="avatar-circle" style="background: #3b82f6;">SRE</span>
+                            <span class="avatar-circle" style="background: #8b5cf6;">NOC</span>
+                            <span class="avatar-circle" style="background: #f59e0b;">SEC</span>
+                        </div>
+                        <div class="trust-rating">
+                            <div class="trust-stars" style="color: var(--success);">●●●●●</div>
+                            <span class="trust-text">All 42 Planetary Edge Nodes Reporting 100% Health</span>
+                        </div>
+                    </div>
                 </div>
-                <h1 style="font-size: clamp(2.2rem, 5vw, 3.8rem); margin-bottom: 1rem; letter-spacing: -0.03em;">
-                    {blueprint.headline}
-                </h1>
-                <p style="color: var(--text-secondary); max-width: 600px; margin: 0 auto 2rem auto; font-size: 1.1rem; line-height: 1.6;">
-                    {blueprint.subheadline}
-                </p>
+
+                <!-- Right Column: Dedicated 3D Holographic Planetary Viewport -->
+                <div class="hero-stage-col">
+                    <div class="viewport-card tilt-card">
+                        <div class="viewport-header">
+                            <div class="window-dots">
+                                <span class="dot red"></span>
+                                <span class="dot yellow"></span>
+                                <span class="dot green"></span>
+                            </div>
+                            <span class="viewport-title-badge">
+                                <span class="status-dot"></span>
+                                Planetary Sensor Sphere • Orbit Sync
+                            </span>
+                            <div class="viewport-actions">
+                                <button id="view-mode-wireframe" class="view-pill" title="Toggle Wireframe">Wireframe</button>
+                                <button id="view-mode-rotate" class="view-pill active" title="Toggle 360° Rotation">360°</button>
+                            </div>
+                        </div>
+
+                        <div class="canvas-wrapper">
+                            <canvas id="webstudio-3d-canvas"></canvas>
+
+                            <div class="viewport-chip chip-top-right">
+                                <i data-lucide="radio" style="width: 14px; height: 14px; color: var(--success);"></i>
+                                <span>Satellites: 24 Online</span>
+                            </div>
+                            <div class="viewport-chip chip-bottom-left">
+                                <i data-lucide="globe" style="width: 14px; height: 14px; color: var(--primary);"></i>
+                                <span>Coverage: 99.98%</span>
+                            </div>
+                            <div class="viewport-chip chip-bottom-right">
+                                <span>Drag to Spin ↻</span>
+                            </div>
+                        </div>
+
+                        <div class="viewport-footer">
+                            <div class="model-color-picker">
+                                <span class="color-dot active" data-color="{blueprint.accent_color}" style="background: {blueprint.accent_color};" title="Radar Blue"></span>
+                                <span class="color-dot" data-color="{blueprint.secondary_color}" style="background: {blueprint.secondary_color};" title="Telemetry Purple"></span>
+                                <span class="color-dot" data-color="#10b981" style="background: #10b981;" title="Emerald Healthy"></span>
+                                <span class="color-dot" data-color="#06b6d4" style="background: #06b6d4;" title="Cyan Beacon"></span>
+                            </div>
+                            <span class="model-stats">Orbital Telemetry • 64 Node Mesh</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Network Protocols & Standards Marquee -->
+        <section class="marquee-container" aria-label="Active Telemetry Protocols">
+            <div class="marquee-content">
+                <div class="marquee-item"><i data-lucide="radio"></i> MQTT v5.0 SECURE</div>
+                <div class="marquee-item"><i data-lucide="activity"></i> gRPC BIDIRECTIONAL STREAMING</div>
+                <div class="marquee-item"><i data-lucide="layers"></i> KAFKA SHARDED CLUSTER</div>
+                <div class="marquee-item"><i data-lucide="shield-check"></i> MUTUAL TLS 1.3</div>
+                <div class="marquee-item"><i data-lucide="cpu"></i> WEBASSEMBLY EDGE WORKERS</div>
+                <div class="marquee-item"><i data-lucide="database"></i> TIMESERIES COMPRESSION 14:1</div>
+                <div class="marquee-item"><i data-lucide="radio"></i> MQTT v5.0 SECURE</div>
+                <div class="marquee-item"><i data-lucide="activity"></i> gRPC BIDIRECTIONAL STREAMING</div>
+                <div class="marquee-item"><i data-lucide="layers"></i> KAFKA SHARDED CLUSTER</div>
+                <div class="marquee-item"><i data-lucide="shield-check"></i> MUTUAL TLS 1.3</div>
             </div>
         </section>
 
@@ -1644,54 +1888,123 @@ document.addEventListener('DOMContentLoaded', () => {{
     </header>
 
     <main>
-        <!-- 3D Interactive Hero Section -->
-        <section class="canvas-container" style="min-height: 85vh; display: flex; align-items: center; justify-content: center; padding: 4rem 1.5rem; text-align: center; position: relative;">
-            <canvas id="webstudio-3d-canvas" class="hero-canvas"></canvas>
+        <!-- 2-Column Split Hero Section (Zero Text-3D Overlap) -->
+        <section class="hero-split-section">
+            <div class="hero-split-container">
+                <!-- Left Column: Copy, Actions, Social Proof -->
+                <div class="hero-copy-col">
+                    <div style="margin-bottom: 1.25rem;">
+                        <span class="pill-badge">
+                            <span style="width: 8px; height: 8px; border-radius: 50%; background: var(--success); display: inline-block; box-shadow: 0 0 10px var(--success);"></span>
+                            Creative Technologist &amp; System Architect • Production Ready
+                        </span>
+                    </div>
 
-            <div class="hero-content" style="max-width: 850px; margin: 0 auto; position: relative; z-index: 10;">
-                <div style="margin-bottom: 1.5rem;">
-                    <span class="pill-badge">
-                        <span style="width: 8px; height: 8px; border-radius: 50%; background: var(--success); display: inline-block; box-shadow: 0 0 10px var(--success);"></span>
-                        Next-Generation Autonomous Experience
-                    </span>
-                </div>
+                    <h1 class="hero-title">
+                        {blueprint.headline}
+                    </h1>
 
-                <h1 style="font-size: clamp(2.5rem, 6vw, 4.5rem); margin-bottom: 1.5rem; letter-spacing: -0.03em;">
-                    {blueprint.headline}
-                </h1>
+                    <p class="hero-subheadline">
+                        {blueprint.subheadline}
+                    </p>
 
-                <p style="font-size: clamp(1.1rem, 2vw, 1.35rem); color: var(--text-secondary); margin-bottom: 2.5rem; max-width: 680px; margin-left: auto; margin-right: auto; line-height: 1.6;">
-                    {blueprint.subheadline}
-                </p>
+                    <div class="hero-cta-group">
+                        <a href="#showcase" class="btn-modern btn-primary">
+                            <span>{blueprint.primary_cta}</span>
+                            <i data-lucide="sparkles" style="width: 18px; height: 18px;"></i>
+                        </a>
+                        <a href="#contact" class="btn-modern btn-glass">
+                            <span>{blueprint.secondary_cta}</span>
+                            <i data-lucide="arrow-right" style="width: 18px; height: 18px;"></i>
+                        </a>
+                    </div>
 
-                <div style="display: flex; justify-content: center; gap: 1rem; flex-wrap: wrap;">
-                    <a href="#showcase" class="btn-modern btn-primary">
-                        <span>{blueprint.primary_cta}</span>
-                        <i data-lucide="sparkles" style="width: 18px; height: 18px;"></i>
-                    </a>
-                    <a href="#contact" class="btn-modern btn-glass">
-                        <span>{blueprint.secondary_cta}</span>
-                        <i data-lucide="arrow-right" style="width: 18px; height: 18px;"></i>
-                    </a>
-                </div>
-
-                <!-- Interactive 3D HUD Controls Pill -->
-                <div style="margin-top: 2.25rem;">
-                    <div class="hud-controls-bar" style="display: inline-flex; align-items: center; gap: 0.75rem; background: var(--glass-bg); padding: 0.4rem 0.85rem; border-radius: 9999px; border: 1px solid var(--border-subtle);">
-                        <button id="hud-wireframe-toggle" class="btn-modern btn-glass active" style="padding: 0.35rem 0.75rem; font-size: 0.8rem; border-radius: 9999px;" title="Toggle 3D Wireframe / Solid Mesh">
-                            <i data-lucide="box" style="width: 14px; height: 14px;"></i>
-                            <span>Wireframe</span>
-                        </button>
-                        <button id="hud-speed-toggle" class="btn-modern btn-glass" style="padding: 0.35rem 0.75rem; font-size: 0.8rem; border-radius: 9999px;" title="Cycle Rotation Speed">
-                            <i data-lucide="gauge" style="width: 14px; height: 14px;"></i>
-                            <span id="hud-speed-label">Speed: 1.0x</span>
-                        </button>
-                        <button id="hud-reset-view" class="btn-modern btn-glass" style="padding: 0.35rem 0.75rem; font-size: 0.8rem; border-radius: 9999px;" title="Reset 3D Scene View">
-                            <i data-lucide="rotate-ccw" style="width: 14px; height: 14px;"></i>
-                            <span>Reset</span>
-                        </button>
+                    <div class="hero-trust-band">
+                        <div class="avatar-stack">
+                            <span class="avatar-circle" style="background: #3b82f6;">AG</span>
+                            <span class="avatar-circle" style="background: #8b5cf6;">NX</span>
+                            <span class="avatar-circle" style="background: #ec4899;">CP</span>
+                            <span class="avatar-circle" style="background: #10b981;">RS</span>
+                        </div>
+                        <div class="trust-rating">
+                            <div class="trust-stars">★★★★★</div>
+                            <span class="trust-text">5.0 Star Code Review • 150+ Open-Source &amp; Production Ships</span>
+                        </div>
                     </div>
                 </div>
+
+                <!-- Right Column: Dedicated 3D Holographic Viewport Card -->
+                <div class="hero-stage-col">
+                    <div class="viewport-card tilt-card">
+                        <div class="viewport-header">
+                            <div class="window-dots">
+                                <span class="dot red"></span>
+                                <span class="dot yellow"></span>
+                                <span class="dot green"></span>
+                            </div>
+                            <span class="viewport-title-badge">
+                                <span class="status-dot"></span>
+                                3D Cyber Core • WebGL 60FPS
+                            </span>
+                            <div class="viewport-actions hud-controls-bar">
+                                <button id="hud-wireframe-toggle" class="view-pill active" title="Toggle 3D Wireframe / Solid Mesh">
+                                    <i data-lucide="box" style="width: 12px; height: 12px;"></i>
+                                    <span>Wireframe</span>
+                                </button>
+                                <button id="hud-speed-toggle" class="view-pill" title="Cycle Rotation Speed">
+                                    <i data-lucide="gauge" style="width: 12px; height: 12px;"></i>
+                                    <span id="hud-speed-label">Speed: 1.0x</span>
+                                </button>
+                                <button id="hud-reset-view" class="view-pill" title="Reset 3D Scene View">
+                                    <i data-lucide="rotate-ccw" style="width: 12px; height: 12px;"></i>
+                                    <span>Reset</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="canvas-wrapper">
+                            <canvas id="webstudio-3d-canvas"></canvas>
+
+                            <div class="viewport-chip chip-top-right">
+                                <i data-lucide="sparkles" style="width: 14px; height: 14px; color: var(--primary);"></i>
+                                <span>Torus Knot Spec: R4.2</span>
+                            </div>
+                            <div class="viewport-chip chip-bottom-left">
+                                <i data-lucide="cpu" style="width: 14px; height: 14px; color: var(--secondary);"></i>
+                                <span>WebGL 2.0 • 60 FPS</span>
+                            </div>
+                            <div class="viewport-chip chip-bottom-right">
+                                <span>Drag to Spin ↻</span>
+                            </div>
+                        </div>
+
+                        <div class="viewport-footer">
+                            <div class="model-color-picker">
+                                <span class="color-dot active" data-color="{blueprint.accent_color}" style="background: {blueprint.accent_color};" title="Primary Neon"></span>
+                                <span class="color-dot" data-color="{blueprint.secondary_color}" style="background: {blueprint.secondary_color};" title="Secondary Glow"></span>
+                                <span class="color-dot" data-color="#06b6d4" style="background: #06b6d4;" title="Cyan Pulse"></span>
+                                <span class="color-dot" data-color="#ec4899" style="background: #ec4899;" title="Magenta Surge"></span>
+                            </div>
+                            <span class="model-stats">Articulated Torus Knot • Multi-Layer Shading</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Core Engineering Stack Marquee -->
+        <section class="marquee-container" aria-label="Core Engineering Stack">
+            <div class="marquee-content">
+                <div class="marquee-item"><i data-lucide="box"></i> THREE.JS &amp; WEBGL</div>
+                <div class="marquee-item"><i data-lucide="cpu"></i> WEBGPU COMPUTE</div>
+                <div class="marquee-item"><i data-lucide="code"></i> TYPESCRIPT &amp; REACT</div>
+                <div class="marquee-item"><i data-lucide="layers"></i> SHADER TOY &amp; GLSL</div>
+                <div class="marquee-item"><i data-lucide="terminal"></i> RUST &amp; PYTHON</div>
+                <div class="marquee-item"><i data-lucide="git-branch"></i> NEXT.JS ARCHITECTURE</div>
+                <div class="marquee-item"><i data-lucide="box"></i> THREE.JS &amp; WEBGL</div>
+                <div class="marquee-item"><i data-lucide="cpu"></i> WEBGPU COMPUTE</div>
+                <div class="marquee-item"><i data-lucide="code"></i> TYPESCRIPT &amp; REACT</div>
+                <div class="marquee-item"><i data-lucide="layers"></i> SHADER TOY &amp; GLSL</div>
             </div>
         </section>
 

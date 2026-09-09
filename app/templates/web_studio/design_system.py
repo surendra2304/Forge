@@ -653,4 +653,374 @@ h1, h2, h3, h4, h5, h6 {{
     color: var(--danger);
     border: 1px solid rgba(239, 68, 68, 0.3);
 }}
+
+/* ==========================================================================
+   Lovable & Bolt-Caliber Split Hero & 3D Holographic Viewport Architecture
+   ========================================================================== */
+
+/* Modern Subtle Dot Grid Background */
+body {{
+    background-image: radial-gradient(rgba(255, 255, 255, 0.07) 1px, transparent 1px);
+    background-size: 28px 28px;
+    background-position: center top;
+}}
+
+/* 2-Column Split Hero Section */
+.hero-split-section {{
+    position: relative;
+    padding: 3rem 1.5rem 4.5rem 1.5rem;
+    overflow: hidden;
+    min-height: 84vh;
+    display: flex;
+    align-items: center;
+}}
+
+.hero-split-container {{
+    max-width: 1280px;
+    margin: 0 auto;
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1.12fr 0.88fr;
+    gap: 3.5rem;
+    align-items: center;
+    position: relative;
+    z-index: 10;
+}}
+
+@media (max-width: 980px) {{
+    .hero-split-container {{
+        grid-template-columns: 1fr;
+        gap: 2.5rem;
+        text-align: center;
+    }}
+}}
+
+.hero-copy-col {{
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    text-align: left;
+}}
+
+@media (max-width: 980px) {{
+    .hero-copy-col {{
+        align-items: center;
+        text-align: center;
+    }}
+}}
+
+.hero-title {{
+    font-size: clamp(2.3rem, 4.5vw, 4.0rem);
+    font-weight: 800;
+    line-height: 1.1;
+    letter-spacing: -0.035em;
+    margin-bottom: 1.25rem;
+    color: var(--text-primary);
+}}
+
+.hero-title .gradient-text {{
+    background: linear-gradient(135deg, #ffffff 25%, var(--primary) 70%, var(--secondary) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}}
+
+.hero-subheadline {{
+    font-size: clamp(1.05rem, 1.8vw, 1.2rem);
+    line-height: 1.65;
+    color: var(--text-secondary);
+    margin-bottom: 2.25rem;
+    max-width: 580px;
+}}
+
+.hero-cta-group {{
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin-bottom: 2.5rem;
+}}
+
+@media (max-width: 980px) {{
+    .hero-cta-group {{
+        justify-content: center;
+    }}
+}}
+
+/* Trust / Social Proof Band */
+.hero-trust-band {{
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--border-subtle);
+}}
+
+.avatar-stack {{
+    display: flex;
+    align-items: center;
+}}
+
+.avatar-stack .avatar-circle {{
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: 2px solid var(--bg-base);
+    margin-left: -8px;
+    background: var(--bg-surface-elevated);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}}
+
+.avatar-stack .avatar-circle:first-child {{
+    margin-left: 0;
+}}
+
+.trust-rating {{
+    display: flex;
+    flex-direction: column;
+    font-size: 0.8rem;
+    line-height: 1.3;
+}}
+
+.trust-stars {{
+    color: #fbbf24;
+    font-size: 0.85rem;
+    letter-spacing: 2px;
+}}
+
+.trust-text {{
+    color: var(--text-muted);
+    font-weight: 500;
+}}
+
+/* Dedicated 3D Holographic Stage Viewport Card */
+.hero-stage-col {{
+    position: relative;
+    width: 100%;
+}}
+
+.viewport-card {{
+    position: relative;
+    background: radial-gradient(circle at 50% 15%, rgba(99, 102, 241, 0.12), rgba(15, 23, 42, 0.75));
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border: 1px solid var(--border-highlight);
+    border-radius: 1.5rem;
+    box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.7), inset 0 1px 1px 0 rgba(255, 255, 255, 0.15);
+    overflow: hidden;
+    transition: transform var(--transition-smooth), box-shadow var(--transition-smooth);
+}}
+
+.viewport-card:hover {{
+    box-shadow: 0 30px 70px -10px var(--accent-glow), inset 0 1px 1px 0 rgba(255, 255, 255, 0.25);
+}}
+
+.viewport-header {{
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.85rem 1.25rem;
+    border-bottom: 1px solid var(--border-subtle);
+    background: rgba(0, 0, 0, 0.25);
+}}
+
+.window-dots {{
+    display: flex;
+    gap: 6px;
+}}
+
+.window-dots .dot {{
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+}}
+
+.window-dots .dot.red {{ background: #ef4444; }}
+.window-dots .dot.yellow {{ background: #f59e0b; }}
+.window-dots .dot.green {{ background: #10b981; }}
+
+.viewport-title-badge {{
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}}
+
+.viewport-title-badge .status-dot {{
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--success);
+    box-shadow: 0 0 8px var(--success);
+}}
+
+.viewport-actions {{
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}}
+
+.view-pill {{
+    padding: 0.25rem 0.65rem;
+    font-size: 0.72rem;
+    font-weight: 600;
+    border-radius: 9999px;
+    background: var(--glass-bg);
+    border: 1px solid var(--border-subtle);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}}
+
+.view-pill:hover, .view-pill.active {{
+    background: var(--primary);
+    color: #ffffff;
+    border-color: var(--primary);
+}}
+
+/* Dedicated 3D Canvas Viewport Box */
+.canvas-wrapper {{
+    position: relative;
+    width: 100%;
+    height: 440px;
+    background: transparent;
+    overflow: hidden;
+}}
+
+.canvas-wrapper canvas {{
+    width: 100% !important;
+    height: 100% !important;
+    display: block;
+    cursor: grab;
+}}
+
+.canvas-wrapper canvas:active {{
+    cursor: grabbing;
+}}
+
+/* Corner Floating Viewport Chips */
+.viewport-chip {{
+    position: absolute;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.35rem 0.75rem;
+    font-size: 0.72rem;
+    font-weight: 600;
+    border-radius: 9999px;
+    background: rgba(15, 23, 42, 0.75);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid var(--border-highlight);
+    color: var(--text-primary);
+    pointer-events: none;
+    z-index: 5;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}}
+
+.viewport-chip.chip-top-right {{
+    top: 1rem;
+    right: 1rem;
+}}
+
+.viewport-chip.chip-bottom-left {{
+    bottom: 1rem;
+    left: 1rem;
+}}
+
+.viewport-chip.chip-bottom-right {{
+    bottom: 1rem;
+    right: 1rem;
+    color: var(--primary);
+}}
+
+/* 3D Viewport Footer & Live Color Customizer */
+.viewport-footer {{
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem 1.25rem;
+    border-top: 1px solid var(--border-subtle);
+    background: rgba(0, 0, 0, 0.2);
+}}
+
+.model-color-picker {{
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}}
+
+.color-dot {{
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: transform 0.2s ease, border-color 0.2s ease;
+}}
+
+.color-dot:hover {{
+    transform: scale(1.2);
+}}
+
+.color-dot.active {{
+    border-color: #ffffff;
+    box-shadow: 0 0 10px rgba(255, 255, 255, 0.6);
+    transform: scale(1.15);
+}}
+
+.model-stats {{
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+}}
+
+/* Infinite Marquee Tech Ticker */
+.marquee-container {{
+    overflow: hidden;
+    white-space: nowrap;
+    position: relative;
+    padding: 2rem 0;
+    border-top: 1px solid var(--border-subtle);
+    border-bottom: 1px solid var(--border-subtle);
+    background: rgba(0, 0, 0, 0.15);
+    margin: 2rem 0 4rem 0;
+    mask-image: linear-gradient(to right, transparent, black 15%, black 85%, transparent);
+    -webkit-mask-image: linear-gradient(to right, transparent, black 15%, black 85%, transparent);
+}}
+
+.marquee-content {{
+    display: inline-flex;
+    gap: 3.5rem;
+    animation: marquee 30s linear infinite;
+}}
+
+@keyframes marquee {{
+    from {{ transform: translateX(0); }}
+    to {{ transform: translateX(-50%); }}
+}}
+
+.marquee-item {{
+    display: inline-flex;
+    align-items: center;
+    gap: 0.6rem;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    opacity: 0.75;
+    transition: opacity 0.2s ease, color 0.2s ease;
+}}
+
+.marquee-item:hover {{
+    opacity: 1;
+    color: var(--text-primary);
+}}
 """

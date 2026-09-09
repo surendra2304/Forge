@@ -109,6 +109,9 @@ async def handle_build(
                 "web app",
                 "saas",
                 "e-commerce",
+                "ecommerce",
+                "store",
+                "shop",
                 "dashboard",
                 "showcase",
             ]

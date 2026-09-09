@@ -50,11 +50,11 @@ function init3DHeroCanvas() {{
 
     function initThreeJSScene(targetCanvas) {{
         const container = targetCanvas.parentElement || document.body;
-        let width = targetCanvas.clientWidth || container.clientWidth || window.innerWidth;
-        let height = targetCanvas.clientHeight || container.clientHeight || window.innerHeight || 600;
+        let width = targetCanvas.clientWidth || container.clientWidth || 550;
+        let height = targetCanvas.clientHeight || container.clientHeight || 440;
 
         const scene = new THREE.Scene();
-        const camera = new THREE.PerspectiveCamera(60, width / height, 0.1, 1000);
+        const camera = new THREE.PerspectiveCamera(55, width / height, 0.1, 1000);
         const renderer = new THREE.WebGLRenderer({{
             canvas: targetCanvas,
             alpha: true,
@@ -67,16 +67,16 @@ function init3DHeroCanvas() {{
         const group = new THREE.Group();
         scene.add(group);
 
-        // Lighting Rig
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.85);
+        // Studio Lighting Rig
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.9);
         scene.add(ambientLight);
 
         const pointLight1 = new THREE.PointLight('{primary_hex}', 3.5, 60);
-        pointLight1.position.set(6, 5, 6);
+        pointLight1.position.set(6, 6, 6);
         scene.add(pointLight1);
 
         const pointLight2 = new THREE.PointLight('{accent_hex}', 3.0, 60);
-        pointLight2.position.set(-6, -5, 4);
+        pointLight2.position.set(-6, -4, 4);
         scene.add(pointLight2);
 
         // Domain-Specific 3D Geometry Setup
@@ -85,39 +85,56 @@ function init3DHeroCanvas() {{
         let orbitRing1, orbitRing2, satBeacon1, satBeacon2;
         let isDragging = false;
         let prevMouse = {{ x: 0, y: 0 }};
+        let autoRotate = true;
 
         if (domain === "ecommerce") {{
-            // E-COMMERCE: Luxury 3D Product Showcase with Mouse Drag Rotation
-            camera.position.z = 5.2;
+            // E-COMMERCE: Articulated Cybernetic Hardware / Spatial Core
+            camera.position.z = 4.8;
 
-            const productGeo = new THREE.DodecahedronGeometry(1.85, 0);
-            const productMat = new THREE.MeshStandardMaterial({{
+            const chassisGeo = new THREE.CylinderGeometry(1.2, 1.2, 0.65, 32);
+            const chassisMat = new THREE.MeshStandardMaterial({{
                 color: '{primary_hex}',
-                metalness: 0.85,
+                metalness: 0.9,
                 roughness: 0.15,
                 emissive: '{accent_hex}',
                 emissiveIntensity: 0.25,
                 wireframe: false
             }});
-            mainMesh = new THREE.Mesh(productGeo, productMat);
+            mainMesh = new THREE.Mesh(chassisGeo, chassisMat);
+            mainMesh.rotation.x = Math.PI / 5;
             group.add(mainMesh);
 
-            const ringGeo = new THREE.TorusGeometry(2.7, 0.035, 16, 100);
-            const ringMat = new THREE.MeshBasicMaterial({{
+            const visorGeo = new THREE.SphereGeometry(1.05, 32, 16, 0, Math.PI * 2, 0, Math.PI * 0.5);
+            const visorMat = new THREE.MeshStandardMaterial({{
                 color: '{accent_hex}',
+                roughness: 0.08,
+                metalness: 0.15,
                 transparent: true,
-                opacity: 0.65
+                opacity: 0.85,
+                emissive: '{accent_hex}',
+                emissiveIntensity: 0.35
             }});
-            secondaryMesh = new THREE.Mesh(ringGeo, ringMat);
-            secondaryMesh.rotation.x = Math.PI / 3;
+            secondaryMesh = new THREE.Mesh(visorGeo, visorMat);
+            secondaryMesh.rotation.x = Math.PI / 2;
             group.add(secondaryMesh);
 
-            // Orbiting sparkles
+            const ring1Geo = new THREE.TorusGeometry(2.1, 0.035, 16, 100);
+            const ring1Mat = new THREE.MeshBasicMaterial({{ color: '{primary_hex}', transparent: true, opacity: 0.7 }});
+            orbitRing1 = new THREE.Mesh(ring1Geo, ring1Mat);
+            orbitRing1.rotation.x = Math.PI / 3;
+            group.add(orbitRing1);
+
+            const ring2Geo = new THREE.TorusGeometry(2.4, 0.02, 16, 100);
+            const ring2Mat = new THREE.MeshBasicMaterial({{ color: '{accent_hex}', transparent: true, opacity: 0.55 }});
+            orbitRing2 = new THREE.Mesh(ring2Geo, ring2Mat);
+            orbitRing2.rotation.y = Math.PI / 4;
+            group.add(orbitRing2);
+
             const sparkGeo = new THREE.BufferGeometry();
-            const sparkCount = 180;
+            const sparkCount = 160;
             const sparkPos = new Float32Array(sparkCount * 3);
             for (let i = 0; i < sparkCount * 3; i += 3) {{
-                const r = 2.2 + Math.random() * 1.5;
+                const r = 2.0 + Math.random() * 1.5;
                 const theta = Math.random() * Math.PI * 2;
                 const phi = (Math.random() - 0.5) * Math.PI;
                 sparkPos[i] = r * Math.cos(theta) * Math.cos(phi);
@@ -125,71 +142,50 @@ function init3DHeroCanvas() {{
                 sparkPos[i + 2] = r * Math.sin(theta) * Math.cos(phi);
             }}
             sparkGeo.setAttribute('position', new THREE.BufferAttribute(sparkPos, 3));
-            const sparkMat = new THREE.PointsMaterial({{ size: 0.04, color: '{accent_hex}', transparent: true, opacity: 0.8 }});
+            const sparkMat = new THREE.PointsMaterial({{ size: 0.035, color: '{primary_hex}', transparent: true, opacity: 0.8 }});
             tertiaryMesh = new THREE.Points(sparkGeo, sparkMat);
             group.add(tertiaryMesh);
 
-            // Drag to rotate product
-            targetCanvas.style.cursor = 'grab';
-            targetCanvas.addEventListener('pointerdown', (e) => {{
-                isDragging = true;
-                prevMouse = {{ x: e.clientX, y: e.clientY }};
-                targetCanvas.style.cursor = 'grabbing';
-            }});
-            window.addEventListener('pointermove', (e) => {{
-                if (!isDragging) return;
-                const dx = e.clientX - prevMouse.x;
-                const dy = e.clientY - prevMouse.y;
-                group.rotation.y += dx * 0.008;
-                group.rotation.x += dy * 0.008;
-                prevMouse = {{ x: e.clientX, y: e.clientY }};
-            }});
-            window.addEventListener('pointerup', () => {{
-                isDragging = false;
-                targetCanvas.style.cursor = 'grab';
-            }});
-
         }} else if (domain === "saas") {{
-            // SAAS: Floating AI Neural Core with Synaptic Node Network
-            camera.position.z = 5.4;
+            // SAAS: Floating Quantum AI Neural Core with Synaptic Constellation
+            camera.position.z = 5.0;
 
-            const geodesicGeo = new THREE.IcosahedronGeometry(1.8, 2);
+            const geodesicGeo = new THREE.IcosahedronGeometry(1.65, 2);
             const geodesicMat = new THREE.MeshStandardMaterial({{
                 color: '{primary_hex}',
                 wireframe: true,
                 transparent: true,
-                opacity: 0.8,
+                opacity: 0.85,
                 emissive: '{primary_hex}',
-                emissiveIntensity: 0.35
+                emissiveIntensity: 0.4
             }});
             mainMesh = new THREE.Mesh(geodesicGeo, geodesicMat);
             group.add(mainMesh);
 
-            const nucleusGeo = new THREE.SphereGeometry(0.85, 32, 32);
+            const nucleusGeo = new THREE.SphereGeometry(0.8, 32, 32);
             const nucleusMat = new THREE.MeshStandardMaterial({{
                 color: '{accent_hex}',
                 emissive: '{accent_hex}',
-                emissiveIntensity: 0.7,
-                roughness: 0.2,
-                metalness: 0.6
+                emissiveIntensity: 0.75,
+                roughness: 0.15,
+                metalness: 0.7
             }});
             secondaryMesh = new THREE.Mesh(nucleusGeo, nucleusMat);
             group.add(secondaryMesh);
 
-            // Constellation node links
             const nodeCount = 35;
             const nodeVectors = [];
             for (let i = 0; i < nodeCount; i++) {{
                 nodeVectors.push(new THREE.Vector3(
-                    (Math.random() - 0.5) * 4.2,
-                    (Math.random() - 0.5) * 4.2,
-                    (Math.random() - 0.5) * 4.2
+                    (Math.random() - 0.5) * 3.8,
+                    (Math.random() - 0.5) * 3.8,
+                    (Math.random() - 0.5) * 3.8
                 ));
             }}
             const linePoints = [];
             for (let i = 0; i < nodeCount; i++) {{
                 for (let j = i + 1; j < nodeCount; j++) {{
-                    if (nodeVectors[i].distanceTo(nodeVectors[j]) < 1.8) {{
+                    if (nodeVectors[i].distanceTo(nodeVectors[j]) < 1.7) {{
                         linePoints.push(nodeVectors[i].x, nodeVectors[i].y, nodeVectors[i].z);
                         linePoints.push(nodeVectors[j].x, nodeVectors[j].y, nodeVectors[j].z);
                     }}
@@ -197,34 +193,33 @@ function init3DHeroCanvas() {{
             }}
             const lineGeo = new THREE.BufferGeometry();
             lineGeo.setAttribute('position', new THREE.Float32BufferAttribute(linePoints, 3));
-            const lineMat = new THREE.LineBasicMaterial({{ color: '{primary_hex}', transparent: true, opacity: 0.45 }});
+            const lineMat = new THREE.LineBasicMaterial({{ color: '{primary_hex}', transparent: true, opacity: 0.5 }});
             tertiaryMesh = new THREE.LineSegments(lineGeo, lineMat);
             group.add(tertiaryMesh);
 
         }} else if (domain === "dashboard") {{
-            // DASHBOARD: Planetary Globe & Concentric Orbital Telemetry Rings
-            camera.position.z = 5.6;
+            // DASHBOARD: Planetary Holographic Globe with Orbital Telemetry Satellites
+            camera.position.z = 5.2;
 
-            const globeGeo = new THREE.SphereGeometry(1.9, 24, 24);
+            const globeGeo = new THREE.SphereGeometry(1.7, 24, 24);
             const globeMat = new THREE.MeshStandardMaterial({{
                 color: '{primary_hex}',
                 wireframe: true,
                 transparent: true,
-                opacity: 0.75,
+                opacity: 0.8,
                 emissive: '{primary_hex}',
-                emissiveIntensity: 0.25
+                emissiveIntensity: 0.3
             }});
             mainMesh = new THREE.Mesh(globeGeo, globeMat);
             group.add(mainMesh);
 
-            const ring1Geo = new THREE.TorusGeometry(2.7, 0.025, 16, 100);
+            const ring1Geo = new THREE.TorusGeometry(2.5, 0.025, 16, 100);
             const ring1Mat = new THREE.MeshBasicMaterial({{ color: '{accent_hex}', transparent: true, opacity: 0.65 }});
             orbitRing1 = new THREE.Mesh(ring1Geo, ring1Mat);
-            orbitRing1.rotation.x = Math.PI / 2.6;
-            orbitRing1.rotation.y = Math.PI / 8;
+            orbitRing1.rotation.x = Math.PI / 2.8;
             group.add(orbitRing1);
 
-            const ring2Geo = new THREE.TorusGeometry(3.2, 0.02, 16, 100);
+            const ring2Geo = new THREE.TorusGeometry(2.9, 0.02, 16, 100);
             const ring2Mat = new THREE.MeshBasicMaterial({{ color: '{primary_hex}', transparent: true, opacity: 0.45 }});
             orbitRing2 = new THREE.Mesh(ring2Geo, ring2Mat);
             orbitRing2.rotation.x = -Math.PI / 3.2;
@@ -239,9 +234,9 @@ function init3DHeroCanvas() {{
 
         }} else {{
             // PORTFOLIO / CYBERPUNK: High-Tech Cybernetic Torus Knot
-            camera.position.z = 5.6;
+            camera.position.z = 5.2;
 
-            const torusGeo = new THREE.TorusKnotGeometry(2.0, 0.45, 128, 32);
+            const torusGeo = new THREE.TorusKnotGeometry(1.8, 0.42, 128, 32);
             const torusMat = new THREE.MeshStandardMaterial({{
                 color: '{primary_hex}',
                 wireframe: true,
@@ -255,7 +250,7 @@ function init3DHeroCanvas() {{
             mainMesh = new THREE.Mesh(torusGeo, torusMat);
             group.add(mainMesh);
 
-            const coreGeo = new THREE.IcosahedronGeometry(1.2, 2);
+            const coreGeo = new THREE.IcosahedronGeometry(1.1, 2);
             const coreMat = new THREE.MeshStandardMaterial({{
                 color: '{accent_hex}',
                 wireframe: false,
@@ -267,12 +262,12 @@ function init3DHeroCanvas() {{
             secondaryMesh = new THREE.Mesh(coreGeo, coreMat);
             group.add(secondaryMesh);
 
-            const particlesCount = 450;
+            const particlesCount = 380;
             const positions = new Float32Array(particlesCount * 3);
             for (let i = 0; i < particlesCount * 3; i += 3) {{
-                positions[i] = (Math.random() - 0.5) * 16;
-                positions[i + 1] = (Math.random() - 0.5) * 16;
-                positions[i + 2] = (Math.random() - 0.5) * 16;
+                positions[i] = (Math.random() - 0.5) * 14;
+                positions[i + 1] = (Math.random() - 0.5) * 14;
+                positions[i + 2] = (Math.random() - 0.5) * 14;
             }}
             const particlesGeometry = new THREE.BufferGeometry();
             particlesGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
@@ -311,6 +306,61 @@ function init3DHeroCanvas() {{
             }}
         }}
 
+        // Live Material Color Customizer
+        document.querySelectorAll('.color-dot').forEach(dot => {{
+            dot.addEventListener('click', () => {{
+                document.querySelectorAll('.color-dot').forEach(d => d.classList.remove('active'));
+                dot.classList.add('active');
+                const hex = dot.getAttribute('data-color');
+                if (hex && mainMesh && mainMesh.material) {{
+                    mainMesh.material.color.set(hex);
+                    if (mainMesh.material.emissive) {{
+                        mainMesh.material.emissive.set(hex);
+                    }}
+                }}
+            }});
+        }});
+
+        // View Mode Toggles in Viewport Card Header
+        const wireBtn = document.getElementById('view-mode-wireframe');
+        if (wireBtn) {{
+            wireBtn.addEventListener('click', () => {{
+                if (mainMesh && mainMesh.material) {{
+                    const isWire = !mainMesh.material.wireframe;
+                    mainMesh.material.wireframe = isWire;
+                    wireBtn.classList.toggle('active', isWire);
+                }}
+            }});
+        }}
+
+        const rotBtn = document.getElementById('view-mode-rotate');
+        if (rotBtn) {{
+            rotBtn.addEventListener('click', () => {{
+                autoRotate = !autoRotate;
+                rotBtn.classList.toggle('active', autoRotate);
+            }});
+        }}
+
+        // Mouse-Drag to Rotate with Smooth Damping
+        targetCanvas.style.cursor = 'grab';
+        targetCanvas.addEventListener('pointerdown', (e) => {{
+            isDragging = true;
+            prevMouse = {{ x: e.clientX, y: e.clientY }};
+            targetCanvas.style.cursor = 'grabbing';
+        }});
+        window.addEventListener('pointermove', (e) => {{
+            if (!isDragging) return;
+            const dx = e.clientX - prevMouse.x;
+            const dy = e.clientY - prevMouse.y;
+            group.rotation.y += dx * 0.008;
+            group.rotation.x += dy * 0.008;
+            prevMouse = {{ x: e.clientX, y: e.clientY }};
+        }});
+        window.addEventListener('pointerup', () => {{
+            isDragging = false;
+            targetCanvas.style.cursor = 'grab';
+        }});
+
         // Mouse Parallax
         let mouseX = 0, mouseY = 0;
         let targetX = 0, targetY = 0;
@@ -326,47 +376,55 @@ function init3DHeroCanvas() {{
             const t = clock.getElapsedTime();
 
             if (domain === "ecommerce") {{
-                if (!isDragging) {{
-                    mainMesh.rotation.y += 0.005;
-                    mainMesh.rotation.x = Math.sin(t * 0.6) * 0.15;
+                if (autoRotate && !isDragging) {{
+                    mainMesh.rotation.y += 0.007;
+                    mainMesh.rotation.x = Math.sin(t * 0.6) * 0.12;
+                    if (secondaryMesh) secondaryMesh.rotation.y += 0.007;
                 }}
-                if (secondaryMesh) secondaryMesh.rotation.z += 0.006;
+                if (orbitRing1) orbitRing1.rotation.z += 0.008;
+                if (orbitRing2) orbitRing2.rotation.x -= 0.007;
                 if (tertiaryMesh) tertiaryMesh.rotation.y -= 0.002;
             }} else if (domain === "saas") {{
-                mainMesh.rotation.x += 0.003;
-                mainMesh.rotation.y += 0.005;
-                const pulse = 0.8 + Math.sin(t * 2.2) * 0.12;
+                if (autoRotate && !isDragging) {{
+                    mainMesh.rotation.x += 0.003;
+                    mainMesh.rotation.y += 0.006;
+                }}
+                const pulse = 0.82 + Math.sin(t * 2.2) * 0.1;
                 if (secondaryMesh) secondaryMesh.scale.set(pulse, pulse, pulse);
                 if (tertiaryMesh) tertiaryMesh.rotation.y -= 0.002;
             }} else if (domain === "dashboard") {{
-                mainMesh.rotation.y += 0.004;
-                if (orbitRing1) orbitRing1.rotation.z += 0.005;
-                if (orbitRing2) orbitRing2.rotation.z -= 0.004;
+                if (autoRotate && !isDragging) {{
+                    mainMesh.rotation.y += 0.005;
+                }}
+                if (orbitRing1) orbitRing1.rotation.z += 0.006;
+                if (orbitRing2) orbitRing2.rotation.z -= 0.005;
                 if (satBeacon1) {{
-                    satBeacon1.position.x = Math.cos(t * 0.9) * 2.7;
-                    satBeacon1.position.y = Math.sin(t * 0.9) * 1.3;
-                    satBeacon1.position.z = Math.sin(t * 0.9) * 2.2;
+                    satBeacon1.position.x = Math.cos(t * 0.9) * 2.5;
+                    satBeacon1.position.y = Math.sin(t * 0.9) * 1.2;
+                    satBeacon1.position.z = Math.sin(t * 0.9) * 2.0;
                 }}
                 if (satBeacon2) {{
-                    satBeacon2.position.x = Math.cos(-t * 0.7) * 3.2;
-                    satBeacon2.position.y = Math.sin(-t * 0.7) * 1.8;
-                    satBeacon2.position.z = Math.sin(t * 0.7) * 1.5;
+                    satBeacon2.position.x = Math.cos(-t * 0.7) * 2.9;
+                    satBeacon2.position.y = Math.sin(-t * 0.7) * 1.6;
+                    satBeacon2.position.z = Math.sin(t * 0.7) * 1.4;
                 }}
             }} else {{
-                if (mainMesh) {{
-                    mainMesh.rotation.x += 0.004;
-                    mainMesh.rotation.y += 0.006;
-                }}
-                if (secondaryMesh) {{
-                    secondaryMesh.rotation.x -= 0.007;
-                    secondaryMesh.rotation.y += 0.004;
+                if (autoRotate && !isDragging) {{
+                    if (mainMesh) {{
+                        mainMesh.rotation.x += 0.004;
+                        mainMesh.rotation.y += 0.006;
+                    }}
+                    if (secondaryMesh) {{
+                        secondaryMesh.rotation.x -= 0.007;
+                        secondaryMesh.rotation.y += 0.004;
+                    }}
                 }}
                 if (tertiaryMesh) tertiaryMesh.rotation.y -= 0.001;
             }}
 
             if (!isDragging) {{
-                targetX += (mouseX * 0.5 - targetX) * 0.05;
-                targetY += (mouseY * 0.5 - targetY) * 0.05;
+                targetX += (mouseX * 0.35 - targetX) * 0.04;
+                targetY += (mouseY * 0.35 - targetY) * 0.04;
                 group.position.x = targetX;
                 group.position.y = targetY;
             }}
@@ -376,13 +434,17 @@ function init3DHeroCanvas() {{
         animate();
 
         function onResize() {{
-            const w = targetCanvas.clientWidth || container.clientWidth || window.innerWidth;
-            const h = targetCanvas.clientHeight || container.clientHeight || window.innerHeight || 600;
+            const w = targetCanvas.clientWidth || container.clientWidth || 550;
+            const h = targetCanvas.clientHeight || container.clientHeight || 440;
             camera.aspect = w / h;
             camera.updateProjectionMatrix();
             renderer.setSize(w, h);
         }}
         window.addEventListener('resize', onResize);
+        if (typeof ResizeObserver !== 'undefined') {{
+            const ro = new ResizeObserver(onResize);
+            ro.observe(container);
+        }}
     }}
 
     function initHighSpeedParticleCanvas(targetCanvas) {{
