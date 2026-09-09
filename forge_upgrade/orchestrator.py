@@ -44,11 +44,26 @@ class ForgeController:
 
     def finish(self) -> RunResult:
         if self.scheduler.failed():
-            return RunResult(
+            res = RunResult(
                 False, TaskPhase.FAILED, "one or more nodes failed", self.scheduler.progress()
             )
-        if self.scheduler.complete():
-            return RunResult(True, TaskPhase.COMPLETE, "all nodes passed", 1.0)
-        return RunResult(
-            False, TaskPhase.IMPLEMENT, "run still in progress", self.scheduler.progress()
-        )
+        elif self.scheduler.complete():
+            res = RunResult(True, TaskPhase.COMPLETE, "all nodes passed", 1.0)
+        else:
+            res = RunResult(
+                False, TaskPhase.IMPLEMENT, "run still in progress", self.scheduler.progress()
+            )
+
+        # Record task lifecycle event to Memora
+        try:
+            from forge_upgrade.memora_client import memora_client
+            memora_client.record_interaction(
+                agent_name="forge",
+                user_input=f"DAG Plan {self.graph.title if hasattr(self.graph, 'title') else 'Task'}",
+                agent_output=f"Phase: {res.phase.value} | Progress: {res.progress * 100:.1f}% | Message: {res.message}",
+                event_type="software_task"
+            )
+        except Exception:
+            pass
+
+        return res
