@@ -206,10 +206,23 @@ class ArchitectRole(BaseAgent):
         except Exception:
             pass
 
+        # Query Memora persistent memory for past architectural specs & guidelines
+        memora_info = ""
+        try:
+            from app.integrations.memora_client import get_memora_client
+
+            memora_client = get_memora_client()
+            memora_ctx = await memora_client.a_build_context_prompt(query=goal)
+            if memora_ctx:
+                memora_info = f"\n{memora_ctx}\n"
+        except Exception:
+            pass
+
         prompt = (
             f"Objective: {goal}\n"
             f"Stage: {node_title}\n"
             f"{workspace_summary}\n"
+            f"{memora_info}"
             f"{consensus_info}\n"
             f"{research_info}\n"
             f"{futuris_info}\n"
@@ -311,6 +324,26 @@ class ArchitectRole(BaseAgent):
             )
             if "docs/FILE_MANIFEST.json" not in written:
                 written.append("docs/FILE_MANIFEST.json")
+
+        # Record architecture design to Memora long-term cognitive memory
+        try:
+            from app.integrations.memora_client import get_memora_client
+
+            memora_client = get_memora_client()
+            await memora_client.a_record_interaction(
+                user_input=f"Design architecture specification and file manifest for: {goal}",
+                agent_output=f"Architecture completed. Files: {manifest_files}",
+                agent_name="forge",
+                event_type="architecture_design",
+                tags=["architecture", "forge"],
+                metadata={
+                    "task_id": task_id,
+                    "role": self.role_name,
+                    "file_manifest": manifest_files,
+                },
+            )
+        except Exception:
+            pass
 
         return {
             "status": "success",
@@ -502,30 +535,15 @@ class DeveloperRole(BaseAgent):
             k in goal_text for k in ["backend", "fastapi", "flask", "django"]
         )
 
-        # For modern 3D web applications, synthesize all assets cohesively via ForgeWebStudio
-        # This guarantees 100% matched element IDs, CSS tokens, and Three.js canvas setup
-        # without selector drift from disconnected single-file model requests.
-        if is_web_3d and not (hasattr(self.provider, "mock_response") and self.provider.mock_response):
-            from app.templates.web_studio.generator import ForgeWebStudio
+        # Query Memora persistent memory for past code patterns and user preferences
+        memora_context_str = ""
+        try:
+            from app.integrations.memora_client import get_memora_client
 
-            enriched_requirements = list(context.get("requirements", []))
-            studio_files = ForgeWebStudio.synthesize_website(goal or node_title, enriched_requirements)
-            for s_name, s_content in studio_files.items():
-                engine.fs.create_file(
-                    task_id=task_id,
-                    relative_path=s_name,
-                    content=s_content,
-                    role=self.role_name,
-                )
-                if s_name not in written:
-                    written.append(s_name)
-
-            return {
-                "status": "success",
-                "files_written": written,
-                "ai_universe_run_id": "webstudio_synthesis",
-                "fallback_stub": False,
-            }
+            memora_client = get_memora_client()
+            memora_context_str = await memora_client.a_build_context_prompt(query=goal or node_title)
+        except Exception:
+            pass
 
         # Fetch IntelX technical research for unfamiliar technologies
         research_context_str = ""
@@ -630,6 +648,15 @@ class DeveloperRole(BaseAgent):
                         "interactive elements, no placeholder images or broken links.\nRequirements:\n"
                         + "\n".join([f"- {r}" for r in enriched_requirements])
                     )
+
+                if sibling_files:
+                    ask_prompt += "\n\nExisting files written for this project (ensure DOM selector and styling alignment):\n"
+                    for s_name, s_code in sibling_files.items():
+                        ask_prompt += f"\n--- File: {s_name} ---\n{s_code[:2000]}\n"
+
+                if memora_context_str:
+                    ask_prompt += f"\n\nCognitive Memory & Architectural Guidelines:\n{memora_context_str}\n"
+
                 ask_prompt += "\nReturn ONLY the raw code."
 
                 try:
@@ -638,7 +665,13 @@ class DeveloperRole(BaseAgent):
                         goal=goal or node_title,
                         file_type=file_type,
                         requirements=enriched_requirements,
-                        context={"project_goal": goal, "prompt": ask_prompt, "stage": "developer"},
+                        context={
+                            "project_goal": goal,
+                            "prompt": ask_prompt,
+                            "stage": "developer",
+                            "sibling_files": sibling_files,
+                            "memora_context": memora_context_str,
+                        },
                     )
                 except Exception:
                     ai_res = await ai_client.ask(question=ask_prompt, mode="auto")
@@ -785,6 +818,27 @@ class DeveloperRole(BaseAgent):
                     )
                 except Exception:
                     pass
+
+        # Record code synthesis outcome to Memora persistent cognitive memory
+        try:
+            from app.integrations.memora_client import get_memora_client
+
+            memora_client = get_memora_client()
+            await memora_client.a_record_interaction(
+                user_input=f"Synthesize implementation code for: {goal}",
+                agent_output=f"Synthesized files: {written} (fallback: {fallback_files})",
+                agent_name="forge",
+                event_type="code_synthesis",
+                tags=["developer", "code_generated" if not fallback_files else "code_fallback"],
+                metadata={
+                    "task_id": task_id,
+                    "role": self.role_name,
+                    "files_written": written,
+                    "fallback_files": fallback_files,
+                },
+            )
+        except Exception:
+            pass
 
         ret: dict[str, Any] = {
             "status": "success",

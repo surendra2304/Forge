@@ -51,6 +51,18 @@ async def handle_build(
 
     await db_manager.init_db()
 
+    # Retrieve Persistent Long-Term Memory from Memora
+    memory_context = ""
+    try:
+        from app.integrations.memora_client import get_memora_client
+
+        memora = get_memora_client()
+        memory_context = await memora.a_build_context_prompt(query=goal)
+        if memory_context:
+            console.print("[dim cyan][MEMORA] Recalled relevant cognitive memories and preferences for synthesis.[/dim cyan]")
+    except Exception as e:
+        logger.debug(f"Memora intake query failed: {e}")
+
     with Progress(
         SpinnerColumn(),
         TextColumn("[progress.description]{task.description}"),
@@ -65,6 +77,7 @@ async def handle_build(
             requirements=requirements,
             mode=TaskMode.AUTONOMOUS,
             max_budget=max_budget,
+            context={"memory_context": memory_context} if memory_context else None,
         )
         progress.update(
             task_p,
@@ -196,6 +209,28 @@ async def handle_build(
             else "[green]Build Complete & Checkpointed!"
         )
         progress.update(task_p, advance=25, description=completion_desc)
+
+        # Record task lifecycle event to Memora persistent cognitive memory
+        try:
+            from app.integrations.memora_client import get_memora_client
+
+            memora = get_memora_client()
+            summary = f"Task {task_id} {task.state.value}. Passed {report.passed_checks}/{report.total_checks} verification checks."
+            await memora.a_record_interaction(
+                user_input=goal,
+                agent_output=summary,
+                agent_name="forge",
+                event_type="software_build",
+                tags=["forge_build", task.state.value, "verified" if report.all_passed else "unverified"],
+                metadata={
+                    "task_id": task_id,
+                    "state": task.state.value,
+                    "checks_passed": report.passed_checks,
+                    "total_checks": report.total_checks,
+                },
+            )
+        except Exception as e:
+            logger.debug(f"Memora build record failed: {e}")
 
     # If fallback or failure occurred, print warning panel
     if is_fallback:

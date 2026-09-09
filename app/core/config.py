@@ -128,6 +128,16 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("CORTEX_API_KEY", "NEXUS_API_KEY", "cortex_api_key"),
         description="API Key for Cortex API authentication",
     )
+    memora_url: str = Field(
+        default="https://memora-9zr9.onrender.com",
+        validation_alias=AliasChoices("MEMORA_URL", "FORGE_MEMORA_URL", "memora_url"),
+        description="Base URL for Memora persistent memory fabric",
+    )
+    memora_api_key: str | None = Field(
+        default="memora_api",
+        validation_alias=AliasChoices("MEMORA_API_KEY", "FORGE_MEMORA_API_KEY", "memora_api_key"),
+        description="API Key for Memora REST API authentication",
+    )
 
     model_config = SettingsConfigDict(
         env_file=".env",

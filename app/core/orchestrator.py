@@ -62,6 +62,7 @@ class OrchestratorCore:
         custom_workspace: str | None = None,
         repo_url: str | None = None,
         local_path: str | Path | None = None,
+        context: dict[str, Any] | None = None,
     ) -> tuple[TaskEntity, TaskGraph]:
         """
         Intake a user request, create isolated workspace (with optional git clone or local copy),

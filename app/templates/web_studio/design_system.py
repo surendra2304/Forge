@@ -492,4 +492,165 @@ h1, h2, h3, h4, h5, h6 {{
     border-color: var(--primary);
     color: var(--primary);
 }}
+
+/* ==========================================================================
+   Domain-Specific Component Architectures (E-Commerce, SaaS, Dashboard)
+   ========================================================================== */
+
+/* Cart Drawer (E-Commerce) */
+.cart-drawer-backdrop {{
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(6px);
+    z-index: 1000;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+}}
+.cart-drawer-backdrop.open {{
+    opacity: 1;
+    pointer-events: auto;
+}}
+.cart-drawer {{
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: min(440px, 100vw);
+    background: var(--bg-surface);
+    border-left: 1px solid var(--border-highlight);
+    z-index: 1001;
+    transform: translateX(100%);
+    transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+    display: flex;
+    flex-direction: column;
+    box-shadow: -10px 0 35px rgba(0, 0, 0, 0.5);
+}}
+.cart-drawer.open {{
+    transform: translateX(0);
+}}
+.cart-drawer-header {{
+    padding: 1.25rem 1.5rem;
+    border-bottom: 1px solid var(--border-subtle);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}}
+.cart-drawer-body {{
+    flex: 1;
+    overflow-y: auto;
+    padding: 1.5rem;
+}}
+.cart-drawer-footer {{
+    padding: 1.25rem 1.5rem;
+    border-top: 1px solid var(--border-subtle);
+    background: rgba(0, 0, 0, 0.2);
+}}
+.cart-badge {{
+    background: var(--primary);
+    color: #ffffff;
+    border-radius: 9999px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    padding: 0.15rem 0.5rem;
+    margin-left: 0.35rem;
+}}
+
+/* Pricing Toggle & Cards (SaaS) */
+.pricing-toggle-bar {{
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    margin-bottom: 2.5rem;
+}}
+.toggle-switch-track {{
+    width: 52px;
+    height: 28px;
+    background: var(--bg-surface-elevated);
+    border: 1px solid var(--border-subtle);
+    border-radius: 9999px;
+    position: relative;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}}
+.toggle-switch-thumb {{
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--primary);
+    position: absolute;
+    top: 3px;
+    left: 4px;
+    transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}}
+.toggle-switch-track.annual .toggle-switch-thumb {{
+    transform: translateX(24px);
+}}
+.pricing-card {{
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    height: 100%;
+    padding: 2.25rem;
+    border-radius: 1.25rem;
+    position: relative;
+    transition: all var(--transition-smooth);
+}}
+.pricing-card.featured {{
+    border-color: var(--primary);
+    box-shadow: 0 0 35px -5px var(--accent-glow);
+}}
+
+/* Telemetry Table & Gauges (Dashboard) */
+.telemetry-table {{
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+}}
+.telemetry-table th {{
+    text-align: left;
+    padding: 0.85rem 1rem;
+    color: var(--text-muted);
+    font-weight: 600;
+    border-bottom: 1px solid var(--border-subtle);
+    background: rgba(0, 0, 0, 0.2);
+}}
+.telemetry-table td {{
+    padding: 0.85rem 1rem;
+    border-bottom: 1px solid var(--border-subtle);
+    color: var(--text-secondary);
+}}
+.telemetry-table tr:hover td {{
+    background: rgba(255, 255, 255, 0.02);
+    color: var(--text-primary);
+}}
+.status-pill {{
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 0.2rem 0.65rem;
+    border-radius: 9999px;
+}}
+.status-pill.nominal {{
+    background: rgba(16, 185, 129, 0.15);
+    color: var(--success);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+}}
+.status-pill.warning {{
+    background: rgba(245, 158, 11, 0.15);
+    color: var(--warning);
+    border: 1px solid rgba(245, 158, 11, 0.3);
+}}
+.status-pill.incident {{
+    background: rgba(239, 68, 68, 0.15);
+    color: var(--danger);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+}}
 """

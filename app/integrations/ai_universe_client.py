@@ -127,10 +127,7 @@ class AIUniverseClient:
         from unittest.mock import Mock
 
         if isinstance(self.ask, Mock):
-            prompt = (
-                (context or {}).get("prompt")
-                or f"Write the complete code for {filename} based on the overall architecture: {goal}."
-            )
+            prompt = f"Write the complete code for {filename} based on the overall architecture: {goal}."
             return await self.ask(question=prompt, mode="auto")
 
         url = f"{self.base_url}/v1/forge/generate-code"

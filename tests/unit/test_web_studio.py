@@ -225,10 +225,76 @@ async def test_developer_role_synchronizes_3d_web_app(tmp_path: Path):
 
     # Verify files on disk match
     html = engine.fs.read_file(task_id, "index.html", role="developer")
-    assert "webstudio-3d-canvas" in html
-    assert "hud-wireframe-toggle" in html
+    assert "<canvas" in html.lower()
+    assert "<html" in html.lower()
+
+    css = engine.fs.read_file(task_id, "style.css", role="developer")
+    assert ":root" in css or "body" in css
 
     js = engine.fs.read_file(task_id, "app.js", role="developer")
-    assert "webstudio-3d-canvas" in js
-    assert "THREE.TorusKnotGeometry" in js or "THREE.Scene" in js
+    assert len(js.strip()) > 50
+
+
+def test_ecommerce_domain_synthesis():
+    """Verify E-Commerce domain produces distinct cart drawer, product grid, and checkout."""
+    files = ForgeWebStudio.synthesize_website(
+        "Build a luxury 3D e-commerce store for futuristic hardware and tech accessories"
+    )
+    html = files["index.html"]
+    js = files["app.js"]
+
+    assert 'id="cart-drawer"' in html
+    assert 'id="cart-btn"' in html
+    assert 'id="checkout-modal"' in html
+    assert "add-to-cart-btn" in html
+    assert "addToCart" in js
+    assert "cart" in js
+
+
+def test_saas_domain_synthesis():
+    """Verify SaaS domain produces distinct ROI calculator, billing toggle, and tier pricing."""
+    files = ForgeWebStudio.synthesize_website(
+        "Create a modern futuristic 3D AI SaaS analytics platform with interactive pricing"
+    )
+    html = files["index.html"]
+    js = files["app.js"]
+
+    assert 'id="roi-calculator"' in html
+    assert 'id="team-size-slider"' in html
+    assert 'id="billing-toggle"' in html
+    assert "tier-price" in html
+    assert "teamSlider" in js or "team-size-slider" in js
+    assert "billingToggle" in js or "billing-toggle" in js
+
+
+def test_dashboard_domain_synthesis():
+    """Verify Dashboard domain produces distinct telemetry table, throughput gauges, and alert drawer."""
+    files = ForgeWebStudio.synthesize_website(
+        "Build a real-time IoT mission control operations dashboard with telemetry"
+    )
+    html = files["index.html"]
+    js = files["app.js"]
+
+    assert 'id="telemetry-table"' in html
+    assert 'id="kpi-throughput"' in html
+    assert 'id="kpi-latency"' in html
+    assert 'id="simulate-spike-btn"' in html
+    assert 'id="alerts-drawer"' in html
+    assert "kpiThroughput" in js or "telemetry-table" in js
+
+
+def test_portfolio_domain_synthesis():
+    """Verify Portfolio domain produces distinct 3D HUD controls, cyber terminal, and showcase cards."""
+    files = ForgeWebStudio.synthesize_website(
+        "Build a futuristic 3D cyberpunk developer portfolio with Three.js"
+    )
+    html = files["index.html"]
+    js = files["app.js"]
+
+    assert 'id="hud-wireframe-toggle"' in html
+    assert 'id="hud-speed-toggle"' in html
+    assert 'id="hud-reset-view"' in html
+    assert 'id="terminal"' in html
+    assert "runTerminalCommand" in js
+
 

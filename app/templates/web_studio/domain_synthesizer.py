@@ -34,27 +34,31 @@ class DomainSynthesizer:
     def analyze_goal(cls, goal: str) -> DomainBlueprint:
         g = goal.lower()
 
-        # 0. Cyberpunk / Sci-Fi / High-Tech 3D
-        if "cyberpunk" in g or "sci-fi" in g or "scifi" in g or "neon" in g:
+        # 0. E-Commerce / Store / Hardware Shop
+        if any(k in g for k in ["ecommerce", "e-commerce", "store", "shop", "hardware", "accessories", "cart", "buy", "shoe", "clothing", "apparel", "retail"]):
+            return cls._build_ecommerce_blueprint(goal)
+
+        # 1. SaaS Platform / Startup with Subscription or Pricing
+        if any(k in g for k in ["saas", "pricing", "subscription", "b2b", "copilot platform"]):
+            return cls._build_saas_blueprint(goal)
+
+        # 2. Analytics / Telemetry / Mission Dashboard
+        if any(k in g for k in ["dashboard", "telemetry", "ops hub", "control center", "monitoring", "operations hub", "iot"]):
+            return cls._build_dashboard_blueprint(goal)
+
+        # 3. Cyberpunk / Sci-Fi / High-Tech 3D
+        if any(k in g for k in ["cyberpunk", "sci-fi", "scifi", "neon", "glsl", "matrix"]):
             return cls._build_cyberpunk_blueprint(goal)
 
-        # 1. Developer / Creative Portfolio
+        # 4. Developer / Creative Portfolio
         if any(k in g for k in ["portfolio", "personal website", "developer profile", "resume", "cv"]):
             return cls._build_portfolio_blueprint(goal)
 
-        # 2. SaaS / AI Platform / Startup
-        if any(k in g for k in ["saas", "ai ", "platform", "startup", "tool", "copilot", "cloud", "api service"]):
+        # 5. Generic SaaS / Platform / AI Tool fallback
+        if any(k in g for k in ["platform", "startup", "tool", "copilot", "cloud", "api service", "ai "]):
             return cls._build_saas_blueprint(goal)
 
-        # 3. E-Commerce / Store / Product Showcase
-        if any(k in g for k in ["shop", "store", "ecommerce", "e-commerce", "product", "cart", "catalog", "buy"]):
-            return cls._build_ecommerce_blueprint(goal)
-
-        # 4. Analytics / Crypto / FinTech Dashboard
-        if any(k in g for k in ["dashboard", "analytics", "crypto", "trading", "finance", "tracker", "metrics"]):
-            return cls._build_dashboard_blueprint(goal)
-
-        # 5. Default / Creative Web App
+        # 6. Default / Creative Web App
         return cls._build_creative_app_blueprint(goal)
 
     @classmethod
@@ -303,6 +307,24 @@ class DomainSynthesizer:
                     "metrics": "$349 • Best Seller",
                     "modal_details": "Experience studio-grade acoustic clarity with bespoke graphene diaphragms and ultra-low distortion.",
                 },
+                {
+                    "id": "prod-3",
+                    "category": "Spatial Compute",
+                    "title": "Apex Pro Spatial Tracker",
+                    "description": "6-DoF optical sub-millimeter positioning tracker with ultra-low latency infrared sensor arrays.",
+                    "tags": ["6-DoF", "Sub-mm Precision", "Zero-Drift"],
+                    "metrics": "$189 • In Stock",
+                    "modal_details": "Engineered for VR/AR spatial anchoring, motion capture studio telemetry, and high-speed robotic alignment.",
+                },
+                {
+                    "id": "prod-4",
+                    "category": "Spatial Compute",
+                    "title": "ChronoGrid Micro-OLED Visor",
+                    "description": "Dual 4K Micro-OLED displays running 120Hz refresh with custom pancake optics and 160g featherweight frame.",
+                    "tags": ["4K OLED", "120Hz", "Pancake Optics"],
+                    "metrics": "$499 • Flagship",
+                    "modal_details": "Revolutionary spatial computing glasses offering 100% DCI-P3 color gamut, hardware eye tracking, and USB-C displayport connectivity.",
+                },
             ],
             features_bento=[
                 {
@@ -343,6 +365,33 @@ class DomainSynthesizer:
                     "tags": ["Kubernetes", "1.30", "Singapore"],
                     "metrics": "99.99% Uptime • 42ms Latency",
                     "modal_details": "Autoscaling node pool configured with Prometheus metrics monitoring and automated pod healing.",
+                },
+                {
+                    "id": "metric-2",
+                    "category": "Storage",
+                    "title": "Vector Database Shard 01",
+                    "description": "1.2B dense embeddings indexed. Disk I/O throughput at 1.8 GB/s.",
+                    "tags": ["HNSW", "Qdrant", "NVMe RAID"],
+                    "metrics": "12ms P99 • 99.98% SLA",
+                    "modal_details": "Distributed memory-mapped vector search cluster supporting cosine similarity querying with zero cache misses.",
+                },
+                {
+                    "id": "metric-3",
+                    "category": "Network",
+                    "title": "Global Edge CDN Gateway",
+                    "description": "48 global Points of Presence with automated BGP anycast route optimization.",
+                    "tags": ["Anycast", "HTTP/3", "Cloudflare"],
+                    "metrics": "8.2ms TTFB • 0.001% Loss",
+                    "modal_details": "Edge caching layer serving TLS 1.3 encrypted static payloads with instant global cache invalidation.",
+                },
+                {
+                    "id": "metric-4",
+                    "category": "Compute",
+                    "title": "Inference GPU Matrix",
+                    "description": "32x NVIDIA H100 SXM5 GPUs executing parallel batch transformer inference.",
+                    "tags": ["H100 SXM5", "vLLM", "TensorRT-LLM"],
+                    "metrics": "84% Utilization • 62°C",
+                    "modal_details": "Autonomous GPU cluster with dynamic request batching, KV cache paged attention, and automatic failover.",
                 },
             ],
             features_bento=[
