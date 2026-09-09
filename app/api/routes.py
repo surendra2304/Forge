@@ -501,7 +501,10 @@ _forge_inf_client: httpx.AsyncClient | None = None
 def _get_forge_inf_client() -> httpx.AsyncClient:
     global _forge_inf_client
     if _forge_inf_client is None or _forge_inf_client.is_closed:
-        _forge_inf_client = httpx.AsyncClient(timeout=30.0)
+        _forge_inf_client = httpx.AsyncClient(
+            timeout=15.0,
+            limits=httpx.Limits(max_connections=50, max_keepalive_connections=20, keepalive_expiry=120.0)
+        )
     return _forge_inf_client
 
 
@@ -516,8 +519,8 @@ async def forge_ask_inference(req: ForgeInferenceRequest):
         "task_type": req.task_type,
         "prompt": req.question,
         "fast_lane": True,
-        "no_cache": True,
-        "max_tokens": 200,
+        "no_cache": False,
+        "max_tokens": 60,
     }
     headers = {"X-FRIDAY-API-Key": "inference_api"}
     client = _get_forge_inf_client()
