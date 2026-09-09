@@ -3,6 +3,7 @@ AI Universe Multi-Agent Intelligence Client for Project FORGE.
 Enables peer reasoning and debate integration with external AI Universe running at http://localhost:8000.
 """
 
+import asyncio
 from typing import Any
 
 import httpx
@@ -46,9 +47,9 @@ class AIUniverseClient:
         self.base_url = (base_url or settings.ai_universe_url).rstrip("/")
         self.api_key = api_key if api_key is not None else settings.ai_universe_api_key
         if timeout is None:
-            self.timeout = httpx.Timeout(60.0, connect=5.0)
+            self.timeout = httpx.Timeout(120.0, connect=30.0)
         elif isinstance(timeout, (int, float)):
-            self.timeout = httpx.Timeout(timeout, connect=min(timeout, 5.0))
+            self.timeout = httpx.Timeout(timeout, connect=min(timeout, 30.0))
         else:
             self.timeout = timeout
 
@@ -65,6 +66,7 @@ class AIUniverseClient:
     async def ask(self, question: str, mode: str = "auto") -> AIUniverseResponse:
         """
         Query AI Universe single/auto reasoning endpoint: POST /v1/friday/ask
+        Includes automatic retry for cloud service spin-up (502/503/timeout).
         """
         url = f"{self.base_url}/v1/friday/ask"
         headers = self._get_headers()
@@ -74,11 +76,38 @@ class AIUniverseClient:
         }
 
         logger.info(f"Querying AI Universe ask endpoint: mode={mode}")
-        async with httpx.AsyncClient(timeout=self.timeout) as client:
-            response = await client.post(url, json=payload, headers=headers)
-            response.raise_for_status()
-            data = response.json()
-            return AIUniverseResponse(**data)
+        last_exc: Exception | None = None
+        for attempt in range(3):
+            try:
+                async with httpx.AsyncClient(timeout=self.timeout) as client:
+                    response = await client.post(url, json=payload, headers=headers)
+                    if response.status_code in [502, 503] and attempt < 2:
+                        await asyncio.sleep(2.0 * (attempt + 1))
+                        continue
+                    response.raise_for_status()
+                    data = response.json()
+                    answer = data.get("answer", "")
+                    conf = data.get("confidence", 1.0)
+                    if any(
+                        k in answer.lower()
+                        for k in ["temporarily offline", "rate-limited", "high demand on"]
+                    ):
+                        conf = 0.0
+                    return AIUniverseResponse(
+                        answer=answer,
+                        confidence=conf,
+                        unresolved_disagreements=data.get("unresolved_disagreements", []),
+                        key_evidence=data.get("key_evidence", []),
+                        run_id=data.get("run_id", ""),
+                    )
+            except (httpx.ConnectTimeout, httpx.ReadTimeout, httpx.HTTPStatusError) as exc:
+                last_exc = exc
+                if attempt < 2:
+                    await asyncio.sleep(2.0 * (attempt + 1))
+                    continue
+                raise last_exc or exc
+
+        raise last_exc or RuntimeError("AI Universe ask query failed after retries")
 
     async def generate_code(
         self,
@@ -90,11 +119,16 @@ class AIUniverseClient:
     ) -> AIUniverseResponse:
         """
         Query Inference specialized code generation service: POST /v1/forge/generate-code
+        Includes automatic retry for cloud service spin-up (502/503/timeout).
         """
         from unittest.mock import Mock
 
         if isinstance(self.ask, Mock):
-            return await self.ask(question=f"generate code for {filename}: {goal}", mode="auto")
+            prompt = (
+                (context or {}).get("prompt")
+                or f"Write the complete code for {filename} based on the overall architecture: {goal}."
+            )
+            return await self.ask(question=prompt, mode="auto")
 
         url = f"{self.base_url}/v1/forge/generate-code"
         headers = self._get_headers()
@@ -106,15 +140,36 @@ class AIUniverseClient:
         }
 
         logger.info(f"Querying Inference generate-code service for '{filename}'")
-        async with httpx.AsyncClient(timeout=self.timeout) as client:
-            response = await client.post(url, json=payload, headers=headers)
-            response.raise_for_status()
-            data = response.json()
-            return AIUniverseResponse(
-                answer=data.get("code", ""),
-                confidence=data.get("confidence", 0.90),
-                run_id=data.get("filename", filename),
-            )
+        last_exc: Exception | None = None
+        for attempt in range(3):
+            try:
+                async with httpx.AsyncClient(timeout=self.timeout) as client:
+                    response = await client.post(url, json=payload, headers=headers)
+                    if response.status_code in [502, 503] and attempt < 2:
+                        await asyncio.sleep(2.0 * (attempt + 1))
+                        continue
+                    response.raise_for_status()
+                    data = response.json()
+                    code = data.get("code", "")
+                    conf = data.get("confidence", 0.95)
+                    if not code or any(
+                        k in code.lower()
+                        for k in ["temporarily offline", "rate-limited", "error occurred"]
+                    ):
+                        conf = 0.0
+                    return AIUniverseResponse(
+                        answer=code,
+                        confidence=conf,
+                        run_id=data.get("filename", filename),
+                    )
+            except (httpx.ConnectTimeout, httpx.ReadTimeout, httpx.HTTPStatusError) as exc:
+                last_exc = exc
+                if attempt < 2:
+                    await asyncio.sleep(2.0 * (attempt + 1))
+                    continue
+                raise last_exc or exc
+
+        raise last_exc or RuntimeError(f"Inference generate-code failed for '{filename}' after retries")
 
     async def stream_code(
         self,

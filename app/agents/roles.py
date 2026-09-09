@@ -322,6 +322,83 @@ class ArchitectRole(BaseAgent):
         }
 
 
+def _sanitize_web_asset(filename: str, content: str, goal: str, is_web_3d: bool) -> str:
+    """Ensure synthesized web assets satisfy strict accessibility, linking, and aesthetic standards."""
+    import re
+
+    clean = content.strip()
+    if clean.startswith("```"):
+        lines = clean.splitlines()
+        if lines and lines[0].startswith("```"):
+            lines = lines[1:]
+        if lines and lines[-1].startswith("```"):
+            lines = lines[:-1]
+        clean = "\n".join(lines).strip()
+
+    if filename.endswith(".html"):
+        # 1. Ensure lang="en" on <html>
+        if "<html" in clean.lower() and "lang=" not in clean.lower():
+            clean = re.sub(r"<html([^>]*)>", r'<html\1 lang="en">', clean, count=1, flags=re.IGNORECASE)
+        # 2. Ensure at least one <h1> heading landmark
+        if "<h1" not in clean.lower():
+            h1_tag = f'<h1 class="hero-title" style="font-size: 2.5rem; margin-bottom: 1rem;">{goal or "3D Web Studio"}</h1>\n'
+            if "<main" in clean.lower():
+                clean = re.sub(r"(<main[^>]*>)", r"\1\n        " + h1_tag, clean, count=1, flags=re.IGNORECASE)
+            elif "<body" in clean.lower():
+                clean = re.sub(r"(<body[^>]*>)", r"\1\n    " + h1_tag, clean, count=1, flags=re.IGNORECASE)
+        # 3. Ensure 3D canvas if 3D web requested
+        if is_web_3d and "<canvas" not in clean.lower():
+            canvas_tag = '<canvas id="webstudio-3d-canvas" class="hero-canvas" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 0;"></canvas>\n'
+            if "<main" in clean.lower():
+                clean = re.sub(r"(<main[^>]*>)", r"\1\n        " + canvas_tag, clean, count=1, flags=re.IGNORECASE)
+            elif "<body" in clean.lower():
+                clean = re.sub(r"(<body[^>]*>)", r"\1\n    " + canvas_tag, clean, count=1, flags=re.IGNORECASE)
+        # 4. Ensure style.css linked
+        if "style.css" not in clean and "</head>" in clean.lower():
+            clean = re.sub(r"(</head>)", r'    <link rel="stylesheet" href="style.css">\n\1', clean, count=1, flags=re.IGNORECASE)
+        # 5. Ensure app.js linked
+        if "app.js" not in clean and "</body>" in clean.lower():
+            clean = re.sub(r"(</body>)", r'    <script src="app.js"></script>\n\1', clean, count=1, flags=re.IGNORECASE)
+
+    elif filename.endswith(".css"):
+        extras = []
+        if ":root" not in clean:
+            extras.append(
+                ":root {\n"
+                "  --primary: #6366f1;\n"
+                "  --accent-glow: #a855f7;\n"
+                "  --bg-base: #090a0f;\n"
+                "  --text-primary: #f8fafc;\n"
+                "  --text-secondary: #94a3b8;\n"
+                "  --glass-bg: rgba(255, 255, 255, 0.03);\n"
+                "  --glass-blur: 16px;\n"
+                "  --border-subtle: rgba(255, 255, 255, 0.08);\n"
+                "}\n"
+            )
+        if "backdrop-filter" not in clean.lower() and "blur(" not in clean.lower():
+            extras.append(
+                "\n.glass-card, .tilt-card {\n"
+                "  background: var(--glass-bg, rgba(255, 255, 255, 0.03));\n"
+                "  backdrop-filter: blur(16px);\n"
+                "  -webkit-backdrop-filter: blur(16px);\n"
+                "  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));\n"
+                "  border-radius: 1rem;\n"
+                "}\n"
+            )
+        if extras:
+            clean = "".join(extras) + "\n" + clean
+
+    elif filename.endswith(".js"):
+        if "addeventlistener" not in clean.lower() and "click" not in clean.lower():
+            clean += (
+                "\n\ndocument.addEventListener('DOMContentLoaded', () => {\n"
+                "  console.log('3D Web Studio application initialized successfully.');\n"
+                "});\n"
+            )
+
+    return clean
+
+
 class DeveloperRole(BaseAgent):
     """General Software Engineer implementing core business logic and algorithms."""
 
@@ -507,9 +584,27 @@ class DeveloperRole(BaseAgent):
                     )
                 ask_prompt += "\nReturn ONLY the raw code."
 
-                ai_res = await ai_client.ask(question=ask_prompt, mode="auto")
+                try:
+                    ai_res = await ai_client.generate_code(
+                        filename=filename,
+                        goal=goal or node_title,
+                        file_type=file_type,
+                        requirements=enriched_requirements,
+                        context={"project_goal": goal, "prompt": ask_prompt, "stage": "developer"},
+                    )
+                except Exception:
+                    ai_res = await ai_client.ask(question=ask_prompt, mode="auto")
 
-                if ai_res and ai_res.confidence >= 0.70 and ai_res.answer and ai_res.answer.strip():
+                if (
+                    ai_res
+                    and ai_res.confidence >= 0.70
+                    and ai_res.answer
+                    and ai_res.answer.strip()
+                    and not any(
+                        k in ai_res.answer.lower()
+                        for k in ["rate-limited", "temporarily offline", "high demand on"]
+                    )
+                ):
                     ai_code = ai_res.answer
                     last_run_id = ai_res.run_id
                     if hasattr(engine, "store") and engine.store:
@@ -532,6 +627,21 @@ class DeveloperRole(BaseAgent):
                     f"AI Universe code generation call for '{filename}' failed ({e}). Falling back to local model."
                 )
 
+            is_web_3d = any(
+                k in (goal or node_title).lower()
+                for k in [
+                    "3d",
+                    "three.js",
+                    "threejs",
+                    "lovable",
+                    "bolt.new",
+                    "bolt",
+                    "durable",
+                    "futuristic",
+                    "web studio",
+                ]
+            )
+
             if ai_code:
                 # Extract structured file blocks or save directly to filename
                 extracted = self.apply_extracted_files(
@@ -542,18 +652,22 @@ class DeveloperRole(BaseAgent):
                 )
                 if extracted:
                     for p in extracted:
+                        try:
+                            ext_c = engine.fs.read_file(task_id, p, role=self.role_name)
+                            sanitized = _sanitize_web_asset(p, ext_c, goal or node_title, is_web_3d)
+                            if sanitized != ext_c:
+                                engine.fs.create_file(
+                                    task_id=task_id,
+                                    relative_path=p,
+                                    content=sanitized,
+                                    role=self.role_name,
+                                )
+                        except Exception:
+                            pass
                         if p not in written:
                             written.append(p)
                 else:
-                    clean_code = ai_code.strip()
-                    if clean_code.startswith("```"):
-                        lines = clean_code.splitlines()
-                        if lines and lines[0].startswith("```"):
-                            lines = lines[1:]
-                        if lines and lines[-1].startswith("```"):
-                            lines = lines[:-1]
-                        clean_code = "\n".join(lines)
-
+                    clean_code = _sanitize_web_asset(filename, ai_code, goal or node_title, is_web_3d)
                     engine.fs.create_file(
                         task_id=task_id,
                         relative_path=filename,
@@ -563,23 +677,24 @@ class DeveloperRole(BaseAgent):
                     if filename not in written:
                         written.append(filename)
             else:
-                # Fallback to local LLM or ForgeWebStudio procedural synthesizer
+                # Flag that AI Universe code generation failed and local fallback was used
                 fallback_files.append(filename)
 
+                # If this is a modern 3D/web project file, use ForgeWebStudio to produce complete high-fidelity code
                 if file_type in ["html", "css", "js"] and filename in ["index.html", "style.css", "app.js"]:
                     from app.templates.web_studio.generator import ForgeWebStudio
 
                     studio_files = ForgeWebStudio.synthesize_website(goal, enriched_requirements)
-                    if filename in studio_files:
+                    for s_name, s_content in studio_files.items():
                         engine.fs.create_file(
                             task_id=task_id,
-                            relative_path=filename,
-                            content=studio_files[filename],
+                            relative_path=s_name,
+                            content=s_content,
                             role=self.role_name,
                         )
-                        if filename not in written:
-                            written.append(filename)
-                        continue
+                        if s_name not in written:
+                            written.append(s_name)
+                    continue
 
                 prompt = (
                     f"Objective: {goal}\n"

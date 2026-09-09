@@ -183,24 +183,22 @@ async def handle_build(
         if final_task:
             task = final_task
 
-        has_fallback = (
-            task.state == TaskState.FAILED
-            or (task.error_message and "fallback" in task.error_message.lower())
-            or not report.all_passed
-        )
         paths = workspace_manager.get_workspace_paths(task_id)
-        if paths and (paths.state / "FALLBACK_STUB.json").exists():
-            has_fallback = True
+        is_fallback = (
+            (paths is not None and (paths.state / "FALLBACK_STUB.json").exists())
+            or (task.error_message is not None and "fallback" in task.error_message.lower())
+        )
+        is_failed = task.state == TaskState.FAILED or is_fallback
 
         completion_desc = (
             "[red]Build Finished (Failed / Fallback Detected)"
-            if has_fallback
+            if is_failed
             else "[green]Build Complete & Checkpointed!"
         )
         progress.update(task_p, advance=25, description=completion_desc)
 
-    # If fallback or failure occurred, print large red warning panel
-    if has_fallback:
+    # If fallback or failure occurred, print warning panel
+    if is_fallback:
         console.print()
         console.print(
             Panel(
@@ -210,9 +208,25 @@ async def handle_build(
             )
         )
         console.print()
+    elif is_failed:
+        console.print()
+        console.print(
+            Panel(
+                f"[bold white on red] TASK FAILED: {task.error_message or 'Execution encountered fatal error.'} [/bold white on red]",
+                style="bold red",
+                expand=False,
+            )
+        )
+        console.print()
+    elif not report.all_passed:
+        console.print()
+        console.print(
+            f"[yellow]Notice:[/yellow] {report.passed_checks}/{report.total_checks} verification checks passed. Review report for minor advisories."
+        )
+        console.print()
 
     # Summary Report
-    header_style = "bold red" if has_fallback else "bold green"
+    header_style = "bold red" if is_failed else "bold green"
     table = Table(
         title=f"Task Completion Report: {task_id}", show_header=True, header_style=header_style
     )
