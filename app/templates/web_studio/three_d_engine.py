@@ -19,112 +19,201 @@ def generate_three_d_scene_script(
 // ForgeWebStudio 3.0 — 3D Scene & Particle Physics Engine
 // ==========================================================================
 
-(function init3DHeroCanvas() {{
+function init3DHeroCanvas() {{
     const canvas = document.getElementById("{canvas_id}");
     if (!canvas) return;
 
-    // Check if Three.js is loaded
-    if (typeof THREE !== 'undefined') {{
-        initThreeJSScene(canvas);
-    }} else {{
-        initHighSpeedParticleCanvas(canvas);
+    // Check if Three.js is loaded, retry briefly if still streaming from CDN
+    let attempts = 0;
+    function tryMount() {{
+        if (typeof THREE !== 'undefined') {{
+            initThreeJSScene(canvas);
+        }} else if (attempts < 10) {{
+            attempts++;
+            setTimeout(tryMount, 200);
+        }} else {{
+            initHighSpeedParticleCanvas(canvas);
+        }}
     }}
+    tryMount();
 
     function initThreeJSScene(targetCanvas) {{
+        const container = targetCanvas.parentElement || document.body;
+        let width = targetCanvas.clientWidth || container.clientWidth || window.innerWidth;
+        let height = targetCanvas.clientHeight || container.clientHeight || window.innerHeight || 600;
+
         const scene = new THREE.Scene();
-        const camera = new THREE.PerspectiveCamera(75, targetCanvas.clientWidth / targetCanvas.clientHeight, 0.1, 1000);
-        const renderer = new THREE.WebGLRenderer({{ canvas: targetCanvas, alpha: true, antialias: true }});
-        renderer.setSize(targetCanvas.clientWidth, targetCanvas.clientHeight);
+        const camera = new THREE.PerspectiveCamera(65, width / height, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({{ canvas: targetCanvas, alpha: true, antialias: true, powerPreference: "high-performance" }});
+        renderer.setSize(width, height);
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
-        // Create 3D Geometric Torus / Mesh
-        const geometry = new THREE.IcosahedronGeometry(2.2, 2);
-        const material = new THREE.MeshStandardMaterial({{
-            color: '{primary_hex}',
-            roughness: 0.2,
-            metalness: 0.85,
-            wireframe: true,
-            emissive: '{accent_hex}',
-            emissiveIntensity: 0.2
-        }});
-        const mesh = new THREE.Mesh(geometry, material);
-        scene.add(mesh);
+        // Group containing all 3D geometries
+        const group = new THREE.Group();
+        scene.add(group);
 
-        // Surrounding Particle Cloud
-        const particlesCount = 350;
+        // 1. Primary Cybernetic Mesh (High-Fidelity Torus Knot)
+        const mainGeometry = new THREE.TorusKnotGeometry(2.0, 0.45, 128, 32);
+        const mainMaterial = new THREE.MeshStandardMaterial({{
+            color: '{primary_hex}',
+            wireframe: true,
+            roughness: 0.15,
+            metalness: 0.9,
+            emissive: '{accent_hex}',
+            emissiveIntensity: 0.35,
+            transparent: true,
+            opacity: 0.9
+        }});
+        const mainMesh = new THREE.Mesh(mainGeometry, mainMaterial);
+        group.add(mainMesh);
+
+        // 2. Inner Glowing Core
+        const coreGeometry = new THREE.IcosahedronGeometry(1.2, 2);
+        const coreMaterial = new THREE.MeshStandardMaterial({{
+            color: '{accent_hex}',
+            wireframe: false,
+            roughness: 0.2,
+            metalness: 0.8,
+            emissive: '{primary_hex}',
+            emissiveIntensity: 0.5
+        }});
+        const coreMesh = new THREE.Mesh(coreGeometry, coreMaterial);
+        group.add(coreMesh);
+
+        // 3. Orbital Particle Galaxy
+        const particlesCount = 500;
         const positions = new Float32Array(particlesCount * 3);
+        const colors = new Float32Array(particlesCount * 3);
+        const c1 = new THREE.Color('{primary_hex}');
+        const c2 = new THREE.Color('{accent_hex}');
+
         for (let i = 0; i < particlesCount * 3; i += 3) {{
-            positions[i] = (Math.random() - 0.5) * 12;
-            positions[i + 1] = (Math.random() - 0.5) * 12;
-            positions[i + 2] = (Math.random() - 0.5) * 12;
+            positions[i] = (Math.random() - 0.5) * 16;
+            positions[i + 1] = (Math.random() - 0.5) * 16;
+            positions[i + 2] = (Math.random() - 0.5) * 16;
+
+            const mixed = Math.random() > 0.5 ? c1 : c2;
+            colors[i] = mixed.r;
+            colors[i + 1] = mixed.g;
+            colors[i + 2] = mixed.b;
         }}
         const particlesGeometry = new THREE.BufferGeometry();
         particlesGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        particlesGeometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
         const particlesMaterial = new THREE.PointsMaterial({{
-            size: 0.04,
-            color: '{accent_hex}',
+            size: 0.05,
+            vertexColors: true,
             transparent: true,
-            opacity: 0.8
+            opacity: 0.85
         }});
         const particleMesh = new THREE.Points(particlesGeometry, particlesMaterial);
-        scene.add(particleMesh);
+        group.add(particleMesh);
 
-        // Lighting
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+        // 4. Lighting Rig
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
         scene.add(ambientLight);
 
-        const pointLight = new THREE.PointLight('{primary_hex}', 2, 50);
-        pointLight.position.set(5, 5, 5);
-        scene.add(pointLight);
+        const pointLight1 = new THREE.PointLight('{primary_hex}', 3, 50);
+        pointLight1.position.set(6, 4, 5);
+        scene.add(pointLight1);
 
-        camera.position.z = 4.8;
+        const pointLight2 = new THREE.PointLight('{accent_hex}', 3, 50);
+        pointLight2.position.set(-6, -4, 5);
+        scene.add(pointLight2);
 
-        // Mouse Parallax Interaction
+        camera.position.z = 5.6;
+
+        // Mouse Parallax & Dynamic Interaction
         let mouseX = 0, mouseY = 0;
+        let targetX = 0, targetY = 0;
+        let rotSpeed = 1.0;
+
         window.addEventListener('mousemove', (e) => {{
             mouseX = (e.clientX / window.innerWidth) * 2 - 1;
             mouseY = -(e.clientY / window.innerHeight) * 2 + 1;
         }});
 
+        // Interactive 3D HUD Controls Wiring
+        const wireframeBtn = document.getElementById('hud-wireframe-toggle');
+        if (wireframeBtn) {{
+            wireframeBtn.addEventListener('click', () => {{
+                mainMaterial.wireframe = !mainMaterial.wireframe;
+                wireframeBtn.classList.toggle('active');
+            }});
+        }}
+
+        const speedBtn = document.getElementById('hud-speed-toggle');
+        if (speedBtn) {{
+            speedBtn.addEventListener('click', () => {{
+                rotSpeed = rotSpeed === 1.0 ? 2.5 : (rotSpeed === 2.5 ? 5.0 : 1.0);
+                speedBtn.textContent = `Speed: ${{rotSpeed}}x`;
+            }});
+        }}
+
+        const resetBtn = document.getElementById('hud-reset-view');
+        if (resetBtn) {{
+            resetBtn.addEventListener('click', () => {{
+                rotSpeed = 1.0;
+                if (speedBtn) speedBtn.textContent = 'Speed: 1.0x';
+                mainMaterial.wireframe = true;
+                if (wireframeBtn) wireframeBtn.classList.add('active');
+                targetX = 0;
+                targetY = 0;
+                group.position.x = 0;
+                group.position.y = 0;
+            }});
+        }}
+
+        // Animation Loop
+        let clock = new THREE.Clock();
         function animate() {{
             requestAnimationFrame(animate);
-            mesh.rotation.x += 0.003;
-            mesh.rotation.y += 0.005;
-            particleMesh.rotation.y -= 0.001;
+            const delta = clock.getDelta();
 
-            mesh.position.x += (mouseX * 0.5 - mesh.position.x) * 0.05;
-            mesh.position.y += (mouseY * 0.5 - mesh.position.y) * 0.05;
+            // Rotations
+            mainMesh.rotation.x += 0.004 * rotSpeed;
+            mainMesh.rotation.y += 0.007 * rotSpeed;
+            coreMesh.rotation.x -= 0.008 * rotSpeed;
+            coreMesh.rotation.y += 0.005 * rotSpeed;
+            particleMesh.rotation.y -= 0.001 * rotSpeed;
+
+            // Smooth mouse follow (easing)
+            targetX += (mouseX * 0.8 - targetX) * 0.05;
+            targetY += (mouseY * 0.8 - targetY) * 0.05;
+            group.position.x = targetX;
+            group.position.y = targetY;
 
             renderer.render(scene, camera);
         }}
         animate();
 
-        window.addEventListener('resize', () => {{
-            const w = targetCanvas.clientWidth;
-            const h = targetCanvas.clientHeight;
+        // Responsive Resize
+        function onResize() {{
+            const w = targetCanvas.clientWidth || container.clientWidth || window.innerWidth;
+            const h = targetCanvas.clientHeight || container.clientHeight || window.innerHeight || 600;
             camera.aspect = w / h;
             camera.updateProjectionMatrix();
             renderer.setSize(w, h);
-        }});
+        }}
+        window.addEventListener('resize', onResize);
     }}
 
     function initHighSpeedParticleCanvas(targetCanvas) {{
         const ctx = targetCanvas.getContext('2d');
-        let width = targetCanvas.width = targetCanvas.clientWidth;
-        let height = targetCanvas.height = targetCanvas.clientHeight;
+        let width = targetCanvas.width = targetCanvas.clientWidth || window.innerWidth;
+        let height = targetCanvas.height = targetCanvas.clientHeight || 600;
 
         const particles = [];
-        const numParticles = Math.min(80, Math.floor(width / 15));
-        const maxDistance = 120;
+        const numParticles = Math.min(100, Math.floor(width / 12));
+        const maxDistance = 130;
 
-        let mouse = {{ x: null, y: null, radius: 140 }};
-
+        let mouse = {{ x: null, y: null, radius: 150 }};
         window.addEventListener('mousemove', (e) => {{
             const rect = targetCanvas.getBoundingClientRect();
             mouse.x = e.clientX - rect.left;
             mouse.y = e.clientY - rect.top;
         }});
-
         window.addEventListener('mouseleave', () => {{
             mouse.x = null;
             mouse.y = null;
@@ -134,19 +223,17 @@ def generate_three_d_scene_script(
             constructor() {{
                 this.x = Math.random() * width;
                 this.y = Math.random() * height;
-                this.vx = (Math.random() - 0.5) * 1.2;
-                this.vy = (Math.random() - 0.5) * 1.2;
-                this.radius = Math.random() * 2 + 1.2;
-                this.baseAlpha = Math.random() * 0.5 + 0.3;
+                this.vx = (Math.random() - 0.5) * 1.5;
+                this.vy = (Math.random() - 0.5) * 1.5;
+                this.radius = Math.random() * 2.2 + 1.2;
+                this.baseAlpha = Math.random() * 0.5 + 0.4;
             }}
             update() {{
                 this.x += this.vx;
                 this.y += this.vy;
-
                 if (this.x < 0 || this.x > width) this.vx *= -1;
                 if (this.y < 0 || this.y > height) this.vy *= -1;
 
-                // Mouse interaction
                 if (mouse.x !== null) {{
                     const dx = mouse.x - this.x;
                     const dy = mouse.y - this.y;
@@ -173,7 +260,6 @@ def generate_three_d_scene_script(
 
         function animate() {{
             ctx.clearRect(0, 0, width, height);
-
             for (let i = 0; i < particles.length; i++) {{
                 particles[i].update();
                 particles[i].draw();
@@ -188,7 +274,7 @@ def generate_three_d_scene_script(
                         ctx.moveTo(particles[i].x, particles[i].y);
                         ctx.lineTo(particles[j].x, particles[j].y);
                         ctx.strokeStyle = '{accent_hex}';
-                        ctx.globalAlpha = (1 - dist / maxDistance) * 0.25;
+                        ctx.globalAlpha = (1 - dist / maxDistance) * 0.35;
                         ctx.lineWidth = 1;
                         ctx.stroke();
                     }}
@@ -199,11 +285,17 @@ def generate_three_d_scene_script(
         animate();
 
         window.addEventListener('resize', () => {{
-            width = targetCanvas.width = targetCanvas.clientWidth;
-            height = targetCanvas.height = targetCanvas.clientHeight;
+            width = targetCanvas.width = targetCanvas.clientWidth || window.innerWidth;
+            height = targetCanvas.height = targetCanvas.clientHeight || 600;
         }});
     }}
-}})();
+}}
+
+if (document.readyState === 'loading') {{
+    document.addEventListener('DOMContentLoaded', init3DHeroCanvas);
+}} else {{
+    init3DHeroCanvas();
+}}
 """
 
 

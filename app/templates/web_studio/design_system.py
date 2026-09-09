@@ -332,4 +332,164 @@ h1, h2, h3, h4, h5, h6 {{
     transform: translateY(0);
     opacity: 1;
 }}
+
+/* Interactive 3D HUD Controls Bar */
+.hud-controls-bar {{
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: var(--glass-bg);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    border: 1px solid var(--border-subtle);
+    padding: 0.4rem 0.8rem;
+    border-radius: 9999px;
+    box-shadow: var(--glass-shadow);
+    z-index: 10;
+    transition: border-color var(--transition-smooth);
+}}
+
+.hud-controls-bar:hover {{
+    border-color: var(--border-glow);
+}}
+
+.btn-hud {{
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+    padding: 0.35rem 0.75rem;
+    border-radius: 9999px;
+    transition: all var(--transition-fast);
+}}
+
+.btn-hud:hover, .btn-hud.active {{
+    background: var(--primary-light);
+    color: var(--primary);
+}}
+
+/* Telemetry Metrics Strip */
+.telemetry-strip {{
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 1.5rem;
+    text-align: center;
+    padding: 1.5rem;
+}}
+
+.telemetry-item .stat-number {{
+    font-size: 2.25rem;
+    font-weight: 800;
+    font-family: var(--font-heading);
+    line-height: 1.1;
+}}
+
+.telemetry-item .stat-label {{
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    letter-spacing: 0.05em;
+    display: block;
+    margin-top: 0.35rem;
+}}
+
+/* Cyber Command Terminal */
+.terminal-container {{
+    background: var(--bg-surface);
+    border: 1px solid var(--border-glow);
+    border-radius: 1rem;
+    overflow: hidden;
+    box-shadow: 0 16px 40px -10px var(--accent-glow);
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+}}
+
+.terminal-header {{
+    background: rgba(0, 0, 0, 0.4);
+    padding: 0.75rem 1.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--border-subtle);
+}}
+
+.terminal-dots {{
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}}
+
+.terminal-dot {{
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+}}
+
+.terminal-output {{
+    padding: 1.25rem;
+    min-height: 160px;
+    max-height: 240px;
+    overflow-y: auto;
+    font-size: 0.85rem;
+    line-height: 1.6;
+    color: #a5f3fc;
+    background: rgba(5, 10, 20, 0.9);
+}}
+
+.terminal-input-row {{
+    display: flex;
+    align-items: center;
+    padding: 0.6rem 1.25rem;
+    background: rgba(0, 0, 0, 0.5);
+    border-top: 1px solid var(--border-subtle);
+    gap: 0.5rem;
+}}
+
+.terminal-prompt {{
+    color: var(--primary);
+    font-weight: bold;
+    font-size: 0.85rem;
+}}
+
+.terminal-input {{
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: #ffffff;
+    font-family: inherit;
+    font-size: 0.85rem;
+    outline: none;
+}}
+
+.terminal-chips {{
+    display: flex;
+    gap: 0.5rem;
+    padding: 0.5rem 1.25rem;
+    background: rgba(0, 0, 0, 0.6);
+    flex-wrap: wrap;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+}}
+
+.terminal-chip {{
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid var(--border-subtle);
+    color: var(--text-secondary);
+    padding: 0.2rem 0.6rem;
+    border-radius: 6px;
+    font-family: inherit;
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}}
+
+.terminal-chip:hover {{
+    background: var(--primary-light);
+    border-color: var(--primary);
+    color: var(--primary);
+}}
 """

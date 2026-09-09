@@ -7,6 +7,7 @@ from typing import Any
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, status
+import httpx
 from pydantic import BaseModel, Field
 
 from app.agents.registry import AgentCapability, agent_registry
@@ -495,10 +496,19 @@ class ForgeInferenceRequest(BaseModel):
     task_type: str = "code"
 
 
+_forge_inf_client: httpx.AsyncClient | None = None
+
+def _get_forge_inf_client() -> httpx.AsyncClient:
+    global _forge_inf_client
+    if _forge_inf_client is None or _forge_inf_client.is_closed:
+        _forge_inf_client = httpx.AsyncClient(timeout=30.0)
+    return _forge_inf_client
+
+
 @router.post("/ask-inference", summary="Ask Inference from Local Forge")
 async def forge_ask_inference(req: ForgeInferenceRequest):
     """Route question from local Forge to live Inference Gateway."""
-    import httpx, time
+    import time
     t0 = time.perf_counter()
     url = "https://inference-3i2b.onrender.com/v1/agent/assist"
     payload = {
@@ -507,13 +517,15 @@ async def forge_ask_inference(req: ForgeInferenceRequest):
         "prompt": req.question,
         "fast_lane": True,
         "no_cache": True,
+        "max_tokens": 200,
     }
-    async with httpx.AsyncClient(timeout=30.0) as client:
-        r = await client.post(url, json=payload)
-        lat = round((time.perf_counter() - t0) * 1000, 2)
-        return {
-            "origin": "LOCAL (Forge :8002)",
-            "status": r.status_code,
-            "latency_ms": lat,
-            "data": r.json() if r.status_code == 200 else {"error": r.text},
-        }
+    headers = {"X-FRIDAY-API-Key": "inference_api"}
+    client = _get_forge_inf_client()
+    r = await client.post(url, json=payload, headers=headers)
+    lat = round((time.perf_counter() - t0) * 1000, 2)
+    return {
+        "origin": "LOCAL (Forge :8001)",
+        "status": r.status_code,
+        "latency_ms": lat,
+        "data": r.json() if r.status_code == 200 else {"error": r.text},
+    }

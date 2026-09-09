@@ -34,6 +34,10 @@ class DomainSynthesizer:
     def analyze_goal(cls, goal: str) -> DomainBlueprint:
         g = goal.lower()
 
+        # 0. Cyberpunk / Sci-Fi / High-Tech 3D
+        if "cyberpunk" in g or "sci-fi" in g or "scifi" in g or "neon" in g:
+            return cls._build_cyberpunk_blueprint(goal)
+
         # 1. Developer / Creative Portfolio
         if any(k in g for k in ["portfolio", "personal website", "developer profile", "resume", "cv"]):
             return cls._build_portfolio_blueprint(goal)
@@ -52,6 +56,87 @@ class DomainSynthesizer:
 
         # 5. Default / Creative Web App
         return cls._build_creative_app_blueprint(goal)
+
+    @classmethod
+    def _build_cyberpunk_blueprint(cls, goal: str) -> DomainBlueprint:
+        title = "Kai Vex — Cyberpunk Systems Architect & 3D WebGL Engineer"
+        return DomainBlueprint(
+            domain_type="portfolio",
+            app_title=title,
+            headline="Synthesizing High-Tech Realities & Autonomous Cybernetic Systems",
+            subheadline="Specializing in real-time Three.js 3D immersion, GLSL shaders, distributed neural pipelines, and zero-latency reactive interfaces.",
+            primary_cta="Initialize 3D Matrix",
+            secondary_cta="Access Neural Terminal",
+            accent_color="#00f0ff",
+            secondary_color="#ff007a",
+            categories=["All Systems", "3D & Neural", "Cybernetic Web", "Core Shaders"],
+            showcase_items=[
+                {
+                    "id": "proj-1",
+                    "category": "3D & Neural",
+                    "title": "OmniNet 3D Neural Matrix",
+                    "description": "GPU-accelerated spatial network visualizer running 100,000 live nodes at 60 FPS in Three.js with dynamic force-directed physics.",
+                    "tags": ["Three.js", "WebGL", "GLSL", "Octree Physics"],
+                    "metrics": "60 FPS • 100k Nodes",
+                    "modal_details": "Autonomous spatial graph engine rendering real-time neural activations with custom vertex shaders, bloom post-processing, and multi-threaded Web Worker layout calculation.",
+                },
+                {
+                    "id": "proj-2",
+                    "category": "Cybernetic Web",
+                    "title": "CyberDeck Command Console",
+                    "description": "Real-time interactive cyber terminal with lock-free WebSocket telemetry streaming and automated AST self-healing.",
+                    "tags": ["TypeScript", "WebSockets", "Kahn DAG", "Zero Bundler"],
+                    "metrics": "18ms Latency • 99.99% Uptime",
+                    "modal_details": "High-throughput developer interface supporting interactive diagnostic scripts, system health verification, and dynamic state inspection.",
+                },
+                {
+                    "id": "proj-3",
+                    "category": "Core Shaders",
+                    "title": "GhostProtocol Raymarcher",
+                    "description": "Volumetric raymarching shader engine simulating cybernetic fog, ambient neon dispersion, and dynamic chromatic aberration.",
+                    "tags": ["GLSL", "Fragment Shaders", "Post-Processing", "Raymarching"],
+                    "metrics": "Zero Memory Leak • 4K Native",
+                    "modal_details": "Engineered for high-fidelity spatial realism with signed distance fields (SDF) and screen-space reflections.",
+                },
+                {
+                    "id": "proj-4",
+                    "category": "Cybernetic Web",
+                    "title": "Chronos Quantum Ledger",
+                    "description": "Sub-microsecond decentralized orderbook with zero-allocation ring buffers and distributed cryptographic consensus.",
+                    "tags": ["Rust", "WASM", "Zero-Copy", "Cryptography"],
+                    "metrics": "450μs P99 • 10M events/sec",
+                    "modal_details": "Engineered for zero-allocation market data ingestion and automated trade execution across global orderbooks.",
+                },
+            ],
+            features_bento=[
+                {
+                    "title": "Interactive 3D Mesh Engine",
+                    "subtitle": "Dual-axis Three.js geometry with mouse parallax, real-time specular lighting, and orbital starfield particles.",
+                    "icon": "box",
+                    "highlight": "Three.js 3D",
+                },
+                {
+                    "title": "Glassmorphic Cyberpunk HUD",
+                    "subtitle": "Multi-layer backdrop blur, neon glowing borders, dynamic radial cursor lighting, and 3D card perspective tilt.",
+                    "icon": "sparkles",
+                    "highlight": "Glass 3.0",
+                },
+                {
+                    "title": "Live Interactive Terminal",
+                    "subtitle": "Embedded command-line console supporting real-time diagnostics, system telemetry, and command dispatch.",
+                    "icon": "terminal",
+                    "highlight": "Interactive",
+                },
+                {
+                    "title": "Zero Placeholder Guarantee",
+                    "subtitle": "100% production-ready copy, verified architecture specs, and responsive mobile-first performance.",
+                    "icon": "shield-check",
+                    "highlight": "Production",
+                },
+            ],
+            interactive_modules=["three_d_canvas", "cyber_terminal", "filter_showcase", "details_modal", "skill_bars", "hud_controls", "theme_toggle"],
+            meta_description="Cyberpunk 3D developer portfolio of Kai Vex — Systems Architect, 3D WebGL Engineer, and Autonomous Software Synthesizer.",
+        )
 
     @classmethod
     def _build_portfolio_blueprint(cls, goal: str) -> DomainBlueprint:

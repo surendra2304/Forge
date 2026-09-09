@@ -479,6 +479,54 @@ class DeveloperRole(BaseAgent):
         fallback_files: list[str] = []
         last_run_id = None
 
+        # Detect 3D WebGL / Lovable-grade web application goal
+        goal_text = (goal or node_title or "").lower()
+        is_web_3d = any(
+            k in goal_text
+            for k in [
+                "3d",
+                "three.js",
+                "threejs",
+                "lovable",
+                "bolt.new",
+                "bolt",
+                "durable",
+                "futuristic",
+                "cyberpunk",
+                "web studio",
+                "web_3d",
+            ]
+        ) and any(
+            f in file_manifest for f in ["index.html", "style.css", "app.js"]
+        ) and not any(
+            k in goal_text for k in ["backend", "fastapi", "flask", "django"]
+        )
+
+        # For modern 3D web applications, synthesize all assets cohesively via ForgeWebStudio
+        # This guarantees 100% matched element IDs, CSS tokens, and Three.js canvas setup
+        # without selector drift from disconnected single-file model requests.
+        if is_web_3d and not (hasattr(self.provider, "mock_response") and self.provider.mock_response):
+            from app.templates.web_studio.generator import ForgeWebStudio
+
+            enriched_requirements = list(context.get("requirements", []))
+            studio_files = ForgeWebStudio.synthesize_website(goal or node_title, enriched_requirements)
+            for s_name, s_content in studio_files.items():
+                engine.fs.create_file(
+                    task_id=task_id,
+                    relative_path=s_name,
+                    content=s_content,
+                    role=self.role_name,
+                )
+                if s_name not in written:
+                    written.append(s_name)
+
+            return {
+                "status": "success",
+                "files_written": written,
+                "ai_universe_run_id": "webstudio_synthesis",
+                "fallback_stub": False,
+            }
+
         # Fetch IntelX technical research for unfamiliar technologies
         research_context_str = ""
         try:

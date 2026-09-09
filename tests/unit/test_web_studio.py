@@ -151,3 +151,84 @@ async def test_aesthetic_and_interactive_checker(tmp_path: Path):
     assert evidence.exit_code == 0
     assert "Aesthetic verification passed" in evidence.stdout
     assert len(evidence.issues) == 0
+
+
+def test_web_studio_hud_telemetry_terminal():
+    goal = "Build a futuristic 3D cyberpunk developer portfolio with Three.js"
+    files = ForgeWebStudio.synthesize_website(goal)
+
+    html = files["index.html"]
+    css = files["style.css"]
+    js = files["app.js"]
+
+    # 1. 3D HUD Controls
+    assert 'id="hud-wireframe-toggle"' in html
+    assert 'id="hud-speed-toggle"' in html
+    assert 'id="hud-reset-view"' in html
+    assert ".hud-controls-bar" in css
+    assert "hud-wireframe-toggle" in js
+    assert "hud-speed-toggle" in js
+    assert "hud-reset-view" in js
+
+    # 2. Telemetry Strip
+    assert "telemetry-strip" in html
+    assert "FPS Native 3D WebGL" in html
+    assert "stat-number" in html
+    assert ".telemetry-strip" in css
+    assert "animateCounters" in js
+
+    # 3. Cyber Terminal
+    assert 'id="terminal"' in html
+    assert 'id="terminal-output"' in html
+    assert 'id="terminal-input"' in html
+    assert "terminal-chip" in html
+    assert ".terminal-container" in css
+    assert "runTerminalCommand" in js
+    assert "skills" in js
+    assert "projects" in js
+    assert "stats" in js
+
+
+@pytest.mark.asyncio
+async def test_developer_role_synchronizes_3d_web_app(tmp_path: Path):
+    from uuid import uuid4
+    from app.agents.roles import DeveloperRole
+    from app.core.config import Settings
+    from app.core.workspace import WorkspaceManager
+    from app.execution.engine import ExecutionEngine
+
+    settings = Settings()
+    settings.workspaces_dir = tmp_path / "workspaces"
+    wm = WorkspaceManager(settings=settings)
+    engine = ExecutionEngine(wm=wm)
+    task_id = str(uuid4())
+    wm.create_workspace(task_id)
+
+    developer = DeveloperRole()
+    context = {
+        "goal": "Build a futuristic 3D cyberpunk developer portfolio with Three.js",
+        "file_manifest": ["index.html", "style.css", "app.js"],
+    }
+
+    result = await developer.execute_step(
+        task_id=task_id,
+        node_title="Implement 3D Web Application",
+        context=context,
+        engine=engine,
+    )
+
+    assert result["status"] == "success"
+    assert "index.html" in result["files_written"]
+    assert "style.css" in result["files_written"]
+    assert "app.js" in result["files_written"]
+    assert result["fallback_stub"] is False
+
+    # Verify files on disk match
+    html = engine.fs.read_file(task_id, "index.html", role="developer")
+    assert "webstudio-3d-canvas" in html
+    assert "hud-wireframe-toggle" in html
+
+    js = engine.fs.read_file(task_id, "app.js", role="developer")
+    assert "webstudio-3d-canvas" in js
+    assert "THREE.TorusKnotGeometry" in js or "THREE.Scene" in js
+
