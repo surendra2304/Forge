@@ -38,9 +38,42 @@ class ForgeController:
 
     def mark_success(self, node_id: str) -> None:
         self.scheduler.mark_passed(node_id)
+        # Record proven pattern into Memora
+        try:
+            from forge_upgrade.memora_client import memora_client
+            memora_client.learn_from_outcome(
+                agent_name="forge",
+                task_name=node_id,
+                status="success",
+                actions_taken=f"node:{node_id}",
+                domain="code_synthesis"
+            )
+        except Exception:
+            pass
 
     def mark_failure(self, node_id: str, error: str) -> None:
         self.scheduler.mark_failed(node_id, error)
+        # Learn from failed node execution into Memora Experience memory
+        try:
+            from forge_upgrade.memora_client import memora_client
+            memora_client.learn_from_outcome(
+                agent_name="forge",
+                task_name=node_id,
+                status="failure",
+                error_log=error,
+                actions_taken=f"node:{node_id}",
+                domain="code_synthesis"
+            )
+        except Exception:
+            pass
+
+    def get_self_upgrade_guidelines(self, node_id: str) -> str:
+        """Retrieve self-upgraded rules from past failures to guide code generation for this node."""
+        try:
+            from forge_upgrade.memora_client import memora_client
+            return memora_client.build_self_upgrade_context("forge", node_id, domain="code_synthesis")
+        except Exception:
+            return ""
 
     def finish(self) -> RunResult:
         if self.scheduler.failed():

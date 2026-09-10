@@ -63,6 +63,15 @@ class BaseAgent(ABC):
     ) -> ProviderResponse:
         """Query the underlying interchangeable model provider with agent persona context."""
         sys_prompt = system_override or self.system_prompt
+        # Inject self-upgraded operational guidelines from Memora Experience memory
+        try:
+            from forge_upgrade.memora_client import memora_client
+            guidelines = memora_client.build_self_upgrade_context("forge", prompt[:120], domain="code_synthesis")
+            if guidelines:
+                sys_prompt = f"{sys_prompt}\n\n{guidelines}"
+        except Exception:
+            pass
+
         response = await self.provider.generate(
             prompt=prompt, system_prompt=sys_prompt, temperature=temperature
         )
@@ -104,6 +113,18 @@ class BaseAgent(ABC):
                 logger.error(
                     f"Failed to write extracted file '{file_item.relative_path}' for agent '{self.role_name}': {e}"
                 )
+                try:
+                    from forge_upgrade.memora_client import memora_client
+                    memora_client.learn_from_outcome(
+                        agent_name="forge",
+                        task_name=f"write_{file_item.relative_path}",
+                        status="failure",
+                        error_log=str(e),
+                        actions_taken=f"role:{self.role_name}",
+                        domain="code_synthesis"
+                    )
+                except Exception:
+                    pass
 
         return written_paths
 
