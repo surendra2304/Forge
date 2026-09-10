@@ -346,11 +346,25 @@ class DomainSynthesizer:
 
     @classmethod
     def _build_dashboard_blueprint(cls, goal: str) -> DomainBlueprint:
+        g = (goal or "").lower()
+        if "iot" in g:
+            title = "Aether IoT — Mission Control & Telemetry Operations"
+            headline = "Autonomous IoT Fleet Operations & Real-Time Sensor Telemetry"
+            subheadline = "Live edge node telemetry, satellite link diagnostics, and automated anomaly remediation."
+        elif "mission control" in g:
+            title = "Orbital Apex — Mission Control Operations Hub"
+            headline = "Orbital Mission Control & Planetary Telemetry Operations"
+            subheadline = "Constellation telemetry tracking, orbital trajectory analysis, and sub-millisecond edge communication."
+        else:
+            title = "Apex Intelligence — Real-Time Operations Hub"
+            headline = "Unified Telemetry & Autonomous Command Center"
+            subheadline = "Real-time multi-cluster health monitoring, predictive resource forecasting, and automated security shield."
+
         return DomainBlueprint(
             domain_type="dashboard",
-            app_title="Apex Intelligence — Real-Time Operations Hub",
-            headline="Unified Telemetry & Autonomous Command Center",
-            subheadline="Real-time multi-cluster health monitoring, predictive resource forecasting, and automated security shield.",
+            app_title=title,
+            headline=headline,
+            subheadline=subheadline,
             primary_cta="Launch Monitoring Console",
             secondary_cta="Export Compliance Audit",
             accent_color="#06b6d4",

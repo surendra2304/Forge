@@ -15,6 +15,104 @@ from app.providers.base import BaseModelProvider
 logger = get_logger("agents.roles")
 
 
+WEB_STUDIO_KEYWORDS = [
+    "website",
+    "landing page",
+    "web page",
+    "html",
+    "portfolio",
+    "css",
+    "calculator website",
+    "static",
+    "3d",
+    "three.js",
+    "threejs",
+    "webgl",
+    "lovable",
+    "bolt.new",
+    "bolt",
+    "durable",
+    "futuristic",
+    "cyberpunk",
+    "web studio",
+    "web app",
+    "saas",
+    "ecommerce",
+    "e-commerce",
+    "store",
+    "shop",
+    "showcase",
+    "dashboard",
+    "telemetry",
+    "iot",
+    "mission control",
+    "operations",
+    "monitoring",
+    "ops hub",
+    "control center",
+    "hardware",
+    "retail",
+    "pricing",
+    "subscription",
+    "b2b",
+    "platform",
+    "startup",
+    "copilot",
+    "developer profile",
+]
+
+BACKEND_EXCLUSIVE_KEYWORDS = [
+    "backend",
+    "fastapi",
+    "flask",
+    "django",
+    "sqlite",
+    "database",
+    "postgres",
+    "mysql",
+    "redis",
+    "grpc",
+]
+
+
+def is_web_studio_goal(goal_or_title: str) -> bool:
+    """Check if a project goal should be synthesized via ForgeWebStudio."""
+    text = (goal_or_title or "").lower()
+    has_web_kw = any(k in text for k in WEB_STUDIO_KEYWORDS)
+    has_backend_exclusive = any(k in text for k in BACKEND_EXCLUSIVE_KEYWORDS)
+    return has_web_kw and not has_backend_exclusive
+
+
+WEB_3D_KEYWORDS = [
+    "3d",
+    "three.js",
+    "threejs",
+    "webgl",
+    "lovable",
+    "bolt.new",
+    "bolt",
+    "durable",
+    "futuristic",
+    "cyberpunk",
+    "web studio",
+    "web_3d",
+    "dashboard",
+    "telemetry",
+    "iot",
+    "mission control",
+    "operations hub",
+    "control center",
+]
+
+
+def is_web_3d_goal(goal_or_title: str) -> bool:
+    """Check if a project goal requires 3D WebGL immersion or master Web Studio synthesis."""
+    text = (goal_or_title or "").lower()
+    has_3d_kw = any(k in text for k in WEB_3D_KEYWORDS)
+    has_backend_exclusive = any(k in text for k in BACKEND_EXCLUSIVE_KEYWORDS)
+    return has_3d_kw and not has_backend_exclusive
+
+
 class PlannerRole(BaseAgent):
     """Specialist responsible for requirements analysis and task graph decomposition."""
 
@@ -282,40 +380,7 @@ class ArchitectRole(BaseAgent):
 
         if not manifest_files:
             goal_lower = goal.lower()
-            is_static_web = any(
-                k in goal_lower
-                for k in [
-                    "website",
-                    "landing page",
-                    "web page",
-                    "html",
-                    "portfolio",
-                    "css",
-                    "calculator website",
-                    "static",
-                    "3d",
-                    "three.js",
-                    "threejs",
-                    "lovable",
-                    "bolt.new",
-                    "bolt",
-                    "durable",
-                    "futuristic",
-                    "cyberpunk",
-                    "web studio",
-                    "web app",
-                    "saas",
-                    "ecommerce",
-                    "e-commerce",
-                    "store",
-                    "shop",
-                    "showcase",
-                    "dashboard",
-                ]
-            ) and not any(
-                k in goal_lower
-                for k in ["backend", "fastapi", "flask", "django", "sqlite", "database", "api"]
-            )
+            is_static_web = is_web_studio_goal(goal)
 
             if any(k in goal_lower for k in ["full-stack", "fullstack"]):
                 manifest_files = [
@@ -392,6 +457,11 @@ def _sanitize_web_asset(filename: str, content: str, goal: str, is_web_3d: bool)
         clean = "\n".join(lines).strip()
 
     if filename.endswith(".html"):
+        # Normalize common mismatched filenames (e.g. styles.css -> style.css, script.js -> app.js)
+        clean = re.sub(r'href=["\']styles\.css["\']', 'href="style.css"', clean, flags=re.IGNORECASE)
+        clean = re.sub(r'src=["\']scripts?\.js["\']', 'src="app.js"', clean, flags=re.IGNORECASE)
+        clean = re.sub(r'src=["\']main\.js["\']', 'src="app.js"', clean, flags=re.IGNORECASE)
+
         # 1. Ensure lang="en" on <html>
         if "<html" in clean.lower() and "lang=" not in clean.lower():
             clean = re.sub(r"<html([^>]*)>", r'<html\1 lang="en">', clean, count=1, flags=re.IGNORECASE)
@@ -414,10 +484,10 @@ def _sanitize_web_asset(filename: str, content: str, goal: str, is_web_3d: bool)
             elif "<body" in clean.lower():
                 clean = re.sub(r"(<body[^>]*>)", r"\1\n    " + canvas_tag, clean, count=1, flags=re.IGNORECASE)
         # 4. Ensure style.css linked
-        if "style.css" not in clean and "</head>" in clean.lower():
+        if 'href="style.css"' not in clean and "</head>" in clean.lower():
             clean = re.sub(r"(</head>)", r'    <link rel="stylesheet" href="style.css">\n\1', clean, count=1, flags=re.IGNORECASE)
         # 5. Ensure app.js linked
-        if "app.js" not in clean and "</body>" in clean.lower():
+        if 'src="app.js"' not in clean and "</body>" in clean.lower():
             clean = re.sub(r"(</body>)", r'    <script src="app.js"></script>\n\1', clean, count=1, flags=re.IGNORECASE)
 
     elif filename.endswith(".css"):
@@ -506,40 +576,7 @@ class DeveloperRole(BaseAgent):
 
         if not file_manifest:
             goal_lower = goal.lower()
-            is_static_web = any(
-                k in goal_lower
-                for k in [
-                    "website",
-                    "landing page",
-                    "web page",
-                    "html",
-                    "portfolio",
-                    "css",
-                    "calculator website",
-                    "static",
-                    "3d",
-                    "three.js",
-                    "threejs",
-                    "lovable",
-                    "bolt.new",
-                    "bolt",
-                    "durable",
-                    "futuristic",
-                    "cyberpunk",
-                    "web studio",
-                    "web app",
-                    "saas",
-                    "ecommerce",
-                    "e-commerce",
-                    "store",
-                    "shop",
-                    "showcase",
-                    "dashboard",
-                ]
-            ) and not any(
-                k in goal_lower
-                for k in ["backend", "fastapi", "flask", "django", "sqlite", "database", "api"]
-            )
+            is_static_web = is_web_studio_goal(goal)
 
             if is_static_web:
                 file_manifest = ["index.html", "style.css", "app.js", "README.md"]
@@ -553,26 +590,8 @@ class DeveloperRole(BaseAgent):
         last_run_id = None
 
         # Detect 3D WebGL / Lovable-grade web application goal
-        goal_text = (goal or node_title or "").lower()
-        is_web_3d = any(
-            k in goal_text
-            for k in [
-                "3d",
-                "three.js",
-                "threejs",
-                "lovable",
-                "bolt.new",
-                "bolt",
-                "durable",
-                "futuristic",
-                "cyberpunk",
-                "web studio",
-                "web_3d",
-            ]
-        ) and any(
+        is_web_3d = is_web_3d_goal(goal or node_title) and any(
             f in file_manifest for f in ["index.html", "style.css", "app.js"]
-        ) and not any(
-            k in goal_text for k in ["backend", "fastapi", "flask", "django"]
         )
 
         # Query Memora persistent memory for past code patterns and user preferences
@@ -779,22 +798,7 @@ class DeveloperRole(BaseAgent):
                     f"AI Universe code generation call for '{filename}' failed ({e}). Falling back to local model."
                 )
 
-            is_web_3d = any(
-                k in (goal or node_title).lower()
-                for k in [
-                    "3d",
-                    "three.js",
-                    "threejs",
-                    "lovable",
-                    "bolt.new",
-                    "bolt",
-                    "durable",
-                    "futuristic",
-                    "cyberpunk",
-                    "web studio",
-                    "web_3d",
-                ]
-            )
+            is_web_3d = is_web_3d_goal(goal or node_title)
 
             if ai_code:
                 # Extract structured file blocks or save directly to filename
@@ -961,19 +965,7 @@ class FrontendEngineerRole(BaseAgent):
             engine=engine,
         )
 
-        if not written and any(
-            k in goal.lower()
-            for k in [
-                "website",
-                "portfolio",
-                "landing page",
-                "3d",
-                "lovable",
-                "bolt",
-                "durable",
-                "web app",
-            ]
-        ):
+        if not written and is_web_studio_goal(goal):
             from app.templates.web_studio.generator import ForgeWebStudio
 
             studio_files = ForgeWebStudio.synthesize_website(goal)

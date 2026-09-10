@@ -12,6 +12,7 @@ from rich.panel import Panel
 from rich.progress import BarColumn, Progress, SpinnerColumn, TextColumn
 from rich.table import Table
 
+from app.agents.roles import is_web_studio_goal
 from app.core.orchestrator import orchestrator
 from app.core.workspace import workspace_manager
 from app.memory.db import db_manager
@@ -90,34 +91,7 @@ async def handle_build(
         paths = workspace_manager.get_workspace_paths(task_id)
 
         goal_lower = goal.lower()
-        is_static_web = any(
-            k in goal_lower
-            for k in [
-                "website",
-                "landing page",
-                "web page",
-                "html",
-                "portfolio",
-                "css",
-                "calculator website",
-                "static",
-                "3d",
-                "lovable",
-                "bolt",
-                "durable",
-                "futuristic",
-                "web app",
-                "saas",
-                "e-commerce",
-                "ecommerce",
-                "store",
-                "shop",
-                "dashboard",
-                "showcase",
-            ]
-        ) and not any(
-            k in goal_lower for k in ["backend", "fastapi", "flask", "api", "database", "sqlite"]
-        )
+        is_static_web = is_web_studio_goal(goal)
 
         if is_static_web:
             from app.templates.web_studio.generator import ForgeWebStudio
