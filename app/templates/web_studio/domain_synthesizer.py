@@ -695,8 +695,10 @@ class DomainSynthesizer:
     fully dynamic, prompt-specific content models — zero hardcoded names, colors, or items."""
 
     @classmethod
-    def analyze_goal(cls, goal: str) -> DomainBlueprint:
-        g = goal.lower()
+    def analyze_goal(cls, goal: str, memora_context: str = "") -> DomainBlueprint:
+        # Incorporate remembered user preferences from Memora cognitive context if present
+        combined_context = f"{goal} {memora_context}".strip() if memora_context else goal
+        g = combined_context.lower()
 
         # 0. E-Commerce
         if any(k in g for k in ["ecommerce", "e-commerce", "store", "shop", "hardware accessories",

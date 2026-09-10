@@ -34,8 +34,9 @@ class ForgeWebStudio:
         Returns a mapping of relative file paths to file contents.
         Routes to distinct domain architectures: E-Commerce, SaaS, Dashboard, or Portfolio.
         """
-        blueprint = DomainSynthesizer.analyze_goal(goal)
         options = custom_options or {}
+        blueprint = DomainSynthesizer.analyze_goal(goal, memora_context=options.get("memora_context", ""))
+        cls._last_blueprint = blueprint
 
         primary_hex = options.get("primary_color", blueprint.accent_color)
         secondary_hex = options.get("secondary_color", blueprint.secondary_color)

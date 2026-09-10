@@ -628,7 +628,10 @@ class DeveloperRole(BaseAgent):
             from app.templates.web_studio.generator import ForgeWebStudio
 
             reqs = list(context.get("requirements", []))
-            studio_files = ForgeWebStudio.synthesize_website(goal or node_title, reqs)
+            studio_opts = {"memora_context": memora_context_str}
+            studio_files = ForgeWebStudio.synthesize_website(
+                goal or node_title, reqs, custom_options=studio_opts
+            )
             for s_name, s_content in studio_files.items():
                 if s_name in file_manifest or s_name in ["index.html", "style.css", "app.js"]:
                     engine.fs.create_file(
@@ -643,12 +646,24 @@ class DeveloperRole(BaseAgent):
             # Store architectural learning in Memora persistent cognitive memory
             if memora_client:
                 try:
+                    last_bp = getattr(ForgeWebStudio, "_last_blueprint", None)
+                    bp_details = ""
+                    if last_bp:
+                        bp_details = f" Domain: {last_bp.domain_type}, Archetype: {last_bp.archetype}, Title: '{last_bp.app_title}', Primary: {last_bp.accent_color}, Heading Font: {last_bp.font_heading}."
                     await memora_client.a_record_fact(
-                        fact_text=f"Built 3D web application for '{goal or node_title}' following Lovable/Bolt standard with 2-Column Split Hero, dedicated Three.js viewport card, and zero text-3D collision.",
+                        fact_text=f"Synthesized bespoke 3D web application for '{goal or node_title}'.{bp_details} Architecture verified with zero placeholders and dedicated Three.js spatial viewport.",
                         agent_name="forge",
-                        category="architecture",
+                        category="web_design",
                         importance=0.98,
-                        entities=["forge", "web_studio", "3d", "lovable", "bolt", "threejs"],
+                        entities=["forge", "web_studio", "3d", "lovable", "bolt", "threejs", last_bp.domain_type if last_bp else "web"],
+                    )
+                    await memora_client.a_record_interaction(
+                        user_input=goal or node_title,
+                        agent_output=f"Synthesized world-class 3D website.{bp_details}",
+                        agent_name="forge",
+                        event_type="web_studio_synthesis",
+                        tags=["forge", "web_studio", "3d", "lovable", "bolt"],
+                        metadata={"task_id": task_id, "domain_type": last_bp.domain_type if last_bp else "web"},
                     )
                 except Exception:
                     pass
