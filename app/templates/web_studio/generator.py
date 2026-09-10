@@ -83,6 +83,14 @@ class ForgeWebStudio:
     ) -> str:
         brand_name = blueprint.app_title.split("—")[0].strip()
 
+        hero_badge = getattr(blueprint, "hero_badge", "") or "3D Interactive Showcase • Drag to Inspect"
+        social_proof = getattr(blueprint, "social_proof_text", "") or "4.9/5 from 1,200+ verified collectors"
+        vp_title = getattr(blueprint, "viewport_title", "") or "3D Interactive Showcase • WebGL 60FPS"
+        chip_top = getattr(blueprint, "viewport_chip_top", "") or "PBR Surface"
+        chip_bottom_l = getattr(blueprint, "viewport_chip_bottom_left", "") or "Sub-mm Precision"
+        chip_bottom_r = getattr(blueprint, "viewport_chip_bottom_right", "") or "Drag to Spin ↻"
+        model_stats = getattr(blueprint, "model_stats", "") or "Physical PBR Shading • 60 FPS"
+
         # Category filter buttons
         filter_buttons = []
         for i, cat in enumerate(blueprint.categories):
@@ -227,7 +235,7 @@ class ForgeWebStudio:
                     <div style="margin-bottom: 1.25rem;">
                         <span class="pill-badge">
                             <span style="width: 8px; height: 8px; border-radius: 50%; background: var(--success); display: inline-block; box-shadow: 0 0 10px var(--success);"></span>
-                            3D Interactive Spatial Hardware • Drag to Inspect
+                            {hero_badge}
                         </span>
                     </div>
 
@@ -259,7 +267,7 @@ class ForgeWebStudio:
                         </div>
                         <div class="trust-rating">
                             <div class="trust-stars">★★★★★</div>
-                            <span class="trust-text">4.9/5 from 1,200+ hardware creators</span>
+                            <span class="trust-text">{social_proof}</span>
                         </div>
                     </div>
                 </div>
@@ -275,7 +283,7 @@ class ForgeWebStudio:
                             </div>
                             <span class="viewport-title-badge">
                                 <span class="status-dot"></span>
-                                3D Hardware Core • WebGL 60FPS
+                                {vp_title}
                             </span>
                             <div class="viewport-actions">
                                 <button id="view-mode-wireframe" class="view-pill" title="Toggle Wireframe">Wireframe</button>
@@ -288,14 +296,14 @@ class ForgeWebStudio:
 
                             <div class="viewport-chip chip-top-right">
                                 <i data-lucide="sparkles" style="width: 14px; height: 14px; color: var(--primary);"></i>
-                                <span>PBR Titanium</span>
+                                <span>{chip_top}</span>
                             </div>
                             <div class="viewport-chip chip-bottom-left">
                                 <i data-lucide="cpu" style="width: 14px; height: 14px; color: var(--secondary);"></i>
-                                <span>Zero-Latency 0.1ms</span>
+                                <span>{chip_bottom_l}</span>
                             </div>
                             <div class="viewport-chip chip-bottom-right">
-                                <span>Drag to Spin ↻</span>
+                                <span>{chip_bottom_r}</span>
                             </div>
                         </div>
 
@@ -306,7 +314,7 @@ class ForgeWebStudio:
                                 <span class="color-dot" data-color="#06b6d4" style="background: #06b6d4;" title="Cyan Pulse"></span>
                                 <span class="color-dot" data-color="#10b981" style="background: #10b981;" title="Emerald Aura"></span>
                             </div>
-                            <span class="model-stats">4.2k Vertices • Physical Shading</span>
+                            <span class="model-stats">{model_stats}</span>
                         </div>
                     </div>
                 </div>
@@ -478,6 +486,7 @@ class ForgeWebStudio:
             primary_hex=primary_hex,
             accent_hex=secondary_hex,
             domain_type="ecommerce",
+            scene_type=getattr(blueprint, "three_d_scene_type", "product_turntable"),
         )
         tilt_code = generate_3d_tilt_script()
 

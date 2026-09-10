@@ -32,6 +32,13 @@ class DomainBlueprint:
     interactive_modules: list[str] = field(default_factory=list)
     meta_description: str = ""
     kpi_metrics: dict[str, str] = field(default_factory=dict)
+    hero_badge: str = ""
+    social_proof_text: str = ""
+    viewport_title: str = ""
+    viewport_chip_top: str = ""
+    viewport_chip_bottom_left: str = ""
+    viewport_chip_bottom_right: str = ""
+    model_stats: str = ""
 
 
 # ---------------------------------------------------------------------------
@@ -169,7 +176,7 @@ def _extract_product_domain(goal: str) -> dict[str, Any]:
     g = goal.lower()
 
     # Map keyword to (store_name_seed, category_list, product_types, color_hint)
-    if any(k in g for k in ["watch", "timepiece", "luxury watch", "swiss"]):
+    if any(k in g for k in ["watch", "timepiece", "luxury watch", "swiss", "dial", "horology"]):
         return {
             "brand_seed": "Chronos",
             "tagline": "Swiss Precision Reimagined for the Digital Era",
@@ -178,6 +185,14 @@ def _extract_product_domain(goal: str) -> dict[str, Any]:
             "accent": "#d4af37",
             "secondary": "#9f7b4a",
             "archetype": "luxury",
+            "hero_badge": "Handcrafted Swiss Horology • Interactive 3D Dial",
+            "social_proof_text": "4.9/5 from 1,200+ horology collectors",
+            "viewport_title": "Interactive 3D Complication Dial • 60FPS",
+            "viewport_chip_top": "Sapphire Crystal",
+            "viewport_chip_bottom_left": "COSC Chronometer",
+            "viewport_chip_bottom_right": "Drag to Rotate 360°",
+            "model_stats": "Swiss Tourbillon Movement • Automatic",
+            "three_d_scene_type": "watch_dial",
         }
     if any(k in g for k in ["sneaker", "shoe", "footwear", "streetwear", "nike", "jordan"]):
         return {
@@ -188,6 +203,14 @@ def _extract_product_domain(goal: str) -> dict[str, Any]:
             "accent": "#f97316",
             "secondary": "#ec4899",
             "archetype": "brutalist",
+            "hero_badge": "High-Performance Streetwear • Interactive 3D Model",
+            "social_proof_text": "4.9/5 from 8,400+ verified sneakerheads",
+            "viewport_title": "Sculpted 3D Kinetic Silhouette • 60FPS",
+            "viewport_chip_top": "Carbon Fibre Plate",
+            "viewport_chip_bottom_left": "Nitrogen Foam 82%",
+            "viewport_chip_bottom_right": "Drag to Inspect 360°",
+            "model_stats": "Adaptive Fit • Energy Return",
+            "three_d_scene_type": "sneaker_3d",
         }
     if any(k in g for k in ["fashion", "clothing", "apparel", "dress", "luxury fashion"]):
         return {
@@ -198,6 +221,14 @@ def _extract_product_domain(goal: str) -> dict[str, Any]:
             "accent": "#d4af37",
             "secondary": "#78716c",
             "archetype": "luxury",
+            "hero_badge": "Atelier Haute Couture • Interactive 3D Silhouette",
+            "social_proof_text": "4.9/5 from 2,800+ bespoke clients",
+            "viewport_title": "Sculptural Draping & Silhouette • 60FPS",
+            "viewport_chip_top": "Mulberry Silk 100%",
+            "viewport_chip_bottom_left": "Hand-Basted Canvas",
+            "viewport_chip_bottom_right": "Drag to Rotate",
+            "model_stats": "Made-to-Order • Tailored Fit",
+            "three_d_scene_type": "luxury_gem",
         }
     if any(k in g for k in ["keyboard", "mechanical", "gaming gear", "peripherals", "hardware"]):
         return {
@@ -208,6 +239,14 @@ def _extract_product_domain(goal: str) -> dict[str, Any]:
             "accent": "#ec4899",
             "secondary": "#8b5cf6",
             "archetype": "cyberpunk",
+            "hero_badge": "Pro Esports Hardware • Interactive 3D Core",
+            "social_proof_text": "4.9/5 from 12,000+ competitive gamers",
+            "viewport_title": "Rapid-Trigger Magnetic Core • 8000Hz",
+            "viewport_chip_top": "Hall Effect Sensor",
+            "viewport_chip_bottom_left": "0.1mm Actuation",
+            "viewport_chip_bottom_right": "Drag to Inspect",
+            "model_stats": "CNC Anodized Aluminum • Hot-Swap",
+            "three_d_scene_type": "product_turntable",
         }
     if any(k in g for k in ["headphone", "audio", "speaker", "music", "studio"]):
         return {
@@ -218,6 +257,14 @@ def _extract_product_domain(goal: str) -> dict[str, Any]:
             "accent": "#06b6d4",
             "secondary": "#6366f1",
             "archetype": "saas",
+            "hero_badge": "Acoustic Reference Standard • Interactive 3D Acoustic Core",
+            "social_proof_text": "4.9/5 from 3,400+ audio engineers",
+            "viewport_title": "Planar Magnetic Driver Core • 60FPS",
+            "viewport_chip_top": "106mm Planar Diaphragm",
+            "viewport_chip_bottom_left": "0.001% THD Balanced",
+            "viewport_chip_bottom_right": "Drag to Inspect",
+            "model_stats": "Open-Back Acoustic Chamber",
+            "three_d_scene_type": "audio_gear",
         }
     if any(k in g for k in ["skincare", "beauty", "cosmetics", "wellness"]):
         return {
@@ -763,7 +810,14 @@ class DomainSynthesizer:
             archetype=archetype,
             font_heading=font_heading,
             font_body=font_body,
-            three_d_scene_type="product_turntable",
+            three_d_scene_type=meta.get("three_d_scene_type", "product_turntable"),
+            hero_badge=meta.get("hero_badge", "3D Interactive Showcase • Drag to Inspect"),
+            social_proof_text=meta.get("social_proof_text", "4.9/5 from 1,200+ verified customers"),
+            viewport_title=meta.get("viewport_title", "3D Interactive Showcase • WebGL 60FPS"),
+            viewport_chip_top=meta.get("viewport_chip_top", "PBR Surface"),
+            viewport_chip_bottom_left=meta.get("viewport_chip_bottom_left", "Sub-mm Precision"),
+            viewport_chip_bottom_right=meta.get("viewport_chip_bottom_right", "Drag to Spin ↻"),
+            model_stats=meta.get("model_stats", "Physical PBR Shading • 60 FPS"),
             categories=meta["categories"],
             showcase_items=items,
             features_bento=[
