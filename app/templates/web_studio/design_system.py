@@ -11,7 +11,7 @@ LUCIDE_ICONS_CDN = '<script src="https://unpkg.com/lucide@latest"></script>'
 GOOGLE_FONTS_LINK = (
     '<link rel="preconnect" href="https://fonts.googleapis.com">\n'
     '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>\n'
-    '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">'
+    '<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;800&family=Inter:wght@300;400;500;600;700;800&family=Montserrat:wght@400;500;600;700&family=Outfit:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@0,600;0,700;1,400&family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Share+Tech+Mono&family=Space+Grotesk:wght@500;700&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">'
 )
 THREE_JS_CDN = '<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>'
 
@@ -20,31 +20,81 @@ def generate_modern_css_theme(
     theme_name: str = "futuristic_dark",
     primary_color: str = "#6366f1",
     accent_glow: str = "#a855f7",
+    font_heading: str | None = None,
+    font_body: str | None = None,
+    archetype: str | None = None,
 ) -> str:
-    """Generate a complete, self-contained modern CSS design system with glassmorphism & dark/light mode."""
+    """Generate a complete, self-contained modern CSS design system tailored to design archetype."""
+    eff_archetype = (archetype or theme_name or "modern_glass").lower()
+
+    # Dynamic typography per archetype
+    if "luxury" in eff_archetype:
+        heading_font = font_heading or "'Cinzel', 'Playfair Display', serif"
+        body_font = font_body or "'Montserrat', 'Inter', sans-serif"
+        bg_base = "#0a0c10"
+        bg_surface = "#121520"
+        border_subtle = "rgba(212, 175, 55, 0.18)"
+        border_glow = "rgba(212, 175, 55, 0.45)"
+    elif "cyberpunk" in eff_archetype:
+        heading_font = font_heading or "'Space Grotesk', sans-serif"
+        body_font = font_body or "'Share Tech Mono', monospace"
+        bg_base = "#060810"
+        bg_surface = "#0d1120"
+        border_subtle = "rgba(0, 240, 255, 0.18)"
+        border_glow = "rgba(0, 240, 255, 0.5)"
+    elif "mission_control" in eff_archetype or "dashboard" in eff_archetype:
+        heading_font = font_heading or "'Space Grotesk', sans-serif"
+        body_font = font_body or "'Inter', sans-serif"
+        bg_base = "#060a14"
+        bg_surface = "#0e1424"
+        border_subtle = "rgba(6, 182, 212, 0.16)"
+        border_glow = "rgba(6, 182, 212, 0.45)"
+    elif "brutalist" in eff_archetype:
+        heading_font = font_heading or "'Syne', sans-serif"
+        body_font = font_body or "'Space Grotesk', sans-serif"
+        bg_base = "#0f0f11"
+        bg_surface = "#1a1a1f"
+        border_subtle = "rgba(255, 230, 0, 0.3)"
+        border_glow = "rgba(255, 230, 0, 0.6)"
+    elif "apple" in eff_archetype or "saas" in eff_archetype:
+        heading_font = font_heading or "'Plus Jakarta Sans', sans-serif"
+        body_font = font_body or "'Inter', sans-serif"
+        bg_base = "#08090e"
+        bg_surface = "#0f121d"
+        border_subtle = "rgba(255, 255, 255, 0.08)"
+        border_glow = "rgba(99, 102, 241, 0.4)"
+    else:
+        heading_font = font_heading or "'Outfit', sans-serif"
+        body_font = font_body or "'Inter', sans-serif"
+        bg_base = "#090d16"
+        bg_surface = "#0f172a"
+        border_subtle = "rgba(255, 255, 255, 0.08)"
+        border_glow = "rgba(99, 102, 241, 0.4)"
+
     return f"""/* ==========================================================================
-   FORGE WebStudio 3.0 — Modern Design System (Glassmorphic / Futuristic)
+   FORGE WebStudio 3.0 — Bespoke Design System [{eff_archetype.upper()}]
    ========================================================================== */
 
 :root {{
-    --font-primary: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    --font-heading: 'Space Grotesk', var(--font-primary);
-    --font-body: 'Inter', var(--font-primary);
+    --font-primary: {body_font};
+    --font-heading: {heading_font};
+    --font-body: {body_font};
+    --font-mono: 'Share Tech Mono', monospace;
 
     /* Dynamic Theme Colors */
     --primary: {primary_color};
-    --primary-hover: #4f46e5;
+    --primary-hover: {primary_color};
     --primary-light: rgba(99, 102, 241, 0.15);
     --accent: {accent_glow};
     --accent-glow: rgba(168, 85, 247, 0.4);
 
     /* Dark Surface Foundations (Default) */
-    --bg-base: #090d16;
-    --bg-surface: #0f172a;
+    --bg-base: {bg_base};
+    --bg-surface: {bg_surface};
     --bg-surface-elevated: #1e293b;
-    --border-subtle: rgba(255, 255, 255, 0.08);
+    --border-subtle: {border_subtle};
     --border-highlight: rgba(255, 255, 255, 0.18);
-    --border-glow: rgba(99, 102, 241, 0.4);
+    --border-glow: {border_glow};
 
     /* Glassmorphism Tokens */
     --glass-bg: rgba(15, 23, 42, 0.65);
