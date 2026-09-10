@@ -53,9 +53,15 @@ class ForgeWebStudio:
             html_content = cls._generate_portfolio_html(blueprint, primary_hex, secondary_hex)
             js_content = cls._generate_portfolio_js(blueprint, primary_hex, secondary_hex)
 
+        archetype = getattr(blueprint, "archetype", None)
+        font_heading = getattr(blueprint, "font_heading", None)
+        font_body = getattr(blueprint, "font_body", None)
         css_content = generate_modern_css_theme(
             primary_color=primary_hex,
             accent_glow=secondary_hex,
+            archetype=archetype,
+            font_heading=font_heading,
+            font_body=font_body,
         )
         readme_content = cls._generate_readme(goal, blueprint)
 
@@ -1301,14 +1307,25 @@ document.addEventListener('DOMContentLoaded', () => {{
     ) -> str:
         brand_name = blueprint.app_title.split("—")[0].strip()
 
-        # Telemetry table initial rows
-        initial_services = [
-            {"name": "api-gateway", "category": "Network", "status": "nominal", "cpu": "24%", "mem": "38%", "lat": "12ms"},
-            {"name": "auth-service", "category": "Compute", "status": "nominal", "cpu": "18%", "mem": "42%", "lat": "16ms"},
-            {"name": "vector-db-shard-1", "category": "Storage", "status": "nominal", "cpu": "62%", "mem": "71%", "lat": "22ms"},
-            {"name": "inference-worker-01", "category": "Compute", "status": "nominal", "cpu": "84%", "mem": "65%", "lat": "45ms"},
-            {"name": "edge-caching-sg", "category": "Network", "status": "nominal", "cpu": "12%", "mem": "29%", "lat": "8ms"},
-        ]
+        # Telemetry table rows — dynamically generated from blueprint.showcase_items
+        kpi_metrics = getattr(blueprint, "kpi_metrics", {})
+        kpi_throughput_val = kpi_metrics.get("throughput", "840k req/s")
+        kpi_latency_val = kpi_metrics.get("latency", "6.4ms P99")
+
+        # Build initial services from blueprint items
+        initial_services = []
+        cpu_values = ["24%", "18%", "62%", "84%", "12%"]
+        mem_values = ["38%", "42%", "71%", "65%", "29%"]
+        lat_values = ["12ms", "16ms", "22ms", "45ms", "8ms"]
+        for i, item in enumerate(blueprint.showcase_items[:5]):
+            initial_services.append({
+                "name": item["title"].lower().replace(" ", "-").replace("—", "").replace("&", "")[:28].rstrip("-"),
+                "category": item.get("category", "System"),
+                "status": "nominal",
+                "cpu": cpu_values[i % len(cpu_values)],
+                "mem": mem_values[i % len(mem_values)],
+                "lat": lat_values[i % len(lat_values)],
+            })
 
         table_rows = []
         for s in initial_services:
@@ -1507,7 +1524,7 @@ document.addEventListener('DOMContentLoaded', () => {{
                         <span style="color: var(--text-muted); font-size: 0.85rem;">Global Throughput</span>
                         <i data-lucide="activity" style="color: var(--success); width: 18px; height: 18px;"></i>
                     </div>
-                    <div id="kpi-throughput" class="gradient-text" style="font-size: 2rem; font-weight: 800; margin-bottom: 0.5rem;">24,850 req/s</div>
+                    <div id="kpi-throughput" class="gradient-text" style="font-size: 2rem; font-weight: 800; margin-bottom: 0.5rem;">{kpi_throughput_val}</div>
                     <div style="color: var(--success); font-size: 0.8rem; font-weight: 600;">↑ 12.4% vs last hour</div>
                 </div>
 
@@ -1516,7 +1533,7 @@ document.addEventListener('DOMContentLoaded', () => {{
                         <span style="color: var(--text-muted); font-size: 0.85rem;">P99 Latency</span>
                         <i data-lucide="gauge" style="color: var(--primary); width: 18px; height: 18px;"></i>
                     </div>
-                    <div id="kpi-latency" style="font-size: 2rem; font-weight: 800; color: var(--success); margin-bottom: 0.5rem;">18.4 ms</div>
+                    <div id="kpi-latency" style="font-size: 2rem; font-weight: 800; color: var(--success); margin-bottom: 0.5rem;">{kpi_latency_val}</div>
                     <div style="color: var(--text-muted); font-size: 0.8rem;">Target SLA: &lt; 50ms</div>
                 </div>
 
