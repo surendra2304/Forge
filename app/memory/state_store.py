@@ -281,8 +281,13 @@ class StateStore:
                         created_at=datetime.fromisoformat(row["created_at"]),
                         updated_at=datetime.fromisoformat(row["updated_at"]),
                     )
-                )
             return results
+
+    async def count_tasks(self) -> int:
+        """Count total tasks in the store."""
+        async with self.db.connection() as conn, conn.execute("SELECT COUNT(*) as cnt FROM tasks") as cursor:
+            row = await cursor.fetchone()
+            return row["cnt"] if row else 0
 
     # --- Audit Events ---
 

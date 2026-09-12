@@ -71,9 +71,16 @@ class OrchestratorCore:
         from app.memory.models import generate_task_id
 
         # Determine sequence number for new task
-        tasks = await self.store.list_tasks()
-        task_seq = len(tasks) + 1
+        if hasattr(self.store, "count_tasks"):
+            total_count = await self.store.count_tasks()
+        else:
+            tasks = await self.store.list_tasks(limit=1000)
+            total_count = len(tasks)
+        task_seq = total_count + 1
         task_id = generate_task_id(task_seq)
+        while await self.store.get_task(task_id):
+            task_seq += 1
+            task_id = generate_task_id(task_seq)
         req_list = requirements or []
         logger.info(f"Orchestrator intaking task '{task_id}': {goal[:80]}...")
 
