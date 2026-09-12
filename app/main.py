@@ -15,6 +15,7 @@ from app.api.improvement import improvement_router
 from app.api.marketplace import marketplace_router, task_template_router
 from app.api.routes import router as api_router
 from app.api.tasks import tasks_router
+from app.api.delegate import delegate_router
 from app.api.websocket import ws_router
 from app.core.config import get_settings
 from app.core.logging import get_logger, setup_logging
@@ -74,6 +75,7 @@ def create_app() -> FastAPI:
     app.include_router(api_router, prefix="/api/v1", tags=["API v1"])
     app.include_router(tasks_router, prefix="/api", tags=["Tasks"])
     app.include_router(tasks_router, prefix="/api/v1", tags=["Tasks v1"])
+    app.include_router(delegate_router, prefix="/api/v1", tags=["FRIDAY Universe Forge Delegation"])
     app.include_router(analytics_router, prefix="/api", tags=["Analytics"])
     app.include_router(analytics_router, prefix="/api/v1", tags=["Analytics v1"])
     app.include_router(improvement_router, prefix="/api", tags=["Self-Improvement"])

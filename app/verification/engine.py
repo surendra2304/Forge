@@ -18,7 +18,13 @@ from app.verification.checkers import (
     SecurityChecker,
     TestChecker,
 )
-from app.verification.evidence import VerificationEvidence, VerificationReport
+from app.verification.evidence import (
+    VerificationEvidence,
+    VerificationManifest,
+    VerificationReport,
+    VerificationStage,
+    VerificationStageResult,
+)
 from app.verification.expanded_battery import (
     AccessibilityChecker,
     CodeQualityComplexityChecker,
@@ -198,7 +204,64 @@ class VerificationEngine:
         report_json = json.dumps(report.model_dump(mode="json"), indent=2)
         self.wm.save_artifact(task_id, "verification_report.json", report_json)
 
+        # Generate canonical verification manifest with full objective metrics
+        self.generate_manifest(task_id, report)
+
         return report
+
+    def generate_manifest(self, task_id: str, report: VerificationReport) -> VerificationManifest:
+        """
+        Compile canonical VerificationManifest with exact commands, exit codes, logs, artifacts, and timestamps.
+        Detects partial failures when some checks/stages passed and others failed.
+        """
+        stages_map: dict[str, VerificationStageResult] = {}
+        for ev in report.evidence:
+            stage_key = ev.category.value if hasattr(ev.category, "value") else str(ev.category)
+            stdout_snip = ev.stdout[:500] if ev.stdout else ""
+            stderr_snip = ev.stderr[:500] if ev.stderr else ""
+            stages_map[ev.check_name] = VerificationStageResult(
+                stage=stage_key,
+                command=ev.command,
+                exit_code=ev.exit_code,
+                passed=ev.passed,
+                duration_ms=ev.duration_ms,
+                stdout_snippet=stdout_snip,
+                stderr_snippet=stderr_snip,
+                artifacts=ev.artifacts_inspected,
+                timestamp=(
+                    ev.timestamp.isoformat()
+                    if hasattr(ev.timestamp, "isoformat")
+                    else str(ev.timestamp)
+                ),
+            )
+
+        passed_stages = sum(1 for s in stages_map.values() if s.passed)
+        failed_stages = len(stages_map) - passed_stages
+
+        # Check partial failure: if any failed, but at least one stage passed
+        partial_failure = (failed_stages > 0 and passed_stages > 0)
+        overall_status = (
+            "PASSED"
+            if failed_stages == 0
+            else ("PARTIAL_FAILURE" if partial_failure else "FAILED")
+        )
+
+        manifest = VerificationManifest(
+            task_id=task_id,
+            overall_status=overall_status,
+            all_passed=(failed_stages == 0),
+            partial_failure=partial_failure,
+            failure_summary="; ".join(report.failure_reasons) if report.failure_reasons else None,
+            total_stages=len(stages_map),
+            passed_stages=passed_stages,
+            failed_stages=failed_stages,
+            stages=stages_map,
+            evidence=report.evidence,
+        )
+
+        manifest_json = json.dumps(manifest.model_dump(mode="json"), indent=2)
+        self.wm.save_artifact(task_id, "verification_manifest.json", manifest_json)
+        return manifest
 
 
 verification_engine = VerificationEngine()

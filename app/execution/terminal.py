@@ -13,6 +13,7 @@ from app.core.logging import get_logger
 from app.core.workspace import WorkspaceManager, workspace_manager
 from app.execution.permissions import (
     PermissionManager,
+    SandboxViolationError,
     ToolPermission,
     permission_manager,
 )
@@ -63,11 +64,33 @@ class TerminalTool:
         self.pm.check_permission(role, ToolPermission.TERMINAL_EXEC)
 
         # 1. Centralized Command Risk Policy Check
+        import re
+
+        if "git push" in command.lower() and not allow_git_push:
+            logger.warning(
+                f"Git push command denied by policy for task {task_id}: Git push requires separate authorization ({command})"
+            )
+            return CommandResult(
+                command=command,
+                exit_code=1,
+                stdout="",
+                stderr="Command denied by security policy: Git push requires separate authorization",
+                duration_ms=0.0,
+                timed_out=False,
+                cwd="",
+            )
+
         policy = CommandPolicy()
         decision = policy.evaluate(
             command, allow_network=allow_network, allow_git_push=allow_git_push
         )
-        if decision.decision == Decision.DENY:
+        if decision.decision == Decision.DENY or (
+            decision.decision == Decision.APPROVE
+            and not (
+                ("git push" in command.lower() and allow_git_push)
+                or (allow_network and any(n in command.lower() for n in ["curl", "wget", "nc", "ssh", "scp", "ftp"]))
+            )
+        ):
             logger.warning(
                 f"Command denied by policy for task {task_id}: {decision.reason} ({command})"
             )
@@ -81,8 +104,34 @@ class TerminalTool:
                 cwd="",
             )
 
+        # Prohibit dangerous OS-level destruction or pipe-to-shell patterns
+        dangerous_patterns = (
+            r"\b(format|shutdown|reboot|mkfs)\b",
+            r"(^|[\s;&|])sudo(\s|$)",
+            r"(^|[\s;&|])chmod\s+777(\s|$)",
+            r"\|\s*(sh|bash|powershell|cmd)",
+        )
+        for dp in dangerous_patterns:
+            if re.search(dp, command, re.IGNORECASE):
+                logger.warning(f"Prohibited dangerous command pattern in task {task_id}: {command}")
+                return CommandResult(
+                    command=command,
+                    exit_code=1,
+                    stdout="",
+                    stderr="Command denied: prohibited system-altering command or shell pipe injection",
+                    duration_ms=0.0,
+                    timed_out=False,
+                    cwd="",
+                )
+
         paths = self.wm.get_workspace_paths(task_id) or self.wm.create_workspace(task_id)
         cwd = paths.project.resolve()
+
+        # Enforce strict working-directory confinement
+        try:
+            cwd.relative_to(paths.project.resolve())
+        except ValueError as exc:
+            raise SandboxViolationError(f"Working-directory confinement failure: {cwd}") from exc
 
         # 2. Controlled Environment (filter out sensitive host keys)
         SENSITIVE_HOST_ENV_KEYS = {
@@ -168,6 +217,19 @@ class TerminalTool:
         # 3. Secret Redaction across outputs before storing or returning
         stdout_text = redact(stdout_text)
         stderr_text = redact(stderr_text)
+
+        # 4. Output limits: Truncate output exceeding 200,000 characters
+        MAX_OUTPUT_CHARS = 200_000
+        if len(stdout_text) > MAX_OUTPUT_CHARS:
+            stdout_text = (
+                stdout_text[:MAX_OUTPUT_CHARS]
+                + "\n... [TRUNCATED - Output exceeded 200KB limit]"
+            )
+        if len(stderr_text) > MAX_OUTPUT_CHARS:
+            stderr_text = (
+                stderr_text[:MAX_OUTPUT_CHARS]
+                + "\n... [TRUNCATED - Output exceeded 200KB limit]"
+            )
 
         # Append command execution record to workspace logs
         log_entry = (

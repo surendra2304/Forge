@@ -34,6 +34,10 @@ class CompletionReportData(BaseModel):
     generated_at: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
 
 
+class SecurityGateFailure(Exception):
+    """Raised when pre-delivery security review finds critical vulnerabilities or secrets."""
+
+
 class DeliveryPackager:
     """Packages completed software artifacts, tags git releases, and authors completion reports."""
 
@@ -54,12 +58,26 @@ class DeliveryPackager:
         known_limitations: list[str] | None = None,
         models_used: list[str] | None = None,
         tag_name: str = "v1.0-forge-delivery",
+        require_sentinel_gate: bool = False,
     ) -> CompletionReportData:
         """
         Produce completion report (JSON + Markdown), commit files, and create release git tag.
+        Enforces pre-delivery Sentinel security gate if required.
         """
         paths = self.wm.get_workspace_paths(task_id) or self.wm.create_workspace(task_id)
         req_list = requirements or []
+
+        # Optional Sentinel pre-delivery security gate
+        if require_sentinel_gate:
+            from app.verification.security_scanner import OutputSecurityScanner
+
+            scanner = OutputSecurityScanner(paths.project)
+            scan_report = scanner.scan_all()
+            if scan_report.blocks_delivery or scan_report.critical_count > 0:
+                issues = [f"{f.check_name}: {f.description}" for f in scan_report.findings]
+                msg = f"Sentinel security gate failed with {scan_report.critical_count} critical findings: {'; '.join(issues[:3])}"
+                logger.error(msg)
+                raise SecurityGateFailure(msg)
 
         # 1. Implementation Summary
         all_project_files = [

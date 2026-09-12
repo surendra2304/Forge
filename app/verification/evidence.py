@@ -66,3 +66,46 @@ class VerificationReport(BaseModel):
                     msg += f" - {ev.stderr.strip()[:120]}"
                 reasons.append(msg)
         return reasons
+
+
+class VerificationStage(str, Enum):
+    BUILD = "build"
+    LINT = "lint"
+    TYPECHECK = "typecheck"
+    UNIT_TESTS = "unit_tests"
+    INTEGRATION_TESTS = "integration_tests"
+    BROWSER_TESTS = "browser_tests"
+    SECURITY = "security"
+
+
+class VerificationStageResult(BaseModel):
+    """Objective result of an individual verification stage."""
+
+    stage: str
+    command: str | None = None
+    exit_code: int = 0
+    passed: bool = True
+    duration_ms: float = 0.0
+    stdout_snippet: str = ""
+    stderr_snippet: str = ""
+    artifacts: list[str] = Field(default_factory=list)
+    timestamp: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
+
+
+class VerificationManifest(BaseModel):
+    """
+    Objective, canonical verification manifest covering all stages:
+    build, lint, typecheck, unit/integration/browser tests, and security.
+    """
+
+    task_id: str
+    overall_status: str = "PASSED"  # PASSED, FAILED, PARTIAL_FAILURE
+    all_passed: bool = True
+    partial_failure: bool = False
+    failure_summary: str | None = None
+    total_stages: int = 0
+    passed_stages: int = 0
+    failed_stages: int = 0
+    stages: dict[str, VerificationStageResult] = Field(default_factory=dict)
+    evidence: list[VerificationEvidence] = Field(default_factory=list)
+    generated_at: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())

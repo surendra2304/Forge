@@ -11,6 +11,10 @@ from app.recovery.classifier import FailureClass
 logger = get_logger("recovery.loop_guard")
 
 
+class RepairLoopDetectedError(RuntimeError):
+    """Raised when an infinite repair loop or duplicate patch application is detected."""
+
+
 class AntiLoopController:
     """Enforces retry budgets, deduplicates patches, and governs escalation boundaries."""
 
@@ -62,6 +66,21 @@ class AntiLoopController:
                 return False, msg
 
         return True, "Repair attempt permitted."
+
+    def assert_can_attempt_repair(
+        self,
+        task_id: str,
+        failure_class: FailureClass,
+        patch_content: str | None = None,
+    ) -> None:
+        """Check if repair attempt is permitted. Raises RepairLoopDetectedError on violation."""
+        allowed, reason = self.can_attempt_repair(
+            task_id=task_id,
+            failure_class=failure_class,
+            patch_content=patch_content,
+        )
+        if not allowed:
+            raise RepairLoopDetectedError(f"Anti-Loop Violation: {reason}")
 
     def record_repair_attempt(
         self,

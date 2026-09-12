@@ -13,6 +13,8 @@ from app.core.workspace import WorkspaceManager, workspace_manager
 from app.execution.permissions import (
     PermissionManager,
     ToolPermission,
+    UnauthorizedGitOperationError,
+    UnauthorizedGitPushError,
     permission_manager,
 )
 
@@ -121,8 +123,18 @@ class GitTool:
         code, out, err = await self._run_git(task_id, ["checkout", "-b", branch_name])
         return code == 0
 
-    async def commit(self, task_id: str, message: str, role: str = "developer") -> str:
+    async def commit(
+        self,
+        task_id: str,
+        message: str,
+        role: str = "developer",
+        authorized: bool = True,
+    ) -> str:
         """Stage all files and commit with a message. Returns commit SHA."""
+        if not authorized:
+            raise UnauthorizedGitOperationError(
+                "Security Violation: Git commit requires explicit authorization."
+            )
         self.pm.check_permission(role, ToolPermission.GIT_WRITE)
         await self.init_repo(task_id, role=role)
         await self._run_git(task_id, ["add", "."])
@@ -130,6 +142,67 @@ class GitTool:
 
         code, sha_out, _ = await self._run_git(task_id, ["rev-parse", "HEAD"])
         return sha_out.strip()
+
+    async def push(
+        self,
+        task_id: str,
+        remote: str = "origin",
+        branch: str = "main",
+        role: str = "developer",
+        authorized: bool = False,
+        push_token: str | None = None,
+    ) -> bool:
+        """
+        Push local commits to remote repository.
+        Requires explicit, separate authorization. Unauthorized attempts are rejected.
+        """
+        self.pm.check_git_push_authorized(authorized=authorized, push_token=push_token)
+        self.pm.check_permission(role, ToolPermission.GIT_PUSH)
+
+        # Enforce branch policy
+        protected_branches = {"main", "master", "production", "release"}
+        if branch.lower() in protected_branches and not push_token:
+            logger.warning(
+                f"Direct push to protected branch '{branch}' rejected without elevated push token"
+            )
+            raise UnauthorizedGitPushError(
+                f"Direct push to protected branch '{branch}' requires elevated authorization token"
+            )
+
+        code, out, err = await self._run_git(task_id, ["push", remote, branch])
+        if code != 0:
+            logger.error(f"Git push failed: {err}")
+            return False
+        return True
+
+    async def create_pr(
+        self,
+        task_id: str,
+        title: str,
+        body: str,
+        head_branch: str,
+        base_branch: str = "main",
+        role: str = "developer",
+        authorized: bool = False,
+        pr_token: str | None = None,
+    ) -> dict[str, str]:
+        """
+        Create a pull request for changes.
+        Requires separate authorization.
+        """
+        if not authorized and not pr_token:
+            raise UnauthorizedGitOperationError(
+                "Security Violation: Pull request creation requires separate authorization."
+            )
+        self.pm.check_permission(role, ToolPermission.PR_CREATE)
+        return {
+            "task_id": task_id,
+            "title": title,
+            "head": head_branch,
+            "base": base_branch,
+            "status": "created",
+            "pr_url": f"https://github.com/mock-repo/pulls/{task_id}",
+        }
 
     async def checkpoint(self, task_id: str, checkpoint_name: str, role: str = "developer") -> str:
         """Create a commit and lightweight git tag for recovery."""

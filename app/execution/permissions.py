@@ -22,10 +22,22 @@ class ToolPermission(str, Enum):
     PROCESS_KILL = "process:kill"
     GIT_READ = "git:read"
     GIT_WRITE = "git:write"
+    GIT_COMMIT = "git:commit"
+    GIT_PUSH = "git:push"
+    PR_CREATE = "pr:create"
+    DELIVERY_PACKAGE = "delivery:package"
 
 
 class PermissionDeniedError(Exception):
     """Raised when an agent attempts an unauthorized tool action."""
+
+
+class UnauthorizedGitOperationError(PermissionDeniedError):
+    """Raised when an unauthorized Git write/commit/PR operation is attempted."""
+
+
+class UnauthorizedGitPushError(UnauthorizedGitOperationError):
+    """Raised when an unauthorized Git push operation is attempted without explicit authorization."""
 
 
 class SandboxViolationError(Exception):
@@ -133,6 +145,29 @@ class PermissionManager:
             msg = f"Security Violation: Agent role '{role_name}' lacks permission '{permission.value}'"
             logger.warning(msg)
             raise PermissionDeniedError(msg)
+
+    def grant_permission(self, role_name: str, permission: ToolPermission) -> None:
+        """Explicitly grant a permission to a role in this manager instance."""
+        role_key = role_name.lower()
+        if role_key not in self._allowlist:
+            self._allowlist[role_key] = set()
+        self._allowlist[role_key].add(permission)
+
+    def check_git_commit_authorized(self, authorized: bool) -> None:
+        """Raise UnauthorizedGitOperationError if git commit is not explicitly authorized."""
+        if not authorized:
+            msg = "Security Violation: Git commit requires explicit authorization"
+            logger.warning(msg)
+            raise UnauthorizedGitOperationError(msg)
+
+    def check_git_push_authorized(
+        self, authorized: bool, push_token: str | None = None
+    ) -> None:
+        """Raise UnauthorizedGitPushError if git push is not explicitly authorized."""
+        if not authorized and not push_token:
+            msg = "Security Violation: Git push requires explicit separate authorization"
+            logger.warning(msg)
+            raise UnauthorizedGitPushError(msg)
 
     def validate_sandbox_path(self, target_path: Path, sandbox_root: Path) -> Path:
         """

@@ -96,6 +96,7 @@ class WorkspaceManager:
 
         # Populate project directory from repo_url, local_path, or create empty
         if repo_url:
+            self.validate_repository_url(repo_url)
             logger.info(f"Cloning repository '{repo_url}' into task workspace {task_id}...")
             try:
                 subprocess.run(
@@ -228,6 +229,76 @@ class WorkspaceManager:
         log_file = paths.logs / log_filename
         with open(log_file, "a", encoding="utf-8") as f:
             f.write(log_message.rstrip() + "\n")
+
+    @staticmethod
+    def validate_repository_url(repo_url: str) -> None:
+        """Validate repository URL against approved patterns."""
+        import re
+
+        clean_url = repo_url.strip()
+        ALLOWED_REPO_PATTERNS = [
+            r"^https:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+(\.git)?$",
+            r"^git@github\.com:[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+(\.git)?$",
+            r"^https:\/\/gitlab\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+(\.git)?$",
+            r"^file:\/\/\/?[A-Za-z0-9_.\-\/:]+$",
+            r"^[A-Za-z0-9_.\-\/\\]+$",
+        ]
+        if not any(re.match(p, clean_url) for p in ALLOWED_REPO_PATTERNS):
+            raise ValueError(
+                f"Repository URL '{repo_url}' is not in the allowed repository allowlist"
+            )
+
+    def create_snapshot(self, task_id: str, snapshot_name: str) -> Path:
+        """Create a full filesystem snapshot of the project directory."""
+        paths = self.get_workspace_paths(task_id) or self.create_workspace(task_id)
+        snapshots_dir = paths.state / "snapshots"
+        snapshots_dir.mkdir(parents=True, exist_ok=True)
+
+        target_snapshot = snapshots_dir / snapshot_name
+        if target_snapshot.exists():
+            shutil.rmtree(target_snapshot)
+
+        shutil.copytree(paths.project, target_snapshot, dirs_exist_ok=True)
+        logger.info(
+            f"Created workspace snapshot '{snapshot_name}' for task '{task_id}' at {target_snapshot}"
+        )
+        return target_snapshot
+
+    def rollback_snapshot(self, task_id: str, snapshot_name: str) -> bool:
+        """Rollback project directory to the state captured in the snapshot."""
+        paths = self.get_workspace_paths(task_id)
+        if not paths:
+            logger.error(f"Cannot rollback: workspace for task '{task_id}' does not exist.")
+            return False
+
+        snapshots_dir = paths.state / "snapshots"
+        target_snapshot = snapshots_dir / snapshot_name
+        if not target_snapshot.exists() or not target_snapshot.is_dir():
+            logger.error(f"Snapshot '{snapshot_name}' not found for task '{task_id}'.")
+            return False
+
+        # Clear project dir and restore pristine contents from snapshot
+        for item in paths.project.iterdir():
+            if item.is_dir():
+                shutil.rmtree(item)
+            else:
+                item.unlink()
+
+        shutil.copytree(target_snapshot, paths.project, dirs_exist_ok=True)
+        logger.info(
+            f"Successfully rolled back project in task '{task_id}' to snapshot '{snapshot_name}'."
+        )
+        return True
+
+    def list_snapshots(self, task_id: str) -> list[str]:
+        """List all available snapshot names for a task."""
+        paths = self.get_workspace_paths(task_id)
+        if not paths:
+            return []
+        snapshots_dir = paths.state / "snapshots"
+        if not snapshots_dir.exists():
+            return []
+        return [d.name for d in snapshots_dir.iterdir() if d.is_dir()]
 
     def cleanup_workspace(self, task_id: str) -> bool:
         """Safely remove a task workspace directory."""
