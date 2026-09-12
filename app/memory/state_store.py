@@ -281,6 +281,7 @@ class StateStore:
                         created_at=datetime.fromisoformat(row["created_at"]),
                         updated_at=datetime.fromisoformat(row["updated_at"]),
                     )
+                )
             return results
 
     async def count_tasks(self) -> int:
