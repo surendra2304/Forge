@@ -7,7 +7,10 @@ import time
 from collections import defaultdict
 from typing import Any
 
-import psutil
+try:
+    import psutil
+except ImportError:
+    psutil = None
 from pydantic import BaseModel, Field
 
 from app.core.config import get_settings
@@ -90,8 +93,15 @@ class ProductionMonitor:
     def get_system_metrics(self) -> dict[str, Any]:
         """Collect current host CPU, RAM, and workspace disk metrics."""
         settings = get_settings()
-        cpu_pct = psutil.cpu_percent(interval=None)
-        mem = psutil.virtual_memory()
+        if psutil is not None:
+            cpu_pct = psutil.cpu_percent(interval=None)
+            mem = psutil.virtual_memory()
+            mem_pct = mem.percent
+            mem_used_mb = round(mem.used / (1024 * 1024), 1)
+        else:
+            cpu_pct = 0.0
+            mem_pct = 0.0
+            mem_used_mb = 0.0
 
         # Disk space for workspaces directory
         disk_pct = 0.0
@@ -106,8 +116,8 @@ class ProductionMonitor:
 
         return {
             "cpu_percent": cpu_pct,
-            "memory_percent": mem.percent,
-            "memory_used_mb": round(mem.used / (1024 * 1024), 1),
+            "memory_percent": mem_pct,
+            "memory_used_mb": mem_used_mb,
             "disk_used_percent": disk_pct,
             "uptime_seconds": round(time.time() - self.start_time, 1),
         }
