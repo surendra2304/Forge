@@ -97,7 +97,7 @@ class Settings(BaseSettings):
         description="API Key for Inference REST API authentication",
     )
     intelx_url: str = Field(
-        default="https://intelx-3cz1.onrender.com",
+        default="https://intelx-mygl.onrender.com",
         validation_alias=AliasChoices("INTELX_URL", "FORGE_INTELX_URL", "intelx_url"),
         description="Base URL for IntelX technical research intelligence service",
     )
