@@ -1,33 +1,40 @@
 services:
   - type: web
-    name: forge-engine
+    name: friday-forge
     env: docker
-    region: singapore
     plan: free
-    repo: https://github.com/surendra2304/Forge.git
-    branch: main
+    region: singapore
     healthCheckPath: /health
-    dockerfilePath: Dockerfile
     envVars:
-      - key: FORGE_ENV
-        value: production
       - key: PORT
-        value: "8000"
-      - key: FORGE_API_KEY
-        value: forge_api
-      - key: INFERENCE_URL
-        value: https://inference-3i2b.onrender.com
-      - key: INFERENCE_API_KEY
-        value: inference_api
-      - key: MEMORA_URL
-        value: https://memora-9zr9.onrender.com
-      - key: MEMORA_API_KEY
-        value: memora_api
+        value: "10000"
+      - key: HOST
+        value: "0.0.0.0"
+      - key: ENVIRONMENT
+        value: "production"
       - key: INTELX_URL
-        value: https://intelx-3cz1.onrender.com
+        sync: false
+      - key: INFERENCE_URL
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
       - key: INTELX_API_KEY
-        value: intelx_api
+        sync: false
+      - key: GITHUB_TOKEN
+        sync: false
+      - key: FORGE_API_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: CORTEX_URL
+        sync: false
       - key: FUTURIS_URL
-        value: https://futuris-x4f4.onrender.com
+        sync: false
       - key: FUTURIS_API_KEY
-        value: futuris_api
+        sync: false
+      - key: CORTEX_API_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: INFERENCE_API_KEY
+        sync: false
