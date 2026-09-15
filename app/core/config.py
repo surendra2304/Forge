@@ -119,7 +119,7 @@ class Settings(BaseSettings):
         description="API Key for Futuris API authentication",
     )
     cortex_url: str = Field(
-        default="https://cortex-qifr.onrender.com",
+        default="https://cortex-0m7c.onrender.com",
         validation_alias=AliasChoices("CORTEX_URL", "NEXUS_URL", "cortex_url"),
         description="Base URL for Cortex Web Operations engine",
     )
