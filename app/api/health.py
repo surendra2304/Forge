@@ -41,7 +41,7 @@ class DiagnosticResponse(BaseModel):
     alerts: AlertStatus
 
 
-@health_router.get("/health", response_model=LivenessResponse, summary="Liveness Probe")
+@health_router.api_route("/health", methods=["GET", "HEAD"], response_model=LivenessResponse, summary="Liveness Probe")
 async def health_liveness():
     """Lightweight liveness probe checking that HTTP server is responsive."""
     settings = get_settings()
@@ -54,7 +54,7 @@ async def health_liveness():
     )
 
 
-@health_router.get("/health/ready", response_model=ReadinessResponse, summary="Readiness Probe")
+@health_router.api_route("/health/ready", methods=["GET", "HEAD"], response_model=ReadinessResponse, summary="Readiness Probe")
 async def health_readiness():
     """Readiness probe checking database connectivity and workspace filesystem write access."""
     db_ok = False

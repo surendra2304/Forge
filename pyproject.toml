@@ -50,7 +50,7 @@ forge = "app.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["app*"]
+include = ["app*", "forge_upgrade*"]
 
 [tool.pytest.ini_options]
 minversion = "8.0"
