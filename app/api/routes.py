@@ -513,7 +513,7 @@ async def forge_ask_inference(req: ForgeInferenceRequest):
     """Route question from local Forge to live Inference Gateway."""
     import time
     t0 = time.perf_counter()
-    url = "https://inference-3i2b.onrender.com/v1/agent/assist"
+    url = "https://inference-r1sn.onrender.com/v1/agent/assist"
     payload = {
         "caller_agent": "forge",
         "task_type": req.task_type,

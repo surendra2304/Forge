@@ -85,7 +85,7 @@ class Settings(BaseSettings):
         description="Default GitHub repository (e.g. owner/repo)",
     )
     ai_universe_url: str = Field(
-        default="https://inference-3i2b.onrender.com",
+        default="https://inference-r1sn.onrender.com",
         validation_alias=AliasChoices("INFERENCE_URL", "AI_UNIVERSE_URL", "ai_universe_url"),
         description="Base URL for external Inference / AI Universe reasoning engine",
     )
@@ -107,7 +107,7 @@ class Settings(BaseSettings):
         description="API Key for IntelX Technical Research API authentication",
     )
     futuris_url: str = Field(
-        default="https://futuris-x4f4.onrender.com",
+        default="https://futuris-th6f.onrender.com",
         validation_alias=AliasChoices("FUTURIS_URL", "FORGE_FUTURIS_URL", "futuris_url"),
         description="Base URL for Futuris predictive capacity & success intelligence service",
     )
@@ -129,7 +129,7 @@ class Settings(BaseSettings):
         description="API Key for Cortex API authentication",
     )
     memora_url: str = Field(
-        default="https://memora-9zr9.onrender.com",
+        default="https://memora-cavc.onrender.com",
         validation_alias=AliasChoices("MEMORA_URL", "FORGE_MEMORA_URL", "memora_url"),
         description="Base URL for Memora persistent memory fabric",
     )
