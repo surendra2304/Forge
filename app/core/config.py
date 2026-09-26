@@ -90,7 +90,7 @@ class Settings(BaseSettings):
         description="Base URL for external Inference / AI Universe reasoning engine",
     )
     ai_universe_api_key: str | None = Field(
-        default="inference_api",
+        default=None,
         validation_alias=AliasChoices(
             "INFERENCE_API_KEY", "AI_UNIVERSE_API_KEY", "ai_universe_api_key"
         ),
@@ -102,7 +102,7 @@ class Settings(BaseSettings):
         description="Base URL for IntelX technical research intelligence service",
     )
     intelx_api_key: str | None = Field(
-        default="intelx_api",
+        default=None,
         validation_alias=AliasChoices("INTELX_API_KEY", "FORGE_INTELX_API_KEY", "intelx_api_key"),
         description="API Key for IntelX Technical Research API authentication",
     )
@@ -112,7 +112,7 @@ class Settings(BaseSettings):
         description="Base URL for Futuris predictive capacity & success intelligence service",
     )
     futuris_api_key: str | None = Field(
-        default="futuris_api",
+        default=None,
         validation_alias=AliasChoices(
             "FUTURIS_API_KEY", "FORGE_FUTURIS_API_KEY", "futuris_api_key"
         ),
@@ -124,7 +124,7 @@ class Settings(BaseSettings):
         description="Base URL for Cortex Web Operations engine",
     )
     cortex_api_key: str | None = Field(
-        default="cortex_api",
+        default=None,
         validation_alias=AliasChoices("CORTEX_API_KEY", "NEXUS_API_KEY", "cortex_api_key"),
         description="API Key for Cortex API authentication",
     )
@@ -134,9 +134,9 @@ class Settings(BaseSettings):
         description="Base URL for Memora persistent memory fabric",
     )
     memora_api_key: str | None = Field(
-        default="memora_api",
-        validation_alias=AliasChoices("MEMORA_API_KEY", "FORGE_MEMORA_API_KEY", "memora_api_key"),
-        description="API Key for Memora REST API authentication",
+        default=None,
+        validation_alias=AliasChoices("FORGE_API_KEY", "FORGE_MEMORA_API_KEY", "MEMORA_API_KEY", "memora_api_key"),
+        description="Forge's named agent credential for Memora Cloud",
     )
 
     model_config = SettingsConfigDict(

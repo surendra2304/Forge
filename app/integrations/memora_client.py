@@ -84,7 +84,7 @@ class MemoraClient:
     ):
         settings: Settings = get_settings()
         self.base_url = (base_url or settings.memora_url).rstrip("/")
-        self.api_key = api_key or settings.memora_api_key or "memora_api"
+        self.api_key = api_key or settings.memora_api_key
         self.timeout = timeout
 
         if local_db_path:
@@ -97,13 +97,15 @@ class MemoraClient:
                 self.local_db_path = str(settings.data_dir / "memora.db")
 
     def _get_headers(self) -> dict[str, str]:
-        return {
+        headers = {
             "Content-Type": "application/json",
             "Accept": "application/json",
-            "Authorization": f"Bearer {self.api_key}",
-            "X-Agent-Key": self.api_key,
             "X-Agent-Name": "forge",
         }
+        if self.api_key:
+            headers["Authorization"] = f"Bearer {self.api_key}"
+            headers["X-Agent-Key"] = self.api_key
+        return headers
 
     # -------------------------------------------------------------------------
     # Asynchronous Memory Operations

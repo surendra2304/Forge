@@ -3,6 +3,7 @@ WebSocket Streaming Subsystem for Project FORGE.
 Provides authenticated real-time telemetry streaming for task-specific and global events.
 """
 
+import hmac
 from collections import defaultdict
 from typing import Any
 
@@ -73,13 +74,7 @@ ws_manager = WebSocketConnectionManager()
 def verify_ws_auth(websocket: WebSocket, api_key: str | None) -> bool:
     """Verify WebSocket authentication via query parameter or header."""
     settings = get_settings()
-    valid_keys = {
-        settings.ai_universe_api_key,
-        "friday_universe_api",
-        "friday_api",
-        "forge_api",
-        "inference_api",
-    }
+    valid_keys = {settings.ai_universe_api_key}
     # Add from production settings or api key manager
     try:
         from app.security.api_keys import api_key_manager
@@ -92,15 +87,16 @@ def verify_ws_auth(websocket: WebSocket, api_key: str | None) -> bool:
 
     # In local testing without any configured keys, allow
     if not valid_keys:
-        return True
+        from app.config.production import production_settings
+        return not production_settings.api_key_required
 
     # Check query param
-    if api_key and api_key in valid_keys:
+    if api_key and any(hmac.compare_digest(api_key.encode(), key.encode()) for key in valid_keys):
         return True
 
     # Check headers
     header_key = websocket.headers.get("x-friday-api-key") or websocket.headers.get("x-api-key")
-    if header_key and header_key in valid_keys:
+    if header_key and any(hmac.compare_digest(header_key.encode(), key.encode()) for key in valid_keys):
         return True
 
     return False

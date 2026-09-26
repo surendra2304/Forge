@@ -513,7 +513,13 @@ async def forge_ask_inference(req: ForgeInferenceRequest):
     """Route question from local Forge to live Inference Gateway."""
     import time
     t0 = time.perf_counter()
-    url = "https://inference-r1sn.onrender.com/v1/agent/assist"
+    settings = get_settings()
+    if not settings.ai_universe_url or not settings.ai_universe_api_key:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Inference is unavailable: configure AI_UNIVERSE_URL and AI_UNIVERSE_API_KEY.",
+        )
+    url = f"{settings.ai_universe_url.rstrip('/')}/v1/agent/assist"
     payload = {
         "caller_agent": "forge",
         "task_type": req.task_type,
@@ -522,7 +528,7 @@ async def forge_ask_inference(req: ForgeInferenceRequest):
         "no_cache": False,
         "max_tokens": 60,
     }
-    headers = {"X-FRIDAY-API-Key": "inference_api"}
+    headers = {"X-FRIDAY-API-Key": settings.ai_universe_api_key}
     client = _get_forge_inf_client()
     r = await client.post(url, json=payload, headers=headers)
     lat = round((time.perf_counter() - t0) * 1000, 2)

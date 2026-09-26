@@ -1,0 +1,26 @@
+from fastapi.testclient import TestClient
+
+from app.config.production import EnvironmentType, production_settings
+from app.main import app
+
+
+def test_production_api_fails_closed_when_forge_key_missing(monkeypatch):
+    monkeypatch.setattr(production_settings, "env", EnvironmentType.PRODUCTION)
+    monkeypatch.setattr(production_settings, "forge_api_key", None)
+
+    response = TestClient(app).get("/agents")
+
+    assert response.status_code == 503
+    assert response.json()["error"] == "service_auth_unconfigured"
+
+
+def test_production_api_checks_configured_key_and_keeps_health_public(monkeypatch):
+    key = "owner-configured-forge-test-key-0123456789"
+    monkeypatch.setattr(production_settings, "env", EnvironmentType.PRODUCTION)
+    monkeypatch.setattr(production_settings, "forge_api_key", key)
+    client = TestClient(app)
+
+    assert client.get("/health").status_code == 200
+    assert client.get("/agents").status_code == 401
+    assert client.get("/agents", headers={"X-API-Key": "wrong-key"}).status_code == 403
+    assert client.get("/agents", headers={"X-API-Key": key}).status_code == 200

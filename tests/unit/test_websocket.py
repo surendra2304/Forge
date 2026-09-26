@@ -6,14 +6,22 @@ import pytest
 from starlette.testclient import TestClient
 
 from app.api.websocket import ws_manager
+from app.core.config import get_settings
 from app.main import app
 
+_TEST_KEY = "forge_websocket_test_key_0123456789abcdef"
 
-def test_task_websocket_endpoint():
+
+@pytest.fixture(autouse=True)
+def configured_websocket_key(monkeypatch):
+    monkeypatch.setattr(get_settings(), "ai_universe_api_key", _TEST_KEY)
+
+
+def test_task_websocket_endpoint(configured_websocket_key):
     client = TestClient(app)
     task_id = "test_ws_task_100"
 
-    with client.websocket_connect(f"/ws/tasks/{task_id}?api_key=friday_universe_api") as websocket:
+    with client.websocket_connect(f"/ws/tasks/{task_id}?api_key={_TEST_KEY}") as websocket:
         # Receive connected greeting
         data = websocket.receive_json()
         assert data["event"] == "connected"
@@ -25,10 +33,10 @@ def test_task_websocket_endpoint():
         assert resp == "pong"
 
 
-def test_global_websocket_endpoint():
+def test_global_websocket_endpoint(configured_websocket_key):
     client = TestClient(app)
 
-    with client.websocket_connect("/ws/tasks?api_key=friday_universe_api") as websocket:
+    with client.websocket_connect(f"/ws/tasks?api_key={_TEST_KEY}") as websocket:
         data = websocket.receive_json()
         assert data["event"] == "connected"
 

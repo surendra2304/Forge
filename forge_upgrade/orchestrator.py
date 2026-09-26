@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import logging
 
 from .audit import AuditLog
 from .budget import BudgetController
 from .dag import DagScheduler
 from .models import PlanGraph, TaskBudget, TaskPhase
 from .plan_guard import PlanGuard
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -48,8 +51,8 @@ class ForgeController:
                 actions_taken=f"node:{node_id}",
                 domain="code_synthesis"
             )
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("Memora success learning write failed for Forge node %s (%s)", node_id, type(exc).__name__)
 
     def mark_failure(self, node_id: str, error: str) -> None:
         self.scheduler.mark_failed(node_id, error)
@@ -64,15 +67,16 @@ class ForgeController:
                 actions_taken=f"node:{node_id}",
                 domain="code_synthesis"
             )
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("Memora failure learning write failed for Forge node %s (%s)", node_id, type(exc).__name__)
 
     def get_self_upgrade_guidelines(self, node_id: str) -> str:
         """Retrieve self-upgraded rules from past failures to guide code generation for this node."""
         try:
             from forge_upgrade.memora_client import memora_client
             return memora_client.build_self_upgrade_context("forge", node_id, domain="code_synthesis")
-        except Exception:
+        except Exception as exc:
+            logger.warning("Memora guideline recall failed for Forge node %s (%s)", node_id, type(exc).__name__)
             return ""
 
     def finish(self) -> RunResult:
@@ -96,7 +100,7 @@ class ForgeController:
                 agent_output=f"Phase: {res.phase.value} | Progress: {res.progress * 100:.1f}% | Message: {res.message}",
                 event_type="software_task"
             )
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("Memora task receipt write failed for Forge (%s)", type(exc).__name__)
 
         return res

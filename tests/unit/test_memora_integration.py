@@ -12,6 +12,13 @@ import pytest
 from app.integrations.memora_client import MemoraClient, get_memora_client
 
 
+def test_forge_named_key_is_used_for_memora_identity():
+    from app.core.config import Settings
+
+    settings = Settings(_env_file=None, FORGE_API_KEY="forge-agent-key")
+    assert settings.memora_api_key == "forge-agent-key"
+
+
 @pytest.mark.asyncio
 async def test_memora_client_local_fallback(tmp_path: Path):
     """Verify MemoraClient seamlessly falls back to local SQLite when cloud is unreachable."""

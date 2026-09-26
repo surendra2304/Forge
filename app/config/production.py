@@ -33,7 +33,9 @@ class ProductionSettings(BaseModel):
     # API Security
     api_key_required: bool = Field(
         default_factory=lambda: (
-            os.getenv("API_KEY_REQUIRED", "false").lower() in ["true", "1", "yes"]
+            os.getenv("API_KEY_REQUIRED", "").lower() in ["true", "1", "yes"]
+            if os.getenv("API_KEY_REQUIRED") is not None
+            else os.getenv("FORGE_ENV", "development").lower() == "production"
         )
     )
     forge_api_key: str | None = Field(default_factory=lambda: os.getenv("FORGE_API_KEY"))

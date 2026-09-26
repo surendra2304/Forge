@@ -5,9 +5,11 @@ FastAPI initialization with lifespan lifecycle management, middleware, and route
 
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+import hmac
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from app.api.analytics import analytics_router
 from app.api.health import health_router
@@ -56,6 +58,37 @@ def create_app() -> FastAPI:
         description="FORGE: Autonomous Software Engineering Engine for goal-driven software synthesis and verification.",
         lifespan=lifespan,
     )
+
+    @app.middleware("http")
+    async def require_production_api_key(request: Request, call_next):
+        """Fail closed for public production routes while leaving health probes public."""
+        from app.config.production import EnvironmentType, production_settings
+
+        if production_settings.env != EnvironmentType.PRODUCTION:
+            return await call_next(request)
+        if request.url.path in {
+            "/health", "/health/ready", "/docs", "/redoc", "/openapi.json",
+        } or request.url.path.startswith("/static/"):
+            return await call_next(request)
+
+        configured_key = production_settings.forge_api_key or ""
+        if len(configured_key) < 32 or configured_key.lower() in {
+            "forge_api", "change-me", "changeme", "password", "secret",
+        }:
+            return JSONResponse(
+                status_code=503,
+                content={"error": "service_auth_unconfigured", "detail": "A unique FORGE_API_KEY is required."},
+            )
+
+        provided_key = request.headers.get("X-API-Key", "")
+        authorization = request.headers.get("Authorization", "")
+        if not provided_key and authorization.lower().startswith("bearer "):
+            provided_key = authorization[7:].strip()
+        if not provided_key:
+            return JSONResponse(status_code=401, content={"error": "unauthorized"})
+        if not hmac.compare_digest(provided_key.encode(), configured_key.encode()):
+            return JSONResponse(status_code=403, content={"error": "forbidden"})
+        return await call_next(request)
 
     # Configure CORS for local development and UI dashboards
     app.add_middleware(
