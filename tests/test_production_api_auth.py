@@ -24,3 +24,21 @@ def test_production_api_checks_configured_key_and_keeps_health_public(monkeypatc
     assert client.get("/agents").status_code == 401
     assert client.get("/agents", headers={"X-API-Key": "wrong-key"}).status_code == 403
     assert client.get("/agents", headers={"X-API-Key": key}).status_code == 200
+
+
+def test_production_dashboard_shell_is_public_but_data_apis_require_key(monkeypatch):
+    key = "owner-configured-forge-test-key-0123456789"
+    monkeypatch.setattr(production_settings, "env", EnvironmentType.PRODUCTION)
+    monkeypatch.setattr(production_settings, "forge_api_key", key)
+    client = TestClient(app)
+
+    for path in ("/", "/dashboard"):
+        response = client.get(path)
+        assert response.status_code == 200
+        assert "text/html" in response.headers["content-type"]
+        assert key not in response.text
+        assert client.head(path).status_code == 200
+
+    assert client.get("/api/tasks").status_code == 401
+    assert client.get("/api/analytics/summary").status_code == 401
+    assert client.get("/api/tasks", headers={"X-API-Key": key}).status_code != 401

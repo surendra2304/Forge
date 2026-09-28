@@ -3,21 +3,21 @@ FORGE Application Entry Point.
 FastAPI initialization with lifespan lifecycle management, middleware, and routers.
 """
 
+import hmac
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-import hmac
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.api.analytics import analytics_router
+from app.api.delegate import delegate_router
 from app.api.health import health_router
 from app.api.improvement import improvement_router
 from app.api.marketplace import marketplace_router, task_template_router
 from app.api.routes import router as api_router
 from app.api.tasks import tasks_router
-from app.api.delegate import delegate_router
 from app.api.websocket import ws_router
 from app.core.config import get_settings
 from app.core.logging import get_logger, setup_logging
@@ -61,7 +61,7 @@ def create_app() -> FastAPI:
 
     @app.middleware("http")
     async def require_production_api_key(request: Request, call_next):
-        """Fail closed for public production routes while leaving health probes public."""
+        """Protect data APIs while allowing the credential-free dashboard shell to load."""
         from app.config.production import EnvironmentType, production_settings
 
         if production_settings.env != EnvironmentType.PRODUCTION:
@@ -69,6 +69,8 @@ def create_app() -> FastAPI:
         if request.url.path in {
             "/health", "/health/ready", "/docs", "/redoc", "/openapi.json",
         } or request.url.path.startswith("/static/"):
+            return await call_next(request)
+        if request.method in {"GET", "HEAD"} and request.url.path in {"/", "/dashboard"}:
             return await call_next(request)
 
         configured_key = production_settings.forge_api_key or ""
