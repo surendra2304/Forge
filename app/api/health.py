@@ -20,7 +20,7 @@ class LivenessResponse(BaseModel):
     status: str = "ok"
     version: str = "0.1.0"
     uptime_seconds: float
-    database_connected: bool = True
+    database_connected: bool
 
 
 class ReadinessResponse(BaseModel):
@@ -41,20 +41,37 @@ class DiagnosticResponse(BaseModel):
     alerts: AlertStatus
 
 
-@health_router.api_route("/health", methods=["GET", "HEAD"], response_model=LivenessResponse, summary="Liveness Probe")
+@health_router.api_route(
+    "/health", methods=["GET", "HEAD"], response_model=LivenessResponse, summary="Liveness Probe"
+)
 async def health_liveness():
-    """Lightweight liveness probe checking that HTTP server is responsive."""
+    """Report process liveness and an observed database connectivity check."""
     settings = get_settings()
     sys_m = production_monitor.get_system_metrics()
+    db_ok = False
+    try:
+        async with db_manager.connection() as conn:
+            cursor = await conn.execute("SELECT 1")
+            row = await cursor.fetchone()
+            db_ok = row is not None and row[0] == 1
+    except Exception:
+        # Keep liveness independent from database health: callers still receive
+        # the process status, while readiness reports whether it can serve work.
+        db_ok = False
     return LivenessResponse(
         status="ok",
         version=settings.app_version,
         uptime_seconds=sys_m["uptime_seconds"],
-        database_connected=True,
+        database_connected=db_ok,
     )
 
 
-@health_router.api_route("/health/ready", methods=["GET", "HEAD"], response_model=ReadinessResponse, summary="Readiness Probe")
+@health_router.api_route(
+    "/health/ready",
+    methods=["GET", "HEAD"],
+    response_model=ReadinessResponse,
+    summary="Readiness Probe",
+)
 async def health_readiness():
     """Readiness probe checking database connectivity and workspace filesystem write access."""
     db_ok = False

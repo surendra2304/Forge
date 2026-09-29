@@ -2,17 +2,52 @@
 Unit tests for Production Hardening, Health Probes, Metrics, Security, and Backup Recovery.
 """
 
+from contextlib import asynccontextmanager
 from pathlib import Path
 from unittest.mock import patch
 
 import pytest
 from httpx import ASGITransport, AsyncClient
 
+from app.api import health as health_module
 from app.backup.recovery import BackupManager
 from app.main import app
 from app.memory.db import DatabaseManager, db_manager
 from app.monitoring.audit import AuditLogger
 from app.security.api_keys import APIKeyManager, RateLimiter
+
+
+@pytest.mark.asyncio
+async def test_liveness_reports_observed_database_state(monkeypatch):
+    class Cursor:
+        async def fetchone(self):
+            return (1,)
+
+    class Connection:
+        async def execute(self, query):
+            assert query == "SELECT 1"
+            return Cursor()
+
+    class HealthyDatabase:
+        @asynccontextmanager
+        async def connection(self):
+            yield Connection()
+
+    class UnavailableDatabase:
+        @asynccontextmanager
+        async def connection(self):
+            raise OSError("database unavailable")
+            yield  # pragma: no cover - makes this an async generator
+
+    monkeypatch.setattr(health_module, "db_manager", HealthyDatabase())
+    healthy = await health_module.health_liveness()
+    assert healthy.status == "ok"
+    assert healthy.database_connected is True
+
+    monkeypatch.setattr(health_module, "db_manager", UnavailableDatabase())
+    unavailable = await health_module.health_liveness()
+    assert unavailable.status == "ok"  # process is alive even when storage is down
+    assert unavailable.database_connected is False
 
 
 @pytest.mark.asyncio
