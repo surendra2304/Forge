@@ -33,9 +33,12 @@ jobs:
         run: ruff check .
 
       - name: Run tests
-        # -n 4 matches GitHub-hosted 4-vCPU runners; xdist workers saturating
-        # more cores have been observed to flake timing-sensitive golden
-        # benchmarks locally (12-core oversubscription).
-        # --timeout=120 turns a hung test into a 2-minute failure instead of
-        # eating the whole 30-minute job budget.
-        run: pytest -n 4 --timeout=120 --timeout-method=thread
+        # -n 4 matches GitHub-hosted 4-vCPU runners; heavier oversubscription
+        # flakes timing-sensitive golden benchmarks.
+        # --timeout-method=signal: the thread method deadlocks with xdist when
+        # a worker wedges on blocked socket I/O (observed: two CI runs hung
+        # past the job timeout with no failing test). SIGALRM interrupts the
+        # hang and fails the offending test; signal is POSIX-only, which CI
+        # (ubuntu) satisfies.
+        # -v streams per-test lines so a CI-only hang names its test live.
+        run: pytest -n 4 --timeout=120 --timeout-method=signal -v
