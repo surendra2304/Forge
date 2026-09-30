@@ -14,7 +14,7 @@ jobs:
   quality:
     name: Lint and tests
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -33,4 +33,9 @@ jobs:
         run: ruff check .
 
       - name: Run tests
-        run: pytest
+        # -n 4 matches GitHub-hosted 4-vCPU runners; xdist workers saturating
+        # more cores have been observed to flake timing-sensitive golden
+        # benchmarks locally (12-core oversubscription).
+        # --timeout=120 turns a hung test into a 2-minute failure instead of
+        # eating the whole 30-minute job budget.
+        run: pytest -n 4 --timeout=120 --timeout-method=thread
