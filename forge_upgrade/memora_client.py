@@ -13,9 +13,9 @@ try:
     from sdk.memora_client import MemoraClient, memora_client
 except Exception:
     import sqlite3
-    import uuid
     import time
-    from typing import Optional, Dict, Any, List
+    import uuid
+    from typing import Any, Dict, List, Optional
 
     class MemoraClient:
         def __init__(self):

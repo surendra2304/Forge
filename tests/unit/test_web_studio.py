@@ -192,6 +192,7 @@ def test_web_studio_hud_telemetry_terminal():
 @pytest.mark.asyncio
 async def test_developer_role_synchronizes_3d_web_app(tmp_path: Path):
     from uuid import uuid4
+
     from app.agents.roles import DeveloperRole
     from app.core.config import Settings
     from app.core.workspace import WorkspaceManager

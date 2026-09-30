@@ -13,6 +13,7 @@ from rich.progress import BarColumn, Progress, SpinnerColumn, TextColumn
 from rich.table import Table
 
 from app.agents.roles import is_web_studio_goal
+from app.core.logging import get_logger
 from app.core.orchestrator import orchestrator
 from app.core.workspace import workspace_manager
 from app.memory.db import db_manager
@@ -31,6 +32,7 @@ if hasattr(sys.stdout, "reconfigure"):
         pass
 
 console = Console()
+logger = get_logger("cli")
 
 
 async def handle_build(
@@ -90,7 +92,6 @@ async def handle_build(
         task_id = task.id
         paths = workspace_manager.get_workspace_paths(task_id)
 
-        goal_lower = goal.lower()
         is_static_web = is_web_studio_goal(goal)
 
         if is_static_web:

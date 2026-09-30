@@ -6,7 +6,6 @@ user preferences, and learned engineering patterns, and record new memories.
 """
 
 import json
-import logging
 import os
 import sqlite3
 import time

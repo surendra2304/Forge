@@ -5,7 +5,6 @@ from __future__ import annotations
 import asyncio
 import time
 import uuid
-from datetime import UTC, datetime
 from typing import Any
 
 import httpx
@@ -17,7 +16,7 @@ from app.core.logging import get_logger
 from app.core.orchestrator import OrchestratorCore
 from app.core.workspace import workspace_manager
 from app.integrations.memora_client import get_memora_client
-from app.memory.models import TaskEntity, TaskMode, TaskState
+from app.memory.models import TaskMode, TaskState
 from app.memory.state_store import StateStore
 from app.verification.engine import verification_engine
 from app.verification.evidence import VerificationManifest, VerificationReport

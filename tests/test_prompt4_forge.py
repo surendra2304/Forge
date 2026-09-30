@@ -16,18 +16,16 @@ Verifies:
 13. Repository Allowlist Validation
 """
 
-import asyncio
 import os
-import shutil
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 from uuid import uuid4
 
 import pytest
 from httpx import ASGITransport, AsyncClient
 
 from app.core.config import Settings
-from app.core.workspace import WorkspaceManager, workspace_manager
+from app.core.workspace import WorkspaceManager
 from app.execution.delivery import DeliveryPackager, SecurityGateFailure
 from app.execution.filesystem import FilesystemTool
 from app.execution.git_tool import GitTool
@@ -42,14 +40,12 @@ from app.execution.terminal import TerminalTool
 from app.main import app
 from app.memory.db import db_manager
 from app.memory.models import TaskEntity, TaskState
-from app.memory.state_store import StateStore
 from app.recovery.classifier import FailureClass
 from app.recovery.loop_guard import AntiLoopController, RepairLoopDetectedError
 from app.verification.engine import VerificationEngine, verification_engine
 from app.verification.evidence import (
     CheckCategory,
     VerificationEvidence,
-    VerificationManifest,
     VerificationReport,
 )
 

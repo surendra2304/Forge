@@ -2,7 +2,6 @@ import asyncio
 import sys
 import time
 
-sys.stdout.reconfigure(encoding="utf-8")
 from app.integrations.ai_universe_client import AIUniverseClient
 
 questions = [
@@ -14,15 +13,17 @@ questions = [
 ]
 
 async def main():
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
     print("=" * 80)
     print("AGENT [2/9]: FORGE -> INFERENCE GATEWAY (5 QUESTIONS)")
     print("Client: app.integrations.ai_universe_client.AIUniverseClient")
     print("=" * 80)
-    
+
     client = AIUniverseClient()
     print(f"Target URL: {client.base_url}")
     print(f"API Key:    {client.api_key[:4]}...")
-    
+
     results = []
     for i, q in enumerate(questions, 1):
         t0 = time.perf_counter()
@@ -37,7 +38,7 @@ async def main():
             lat = (time.perf_counter() - t0) * 1000
             print(f"[FORGE Q{i}/5] ERROR | {lat:>7.1f}ms | {e}")
             results.append({"q_num": i, "status": "ERROR", "latency_ms": round(lat, 1), "error": str(e)})
-            
+
     print("-" * 80)
     lats = [r["latency_ms"] for r in results if r["status"] == 200]
     if lats:

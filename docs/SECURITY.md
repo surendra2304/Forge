@@ -92,7 +92,7 @@ Project FORGE is engineered with a **Security-First** philosophy. Every autonomo
 ### 1. Hardcoded Credentials
 - **Insecure:**
   ```python
-  API_KEY = "sk-1234567890abcdef1234567890abcdef"
+    API_KEY = "<REDACTED_SECRET_EXAMPLE>"
   ```
 - **Secure:**
   ```python

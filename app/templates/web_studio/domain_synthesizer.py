@@ -689,8 +689,6 @@ def _generate_portfolio_projects(goal: str, specialty: str, techs: list[str]) ->
 
 def _generate_ecommerce_items(product_type: str, goal: str) -> list[dict]:
     """Generate bespoke product items for an e-commerce store based on product category."""
-    g = goal.lower()
-
     if product_type == "watches":
         return [
             {"id": "prod-1", "category": "Tourbillons", "title": "Celestia Grand Tourbillon", "description": "Flying tourbillon at 6 o'clock, 72-hour power reserve, hand-chamfered movement with 312 components.", "tags": ["Tourbillon", "72h Reserve", "Sapphire"], "metrics": "$18,400 • Limited 50", "modal_details": "Calibre CS-01. 6Hz frequency, Si-balance spring, three-body polished lugs. Certificated by COSC."},

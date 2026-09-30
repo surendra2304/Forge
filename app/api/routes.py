@@ -6,8 +6,8 @@ Implements endpoints for Tasks, Workspaces, Lifecycle Actions, Runs/Audit Events
 from typing import Any
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, status
 import httpx
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
 from app.agents.registry import AgentCapability, agent_registry

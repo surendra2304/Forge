@@ -22,7 +22,6 @@ from app.verification.evidence import (
     VerificationEvidence,
     VerificationManifest,
     VerificationReport,
-    VerificationStage,
     VerificationStageResult,
 )
 from app.verification.expanded_battery import (
