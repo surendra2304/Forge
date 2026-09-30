@@ -3,6 +3,7 @@ Workspace Manager for Project FORGE.
 Handles isolated workspace provisioning, directory hierarchies, path resolution, and artifact management.
 """
 
+import os
 import shutil
 from pathlib import Path
 
@@ -12,6 +13,19 @@ from app.core.config import Settings, get_settings
 from app.core.logging import get_logger
 
 logger = get_logger("core.workspace")
+
+
+def canonical_path(path: Path) -> Path:
+    """Return a fully resolved, case-corrected path.
+
+    On Windows, Path.resolve() keeps 8.3 short names (C:\\Users\\RUNNER~1\\...)
+    when a component of an *existing* parent directory uses them, while paths
+    built by joining onto such a parent can carry the long form from a
+    different origin. Mixing the two forms breaks relative_to() containment
+    checks. os.path.realpath resolves short names to their long form on both
+    platforms and is safe on nonexistent leaves.
+    """
+    return Path(os.path.realpath(str(path)))
 
 
 class WorkspacePaths(BaseModel):
@@ -68,8 +82,8 @@ class WorkspaceManager:
         import subprocess
 
         if custom_base:
-            base_workspaces = (self.settings.base_dir / self.settings.workspaces_dir).resolve()
-            resolved_custom = Path(custom_base).resolve()
+            base_workspaces = canonical_path(self.settings.base_dir / self.settings.workspaces_dir)
+            resolved_custom = canonical_path(Path(custom_base))
             try:
                 resolved_custom.relative_to(base_workspaces)
             except ValueError as exc:
@@ -137,12 +151,12 @@ class WorkspaceManager:
         manifest_file.write_text(manifest_content, encoding="utf-8")
 
         paths = WorkspacePaths(
-            root=root_dir,
-            project=subdirs["project"],
-            artifacts=subdirs["artifacts"],
-            logs=subdirs["logs"],
-            state=subdirs["state"],
-            cache=subdirs["cache"],
+            root=canonical_path(root_dir),
+            project=canonical_path(subdirs["project"]),
+            artifacts=canonical_path(subdirs["artifacts"]),
+            logs=canonical_path(subdirs["logs"]),
+            state=canonical_path(subdirs["state"]),
+            cache=canonical_path(subdirs["cache"]),
         )
         logger.info(f"Initialized isolated task workspace at {root_dir}")
         return paths
@@ -154,23 +168,24 @@ class WorkspaceManager:
             return None
 
         return WorkspacePaths(
-            root=root_dir,
-            project=root_dir / "project",
-            artifacts=root_dir / "artifacts",
-            logs=root_dir / "logs",
-            state=root_dir / "state",
-            cache=root_dir / "cache",
+            root=canonical_path(root_dir),
+            project=canonical_path(root_dir / "project"),
+            artifacts=canonical_path(root_dir / "artifacts"),
+            logs=canonical_path(root_dir / "logs"),
+            state=canonical_path(root_dir / "state"),
+            cache=canonical_path(root_dir / "cache"),
         )
 
     def write_project_file(self, task_id: str, relative_path: str, content: str) -> Path:
         """Safely write a file inside the task's project directory."""
         paths = self.get_workspace_paths(task_id) or self.create_workspace(task_id)
-        project_root = paths.project.resolve()
+        project_root = canonical_path(paths.project)
         target = (
             project_root / relative_path
             if not Path(relative_path).is_absolute()
             else Path(relative_path)
-        ).resolve()
+        )
+        target = canonical_path(target)
 
         # Prevent directory traversal outside project dir
         try:
@@ -187,12 +202,13 @@ class WorkspaceManager:
         paths = self.get_workspace_paths(task_id)
         if not paths:
             return None
-        project_root = paths.project.resolve()
+        project_root = canonical_path(paths.project)
         target = (
             project_root / relative_path
             if not Path(relative_path).is_absolute()
             else Path(relative_path)
-        ).resolve()
+        )
+        target = canonical_path(target)
         try:
             target.relative_to(project_root)
         except ValueError:
@@ -204,12 +220,12 @@ class WorkspaceManager:
     def save_artifact(self, task_id: str, artifact_name: str, content: bytes | str) -> Path:
         """Save a generated artifact to the task's artifacts directory."""
         paths = self.get_workspace_paths(task_id) or self.create_workspace(task_id)
-        artifacts_root = paths.artifacts.resolve()
-        target = (
+        artifacts_root = canonical_path(paths.artifacts)
+        target = canonical_path(
             artifacts_root / artifact_name
             if not Path(artifact_name).is_absolute()
             else Path(artifact_name)
-        ).resolve()
+        )
 
         try:
             target.relative_to(artifacts_root)
@@ -302,8 +318,8 @@ class WorkspaceManager:
 
     def cleanup_workspace(self, task_id: str) -> bool:
         """Safely remove a task workspace directory."""
-        base_workspaces = (self.settings.base_dir / self.settings.workspaces_dir).resolve()
-        root_dir = self.get_task_workspace_dir(task_id).resolve()
+        base_workspaces = canonical_path(self.settings.base_dir / self.settings.workspaces_dir)
+        root_dir = canonical_path(self.get_task_workspace_dir(task_id))
         try:
             root_dir.relative_to(base_workspaces)
         except ValueError as exc:

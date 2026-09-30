@@ -44,8 +44,16 @@ jobs:
         if: runner.os == 'Linux'
         run: python -c "import app.main, app.core.orchestrator, app.verification.engine; print('core imports OK')"
 
-      - name: Run tests (Windows, full gate)
+      - name: Run tests (Windows, parallel units)
         # Development platform and the runner with enough memory for the
         # suite; failures here are real and get fixed, not skipped.
+        # Golden end-to-end benchmarks spawn nested subprocess trees and are
+        # run serially in the next step: under xdist a worker crashed on
+        # test_golden_benchmark_automated_debugging_loop, and on the Linux
+        # runner they contributed to the OOM kills.
         if: runner.os == 'Windows'
-        run: python -m pytest -n 2 --timeout=120 --timeout-method=thread -v
+        run: python -m pytest -n 2 --timeout=120 --timeout-method=thread tests --ignore=tests/golden -v
+
+      - name: Run golden benchmarks (Windows, serial)
+        if: runner.os == 'Windows'
+        run: python -m pytest tests/golden --timeout=300 --timeout-method=thread -v

@@ -7,6 +7,7 @@ from enum import Enum
 from pathlib import Path
 
 from app.core.logging import get_logger
+from app.core.workspace import canonical_path
 
 logger = get_logger("execution.permissions")
 
@@ -174,10 +175,12 @@ class PermissionManager:
         Ensure resolved target_path strictly resides within the sandbox_root directory.
         Raises SandboxViolationError on path traversal attempts.
         """
-        resolved_sandbox = sandbox_root.resolve()
-        resolved_target = (
+        # canonical_path resolves Windows 8.3 short names (RUNNER~1) so both
+        # sides of the containment comparison share one real form.
+        resolved_sandbox = canonical_path(sandbox_root)
+        resolved_target = canonical_path(
             sandbox_root / target_path if not target_path.is_absolute() else target_path
-        ).resolve()
+        )
 
         try:
             resolved_target.relative_to(resolved_sandbox)
