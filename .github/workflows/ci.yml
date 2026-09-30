@@ -45,13 +45,13 @@ jobs:
         # wedge FAILS the step (retaining logs and naming the test) instead of
         # being cancelled at the job level, which destroys the evidence.
         if: runner.os == 'Linux'
-        run: timeout 420 pytest -n 4 --timeout=120 --timeout-method=signal -v
+        run: timeout 420 pytest -n 2 --timeout=120 --timeout-method=signal -v
 
       - name: Run tests (Windows)
         # Development platform: the full suite passes here (271 tests,
         # verified locally, keyless and keyed).
         if: runner.os == 'Windows'
-        run: pytest -n 4 --timeout=120 --timeout-method=thread -v
+        run: python -m pytest -n 2 --timeout=120 --timeout-method=thread -v
 
       - name: Print hung-test tail on failure
         if: failure() && runner.os == 'Linux'
