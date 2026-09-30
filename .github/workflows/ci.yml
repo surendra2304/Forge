@@ -37,15 +37,13 @@ jobs:
         run: ruff check .
 
       - name: Run tests (Linux, shell-guarded)
-        # -n 4 matches GitHub-hosted 4-vCPU runners; heavier oversubscription
-        # flakes timing-sensitive golden benchmarks.
-        # --timeout-method=signal (POSIX): the thread method deadlocked with
-        # xdist on blocked socket I/O — two CI runs hung with no failing test.
-        # -v streams per-test lines; combined with the GNU timeout wrapper a
-        # wedge FAILS the step (retaining logs and naming the test) instead of
-        # being cancelled at the job level, which destroys the evidence.
+        # Serial run: the ubuntu runner OOM-killed pytest even with 2 xdist
+        # workers (exit 137, Killed) — the 7 GB ubuntu runner is smaller than
+        # windows. Serial keeps memory low; per-test -v lines name any test
+        # that wedges, and the GNU timeout wrapper FAILS the step (retaining
+        # logs) instead of a job-level cancel that destroys evidence.
         if: runner.os == 'Linux'
-        run: timeout 420 pytest -n 2 --timeout=120 --timeout-method=signal -v
+        run: timeout 420 python -m pytest --timeout=120 --timeout-method=signal -v
 
       - name: Run tests (Windows)
         # Development platform: the full suite passes here (271 tests,
