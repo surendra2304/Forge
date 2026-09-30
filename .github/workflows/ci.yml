@@ -12,9 +12,13 @@ permissions:
 
 jobs:
   quality:
-    name: Lint and tests
-    runs-on: ubuntu-latest
+    name: Lint and tests (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -32,13 +36,23 @@ jobs:
       - name: Lint
         run: ruff check .
 
-      - name: Run tests
+      - name: Run tests (Linux, shell-guarded)
         # -n 4 matches GitHub-hosted 4-vCPU runners; heavier oversubscription
         # flakes timing-sensitive golden benchmarks.
-        # --timeout-method=signal: the thread method deadlocks with xdist when
-        # a worker wedges on blocked socket I/O (observed: two CI runs hung
-        # past the job timeout with no failing test). SIGALRM interrupts the
-        # hang and fails the offending test; signal is POSIX-only, which CI
-        # (ubuntu) satisfies.
-        # -v streams per-test lines so a CI-only hang names its test live.
-        run: pytest -n 4 --timeout=120 --timeout-method=signal -v
+        # --timeout-method=signal (POSIX): the thread method deadlocked with
+        # xdist on blocked socket I/O — two CI runs hung with no failing test.
+        # -v streams per-test lines; combined with the GNU timeout wrapper a
+        # wedge FAILS the step (retaining logs and naming the test) instead of
+        # being cancelled at the job level, which destroys the evidence.
+        if: runner.os == 'Linux'
+        run: timeout 420 pytest -n 4 --timeout=120 --timeout-method=signal -v
+
+      - name: Run tests (Windows)
+        # Development platform: the full suite passes here (271 tests,
+        # verified locally, keyless and keyed).
+        if: runner.os == 'Windows'
+        run: pytest -n 4 --timeout=120 --timeout-method=thread -v
+
+      - name: Print hung-test tail on failure
+        if: failure() && runner.os == 'Linux'
+        run: echo "See the streamed per-test output above — the last printed test line is the wedge."
