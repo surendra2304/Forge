@@ -87,6 +87,17 @@ def _runner() -> str:
     return f'"{PY}" -m pytest test_calc.py -q'
 
 
+def _git_raw(repo: Path, *args: str) -> subprocess.CompletedProcess:
+    """Like ``_git`` but tolerates a non-zero exit.
+
+    Needed to assert *that* HEAD is detached rather than only which branch it is
+    on — ``_git`` would raise on the command whose success is the opposite.
+    """
+    return subprocess.run(
+        ["git", *args], cwd=repo, capture_output=True, text=True, timeout=60
+    )
+
+
 def _candidate(**kw) -> CandidateFix:
     defaults = dict(
         target_file="calc.py",
@@ -354,3 +365,165 @@ def test_outcome_summary_reports_a_pass_flag():
         command="pytest", passed=True, returncode=0, stdout="1 passed", stderr="", duration_ms=5
     )
     assert run.as_evidence()["summary"] == "1 passed"
+
+
+# ── leaving the caller's repository as it was found ───────────────────────
+#
+# Checking out a commit SHA detaches HEAD. Detaching is unavoidable if the
+# proposer wants to drop its own scratch branch, so the obligation is to put
+# the caller back on the branch they started from. Both tests below were
+# written after reproducing the failure against a real repository.
+
+
+@pytest.mark.asyncio
+async def test_the_callers_branch_is_restored_after_a_successful_proposal(tmp_path, proposer):
+    """A proposer must not leave the operator on a detached HEAD.
+
+    Detached HEAD is a quiet trap: the tree looks clean, commits still
+    succeed, and the work simply goes nowhere retrievable.
+    """
+    repo, base = _build(tmp_path)
+    assert _git(repo, "rev-parse", "--abbrev-ref", "HEAD") == "main"
+
+    outcome = await proposer.propose(
+        repo_path=str(repo),
+        base_commit=base,
+        branch="repair/calc",
+        candidate=_candidate(),
+        test_command=_runner(),
+        env=TEST_ENV,
+    )
+    assert outcome.fixed
+    assert _git(repo, "rev-parse", "--abbrev-ref", "HEAD") == "main", (
+        "the caller was left on a detached HEAD instead of the branch it started on"
+    )
+
+
+@pytest.mark.asyncio
+async def test_the_callers_branch_is_restored_when_the_candidate_does_not_work(tmp_path, proposer):
+    """The failure paths must restore too, not just the happy one."""
+    repo, base = _build(tmp_path)
+
+    outcome = await proposer.propose(
+        repo_path=str(repo),
+        base_commit=base,
+        branch="repair/calc",
+        candidate=_candidate(replacement_snippet="    return a * b\n"),
+        test_command=_runner(),
+        env=TEST_ENV,
+    )
+    assert not outcome.fixed
+    assert _git(repo, "rev-parse", "--abbrev-ref", "HEAD") == "main"
+
+
+@pytest.mark.asyncio
+async def test_the_callers_branch_is_restored_when_the_test_already_passed(tmp_path, proposer):
+    """Nothing was broken, so nothing should have been left changed either."""
+    repo, base = _build(tmp_path, source=FIXED)
+
+    outcome = await proposer.propose(
+        repo_path=str(repo),
+        base_commit=base,
+        branch="repair/calc",
+        candidate=_candidate(original_snippet="    return a + b\n"),
+        test_command=_runner(),
+        env=TEST_ENV,
+    )
+    assert not outcome.fixed
+    assert _git(repo, "rev-parse", "--abbrev-ref", "HEAD") == "main"
+
+
+@pytest.mark.asyncio
+async def test_an_existing_branch_raises_a_clear_error_not_an_attribute_error(tmp_path, proposer):
+    """A collision must name the collision.
+
+    This path once called a helper that did not exist, so the failure surfaced
+    as `AttributeError: no attribute '_restore_worktree'` instead of anything a
+    caller could act on.
+    """
+    repo, base = _build(tmp_path)
+    _git(repo, "branch", "repair/calc")
+
+    with pytest.raises(RuntimeError, match="cannot create branch repair/calc"):
+        await proposer.propose(
+            repo_path=str(repo),
+            base_commit=base,
+            branch="repair/calc",
+            candidate=_candidate(),
+            test_command=_runner(),
+            env=TEST_ENV,
+        )
+
+
+@pytest.mark.asyncio
+async def test_the_working_tree_is_clean_after_a_successful_proposal(tmp_path, proposer):
+    """Proposing is not applying: no uncommitted change may survive."""
+    repo, base = _build(tmp_path)
+    outcome = await proposer.propose(
+        repo_path=str(repo),
+        base_commit=base,
+        branch="repair/calc",
+        candidate=_candidate(),
+        test_command=_runner(),
+        env=TEST_ENV,
+    )
+    assert outcome.fixed
+    assert _git(repo, "status", "--porcelain") == ""
+    assert "    return a - b\n" in (repo / "calc.py").read_text(encoding="utf-8")
+
+
+@pytest.mark.asyncio
+async def test_keep_branch_still_leaves_the_caller_on_their_own_branch(tmp_path, proposer):
+    """Retaining the scratch branch must not cost the caller their branch."""
+    repo, base = _build(tmp_path)
+    outcome = await proposer.propose(
+        repo_path=str(repo),
+        base_commit=base,
+        branch="repair/calc",
+        candidate=_candidate(),
+        test_command=_runner(),
+        env=TEST_ENV,
+        keep_branch=True,
+    )
+    assert outcome.fixed
+    assert "repair/calc" in _git(repo, "branch", "--list", "repair/calc")
+    assert _git(repo, "rev-parse", "--abbrev-ref", "HEAD") == "main"
+    # "Retained for inspection" has to be true of the branch, not just of a dirty
+    # working tree the caller happened to still be sitting in.
+    assert _git(repo, "show", "repair/calc:calc.py").endswith("return a + b")
+    assert _git(repo, "status", "--porcelain") == ""
+    retained = _git(repo, "rev-parse", "--short", "repair/calc")
+    assert retained in outcome.reason, "the reason must name the commit that was retained"
+
+
+@pytest.mark.asyncio
+async def test_a_detached_caller_is_returned_to_the_same_commit_not_the_default_branch(
+    tmp_path, proposer
+):
+    """A detached HEAD has no branch to return to, and guessing one moves their work.
+
+    The caller here is parked on a commit of their own. Restoring them onto the
+    default branch would look tidy and be wrong: their working tree would change
+    underneath them without a word.
+    """
+    repo, base = _build(tmp_path)
+    (repo / "marker.txt").write_text("work in progress\n", encoding="utf-8")
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-m", "marker")
+    parked = _git(repo, "rev-parse", "HEAD")
+    _git(repo, "checkout", "--detach", parked)
+
+    outcome = await proposer.propose(
+        repo_path=str(repo),
+        base_commit=base,
+        branch="repair/calc",
+        candidate=_candidate(),
+        test_command=_runner(),
+        env=TEST_ENV,
+    )
+    assert outcome.fixed
+    assert _git(repo, "rev-parse", "HEAD") == parked
+    assert _git_raw(repo, "symbolic-ref", "--short", "HEAD").returncode != 0, (
+        "the caller was moved onto a branch they were not on"
+    )
+    assert "marker.txt" in _git(repo, "ls-tree", "--name-only", "HEAD")

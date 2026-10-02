@@ -179,18 +179,78 @@ class GitSelfRepairProposer:
             duration_ms=duration,
         )
 
-    async def _cleanup(self, repo: str, base_commit: str, branch: str) -> None:
+    async def _original_head(self, repo: str) -> tuple[str | None, str]:
+        """Where the caller was: ``(branch or None, exact commit)``.
+
+        Recorded before anything is touched. Checking out a commit SHA detaches
+        HEAD, so a proposer that only restores *what* it changed and not *where*
+        it was leaves the caller's repository on a detached HEAD — every later
+        commit would land nowhere, and the operator would have no idea why.
+
+        The commit is kept alongside the refname because a detached caller has no
+        refname to return to. Restoring them onto the default branch instead would
+        silently move their work.
+        """
+        ref_code, ref_out, _ = await self._git(repo, "symbolic-ref", "--short", "HEAD")
+        ref = ref_out.strip() if ref_code == 0 else ""
+        sha_code, sha_out, sha_err = await self._git(repo, "rev-parse", "HEAD")
+        sha = sha_out.strip() if sha_code == 0 else ""
+        if not sha:
+            raise RuntimeError(f"cannot read HEAD before touching the repository: {sha_err}")
+        return (ref or None), sha
+
+    async def _restore(self, repo: str, original: tuple[str | None, str]) -> None:
+        """Put the caller's working tree and branch back exactly as found."""
+        ref, sha = original
+        await self._git(repo, "reset", "--hard")
+        await self._git(repo, "clean", "-fd")
+        args = ("checkout", ref) if ref else ("checkout", "--detach", sha)
+        code, _, err = await self._git(repo, *args)
+        if code != 0:
+            raise RuntimeError(f"cannot return to {ref or sha}: {err}")
+
+    async def _commit_retained(self, repo: str, branch: str) -> str:
+        """Commit the verified fix on the scratch branch; return the new commit.
+
+        Only used by ``keep_branch=True``. A branch left with the fix sitting
+        uncommitted in the working tree is not retained at all: the moment the
+        caller checks anything else out, the patch is gone and the branch is an
+        empty copy of the base. Committing is what makes "retained for
+        inspection" true, and it puts the patch on a named ref where a human can
+        read it with ``git show`` before approving anything.
+        """
+        message = (
+            f"candidate repair on {branch}: verified by a real passing test run, not applied"
+        )
+        for args in (("add", "-A"), ("commit", "-m", message)):
+            code, out, err = await self._git(repo, *args)
+            if code != 0:
+                raise RuntimeError(f"cannot {' '.join(args)}: {err or out}")
+        code, sha, err = await self._git(repo, "rev-parse", "HEAD")
+        if code != 0:
+            raise RuntimeError(f"cannot read the retained commit: {err or sha}")
+        return sha.strip()
+
+    async def _cleanup(
+        self,
+        repo: str,
+        base_commit: str,
+        branch: str,
+        original_ref: tuple[str | None, str] | None = None,
+    ) -> None:
         """Hand the working tree and the scratch branch back, leaving no trace.
 
         Used by every path that has modified the tree, on success and on failure
-        alike. Two details are load-bearing and were both learned the hard way:
+        alike. Three details are load-bearing and were all learned the hard way:
 
         * ``reset --hard`` rather than ``checkout <sha>`` — git refuses to discard
           local modifications when there is no commit to switch to, so checkout
           silently leaves the change in place.
         * ``checkout --detach`` before ``branch -D`` — git refuses to delete the
-          branch that is currently checked out. Detaching is also safer than
-          guessing the default branch name, which may be main or master.
+          branch that is currently checked out.
+        * returning to the caller's original ref afterwards — detaching is a side effect of
+          being able to drop the branch at all, so the caller must be put back on
+          the branch they started from rather than left on a detached HEAD.
 
         Duplicating this at each call site is how the failure paths were able to
         leak a half-applied patch; there is deliberately only one copy.
@@ -203,6 +263,8 @@ class GitSelfRepairProposer:
         drop_code, _, drop_err = await self._git(repo, "branch", "-D", branch)
         if drop_code != 0:
             raise RuntimeError(f"cannot drop scratch branch {branch}: {drop_err}")
+        if original_ref:
+            await self._restore(repo, original_ref)
 
     async def propose(
         self,
@@ -224,7 +286,10 @@ class GitSelfRepairProposer:
         propose-then-approve flow: Forge is proposing, not applying. Leaving a
         committed fix sitting on a branch would mean the patch had already been
         written before anyone approved it, and would collide with the gate when
-        the gate creates its own repair branch.
+        the gate creates its own repair branch. ``keep_branch=True`` is the
+        deliberate opt-in for a human who wants to read the patch first: the fix
+        is committed on the scratch branch, and the caller is still returned to the
+        ref they started on with a clean working tree.
         """
         repo = str(Path(repo_path).resolve())
         if not (Path(repo) / ".git").exists():
@@ -234,6 +299,10 @@ class GitSelfRepairProposer:
         if not Path(target).is_file():
             raise FileNotFoundError(candidate.target_file)
 
+        # Recorded before the first checkout, because checking out a commit SHA
+        # detaches HEAD and nothing later would put the caller back.
+        original_ref = await self._original_head(repo)
+
         committed = await self._git(repo, "checkout", base_commit)
         if committed[0] != 0:
             raise RuntimeError(f"cannot check out {base_commit}: {committed[2] or committed[1]}")
@@ -241,6 +310,7 @@ class GitSelfRepairProposer:
         # 1. The test must fail before the fix, or there is nothing to repair.
         before = await self._test(repo, test_command, env=env)
         if before.passed:
+            await self._restore(repo, original_ref)
             return ProposalOutcome(
                 fixed=False,
                 before=before,
@@ -254,12 +324,12 @@ class GitSelfRepairProposer:
         # 2. Branch from the pinned commit and apply the candidate.
         branched = await self._git(repo, "checkout", "-b", branch, base_commit)
         if branched[0] != 0:
-            await self._restore_worktree(repo)
+            await self._restore(repo, original_ref)
             raise RuntimeError(f"cannot create branch {branch}: {branched[2] or branched[1]}")
 
         current = Path(target).read_text(encoding="utf-8")
         if candidate.original_snippet not in current:
-            await self._cleanup(repo, base_commit, branch)
+            await self._cleanup(repo, base_commit, branch, original_ref)
             return ProposalOutcome(
                 fixed=False,
                 before=before,
@@ -270,7 +340,7 @@ class GitSelfRepairProposer:
                 reason="the snippet to replace is not present in the file at the base commit",
             )
         if current.count(candidate.original_snippet) != 1:
-            await self._cleanup(repo, base_commit, branch)
+            await self._cleanup(repo, base_commit, branch, original_ref)
             return ProposalOutcome(
                 fixed=False,
                 before=before,
@@ -302,7 +372,7 @@ class GitSelfRepairProposer:
         # 3. The same command must now pass. This is the only accepted evidence.
         after = await self._test(repo, test_command, env=env)
         if not after.passed:
-            await self._cleanup(repo, base_commit, branch)
+            await self._cleanup(repo, base_commit, branch, original_ref)
             return ProposalOutcome(
                 fixed=False,
                 before=before,
@@ -331,8 +401,21 @@ class GitSelfRepairProposer:
         #    delete the branch that is currently checked out. Detaching is also
         #    safer than guessing the default branch name, which may be main or
         #    master depending on how the repository was initialised.
-        if not keep_branch:
-            await self._cleanup(repo, base_commit, branch)
+        if keep_branch:
+            # The fix is committed on the scratch branch *and* the caller is handed
+            # back their own ref with a clean tree. Leaving the caller parked on
+            # the scratch branch means their next commit lands there instead of on
+            # their branch, which is a worse surprise than an unfixed test.
+            try:
+                retained = await self._commit_retained(repo, branch)
+            except RuntimeError:
+                await self._cleanup(repo, base_commit, branch, original_ref)
+                raise
+            await self._restore(repo, original_ref)
+            disposition = f"branch retained for inspection at {retained[:12]}"
+        else:
+            await self._cleanup(repo, base_commit, branch, original_ref)
+            disposition = "branch rolled back - the gate applies"
 
         return ProposalOutcome(
             fixed=True,
@@ -341,10 +424,7 @@ class GitSelfRepairProposer:
             branch=branch,
             base_commit=base_commit,
             candidate=candidate,
-            reason=(
-                f"test went from failing to passing on {branch}; branch "
-                f"{'retained for inspection' if keep_branch else 'rolled back - the gate applies'}"
-            ),
+            reason=f"test went from failing to passing on {branch}; {disposition}",
         )
 
     @staticmethod
