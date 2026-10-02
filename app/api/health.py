@@ -3,6 +3,7 @@ Health, Readiness, Diagnostics, and Prometheus Metrics Endpoints for Project FOR
 """
 
 import time
+from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Response, status
@@ -16,17 +17,26 @@ from app.monitoring.production_monitor import AlertStatus, production_monitor
 health_router = APIRouter(tags=["Health & Monitoring"])
 
 
+def _observed_at() -> str:
+    """Single source for the instant a probe answered, reused by every evidence field."""
+    return datetime.now(timezone.utc).isoformat()
+
+
 class LivenessResponse(BaseModel):
     status: str = "ok"
     version: str = "0.1.0"
     uptime_seconds: float
     database_connected: bool
+    evidence_class: str = "process_liveness"
+    observed_at: str = Field(default_factory=_observed_at)
 
 
 class ReadinessResponse(BaseModel):
     status: str = "ready"
     database_connected: bool = True
     workspaces_writable: bool = True
+    evidence_class: str = "dependency_readiness"
+    observed_at: str = Field(default_factory=_observed_at)
 
 
 class DiagnosticResponse(BaseModel):
@@ -63,6 +73,7 @@ async def health_liveness():
         version=settings.app_version,
         uptime_seconds=sys_m["uptime_seconds"],
         database_connected=db_ok,
+        observed_at=_observed_at(),
     )
 
 
@@ -101,12 +112,15 @@ async def health_readiness():
         ws_ok = False
 
     if not db_ok or not ws_ok:
+        observed_at = _observed_at()
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail={
                 "status": "not_ready",
                 "database_connected": db_ok,
                 "workspaces_writable": ws_ok,
+                "evidence_class": "dependency_readiness",
+                "observed_at": observed_at,
             },
         )
 
@@ -114,6 +128,7 @@ async def health_readiness():
         status="ready",
         database_connected=db_ok,
         workspaces_writable=ws_ok,
+        observed_at=_observed_at(),
     )
 
 

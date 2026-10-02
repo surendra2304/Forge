@@ -3,6 +3,7 @@ Integration tests for FORGE FastAPI REST endpoints.
 Covers Tasks, Lifecycle Transitions, Runs/Audit Events, Artifacts, Agents, Capabilities, and Health.
 """
 
+from datetime import datetime
 from uuid import uuid4
 
 import pytest
@@ -17,6 +18,9 @@ async def test_health_and_capabilities_endpoints(async_client: AsyncClient):
     health_data = health_res.json()
     assert health_data["status"] in ["healthy", "ok", "degraded"]
     assert health_data["database_connected"] is True
+    # Evidence contract: a probe must state what it proves and when it observed it.
+    assert health_data["evidence_class"] == "process_liveness"
+    assert datetime.fromisoformat(health_data["observed_at"]).tzinfo is not None
 
     # Test GET /capabilities
     caps_res = await async_client.get("/capabilities")

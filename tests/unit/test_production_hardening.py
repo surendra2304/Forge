@@ -3,6 +3,7 @@ Unit tests for Production Hardening, Health Probes, Metrics, Security, and Backu
 """
 
 from contextlib import asynccontextmanager
+from datetime import datetime
 from pathlib import Path
 from unittest.mock import patch
 
@@ -43,11 +44,14 @@ async def test_liveness_reports_observed_database_state(monkeypatch):
     healthy = await health_module.health_liveness()
     assert healthy.status == "ok"
     assert healthy.database_connected is True
+    assert healthy.evidence_class == "process_liveness"
+    assert datetime.fromisoformat(healthy.observed_at).tzinfo is not None
 
     monkeypatch.setattr(health_module, "db_manager", UnavailableDatabase())
     unavailable = await health_module.health_liveness()
     assert unavailable.status == "ok"  # process is alive even when storage is down
     assert unavailable.database_connected is False
+    assert unavailable.evidence_class == "process_liveness"
 
 
 @pytest.mark.asyncio
@@ -60,12 +64,16 @@ async def test_health_liveness_and_readiness():
         res = await client.get("/health")
         assert res.status_code == 200
         assert res.json()["status"] == "ok"
+        assert res.json()["evidence_class"] == "process_liveness"
+        assert res.json()["observed_at"]
 
         # Readiness
         res_ready = await client.get("/health/ready")
         assert res_ready.status_code == 200
         assert res_ready.json()["status"] == "ready"
         assert res_ready.json()["database_connected"] is True
+        assert res_ready.json()["evidence_class"] == "dependency_readiness"
+        assert res_ready.json()["observed_at"]
 
         # Detailed Diagnostics
         res_diag = await client.get("/health/detailed")
