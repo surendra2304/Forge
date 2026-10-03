@@ -88,7 +88,16 @@ def create_app() -> FastAPI:
             provided_key = authorization[7:].strip()
         if not provided_key:
             return JSONResponse(status_code=401, content={"error": "unauthorized"})
-        if not hmac.compare_digest(provided_key.encode(), configured_key.encode()):
+
+        # Accept either the calling agent's credential, which is how the rest of the
+        # mesh authenticates, or Forge's own key for direct operator access. Previously
+        # only Forge's own key was accepted, so no peer could ever call Forge and every
+        # FRIDAY->Forge delegation was rejected with 403.
+        caller_key = production_settings.friday_api_key or ""
+        accepted = [configured_key]
+        if len(caller_key) >= 32:
+            accepted.append(caller_key)
+        if not any(hmac.compare_digest(provided_key.encode(), key.encode()) for key in accepted):
             return JSONResponse(status_code=403, content={"error": "forbidden"})
         return await call_next(request)
 

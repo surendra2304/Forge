@@ -39,6 +39,9 @@ class ProductionSettings(BaseModel):
         )
     )
     forge_api_key: str | None = Field(default_factory=lambda: os.getenv("FORGE_API_KEY"))
+    # The calling agent's credential. The mesh authenticates every caller against its
+    # own <AGENT>_API_KEY, so Forge must know FRIDAY's key to accept a delegation.
+    friday_api_key: str | None = Field(default_factory=lambda: os.getenv("FRIDAY_API_KEY"))
     secret_key: str = Field(
         default_factory=lambda: os.getenv("FORGE_SECRET_KEY", secrets.token_hex(32))
     )
