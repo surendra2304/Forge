@@ -85,7 +85,7 @@ class Settings(BaseSettings):
         description="Default GitHub repository (e.g. owner/repo)",
     )
     ai_universe_url: str = Field(
-        default="https://inference-r1sn.onrender.com",
+        default="https://inference-h7bn.onrender.com",
         validation_alias=AliasChoices("INFERENCE_URL", "AI_UNIVERSE_URL", "ai_universe_url"),
         description="Base URL for external Inference / AI Universe reasoning engine",
     )
