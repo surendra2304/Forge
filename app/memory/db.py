@@ -3,6 +3,7 @@ SQLite database layer for FORGE using aiosqlite.
 Manages connections, schema initialization, and transaction boundaries.
 """
 
+import asyncio
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -89,6 +90,8 @@ CREATE TABLE IF NOT EXISTS checkpoints (
 );
 
 CREATE INDEX IF NOT EXISTS idx_tasks_state ON tasks(state);
+CREATE INDEX IF NOT EXISTS idx_tasks_created_at ON tasks(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_tasks_updated_at ON tasks(updated_at DESC);
 CREATE INDEX IF NOT EXISTS idx_audit_events_task ON audit_events(task_id, timestamp);
 CREATE INDEX IF NOT EXISTS idx_artifacts_task ON artifacts(task_id);
 CREATE INDEX IF NOT EXISTS idx_task_graphs_project ON task_graphs(project_id);
@@ -103,10 +106,42 @@ class DatabaseManager:
     def __init__(self, db_path: Path | None = None):
         self.settings = get_settings()
         self.db_path = db_path or (self.settings.base_dir / self.settings.database_path)
+        self._schema_ready = False
+        self._schema_lock = asyncio.Lock()
+
+    async def _ensure_schema(self) -> None:
+        """Create the tables and indexes if this process has not done so yet.
+
+        Only the CLI called init_db(), so any embedder that used the orchestrator
+        or the state store directly -- the documented programmatic path -- hit
+        `sqlite3.OperationalError: no such table: tasks` on a fresh database.
+        Proven live: OrchestratorCore().intake_and_plan() crashed on first use.
+
+        SCHEMA_SQL is idempotent (CREATE TABLE IF NOT EXISTS), and the flag is
+        per-process, so this costs one executescript on the first connection of a
+        run and nothing afterwards.
+        """
+        if self._schema_ready:
+            return
+        async with self._schema_lock:
+            if self._schema_ready:
+                return
+            self.db_path.parent.mkdir(parents=True, exist_ok=True)
+            async with aiosqlite.connect(str(self.db_path)) as conn:
+                await conn.executescript(SCHEMA_SQL)
+                try:
+                    await conn.execute(
+                        "ALTER TABLE tasks ADD COLUMN metadata TEXT NOT NULL DEFAULT '{}';"
+                    )
+                except Exception:
+                    pass
+                await conn.commit()
+            self._schema_ready = True
 
     @asynccontextmanager
     async def connection(self) -> AsyncGenerator[aiosqlite.Connection, None]:
         """Async context manager yielding a configured connection."""
+        await self._ensure_schema()
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         async with aiosqlite.connect(str(self.db_path)) as conn:
             conn.row_factory = aiosqlite.Row
@@ -115,17 +150,8 @@ class DatabaseManager:
             yield conn
 
     async def init_db(self) -> None:
-        """Initialize SQLite database tables and indexes."""
-        self.db_path.parent.mkdir(parents=True, exist_ok=True)
-        async with self.connection() as conn:
-            await conn.executescript(SCHEMA_SQL)
-            try:
-                await conn.execute(
-                    "ALTER TABLE tasks ADD COLUMN metadata TEXT NOT NULL DEFAULT '{}';"
-                )
-            except Exception:
-                pass
-            await conn.commit()
+        """Initialize SQLite database tables and indexes (idempotent)."""
+        await self._ensure_schema()
         logger.info(f"Initialized SQLite database at {self.db_path}")
 
 
