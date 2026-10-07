@@ -159,9 +159,12 @@ class GitTool:
         self.pm.check_git_push_authorized(authorized=authorized, push_token=push_token)
         self.pm.check_permission(role, ToolPermission.GIT_PUSH)
 
-        # Enforce branch policy
+        # Enforce branch policy. The elevated token must actually validate --
+        # a bare non-empty string used to be enough.
         protected_branches = {"main", "master", "production", "release"}
-        if branch.lower() in protected_branches and not push_token:
+        if branch.lower() in protected_branches and not self.pm._elevated_token_is_valid(
+            push_token
+        ):
             logger.warning(
                 f"Direct push to protected branch '{branch}' rejected without elevated push token"
             )
@@ -190,18 +193,45 @@ class GitTool:
         Create a pull request for changes.
         Requires separate authorization.
         """
-        if not authorized and not pr_token:
+        if not authorized and not self.pm._elevated_token_is_valid(pr_token):
             raise UnauthorizedGitOperationError(
                 "Security Violation: Pull request creation requires separate authorization."
             )
         self.pm.check_permission(role, ToolPermission.PR_CREATE)
+        # This used to return a hardcoded https://github.com/mock-repo/pulls/<id>
+        # URL and report status "created" without contacting GitHub at all, so
+        # callers could not distinguish a real PR from a fabricated one. Delegate
+        # to GitHubTool, which performs a real API call when a token/repo are
+        # configured and otherwise fails loudly.
+        from app.execution.github import GitHubTool
+
+        github = GitHubTool(wm=self.wm, pm=self.pm)
+        repo = self.wm.get_workspace_paths(task_id)
+        remote_url = ""
+        if repo:
+            try:
+                code, out, _ = await self._run_git(task_id, ["remote", "get-url", "origin"])
+                if code == 0:
+                    remote_url = out.strip()
+            except Exception:
+                remote_url = ""
+
+        result = await github.create_pull_request(
+            repo=None,
+            title=title,
+            body=body,
+            head_branch=head_branch,
+            base_branch=base_branch,
+        )
         return {
             "task_id": task_id,
-            "title": title,
-            "head": head_branch,
-            "base": base_branch,
-            "status": "created",
-            "pr_url": f"https://github.com/mock-repo/pulls/{task_id}",
+            "title": result.title,
+            "head": result.head,
+            "base": result.base,
+            "status": result.state,
+            "pr_url": result.html_url,
+            "pr_number": result.pr_number,
+            "remote_url": remote_url,
         }
 
     async def checkpoint(self, task_id: str, checkpoint_name: str, role: str = "developer") -> str:

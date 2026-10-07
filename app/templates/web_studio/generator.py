@@ -35,7 +35,13 @@ class ForgeWebStudio:
         Routes to distinct domain architectures: E-Commerce, SaaS, Dashboard, or Portfolio.
         """
         options = custom_options or {}
-        blueprint = DomainSynthesizer.analyze_goal(goal, memora_context=options.get("memora_context", ""))
+        # `requirements` was silently dropped: it never reached the classifier, so
+        # `forge build --req "must be a store"` could not influence the architecture.
+        blueprint = DomainSynthesizer.analyze_goal(
+            goal,
+            memora_context=options.get("memora_context", ""),
+            requirements=requirements,
+        )
         cls._last_blueprint = blueprint
 
         primary_hex = options.get("primary_color", blueprint.accent_color)
@@ -64,7 +70,7 @@ class ForgeWebStudio:
             font_heading=font_heading,
             font_body=font_body,
         )
-        readme_content = cls._generate_readme(goal, blueprint)
+        readme_content = cls._generate_readme(goal, blueprint, requirements=requirements)
 
         return {
             "index.html": html_content,
@@ -2363,11 +2369,20 @@ document.addEventListener('DOMContentLoaded', () => {{
 """
 
     @classmethod
-    def _generate_readme(cls, goal: str, blueprint: DomainBlueprint) -> str:
+    def _generate_readme(
+        cls, goal: str, blueprint: DomainBlueprint, requirements: list[str] | None = None
+    ) -> str:
+        requirements_block = ""
+        if requirements:
+            bullets = "\n".join(f"- {req}" for req in requirements)
+            requirements_block = f"""
+## 📋 Requested Requirements
+{bullets}
+"""
         return f"""# {blueprint.app_title}
 
 Generated autonomously by **Project FORGE 3.0 (WebStudio Engine)**.
-
+{requirements_block}
 ## 🌟 Architectural Features
 - **Domain Archetype**: `{blueprint.domain_type.upper()}`
 - **3D & Interactive Canvas**: Three.js WebGL interactive 3D geometry with high-performance 60 FPS particle physics fallback.

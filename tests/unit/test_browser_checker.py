@@ -62,11 +62,28 @@ async def test_browser_checker_verifies_web_page_and_captures_screenshot(browser
     assert evidence.exit_code == 0
     assert "Browser verification completed" in evidence.stdout
 
-    # Verify screenshot artifact was generated
+    # Evidence must be real. The checker used to write a hardcoded 1x1 PNG and
+    # call it a screenshot, so this assertion has been corrected (not weakened)
+    # to demand the honest contract: the fetched HTML is persisted as evidence
+    # and the metadata explicitly records that no screenshot was captured.
     artifacts_dir = wm.get_task_workspace_dir(task_id) / "artifacts"
-    screenshots = list(artifacts_dir.glob("screenshot_*.png"))
-    assert len(screenshots) >= 1
-    assert screenshots[0].stat().st_size > 0
+    evidence_files = list(artifacts_dir.glob("browser_evidence_*.html"))
+    assert len(evidence_files) >= 1, "no real evidence artifact was written"
+    assert evidence_files[0].stat().st_size > 0
+    assert "Todo Application" in evidence_files[0].read_text(encoding="utf-8")
+
+    meta_files = list(artifacts_dir.glob("browser_evidence_*.meta.json"))
+    assert len(meta_files) >= 1
+    import json
+
+    meta = json.loads(meta_files[0].read_text(encoding="utf-8"))
+    assert meta["screenshot"] is False
+    assert "playwright" in meta["note"].lower()
+
+    # The fabricated 1x1 PNG must be gone.
+    assert not list(artifacts_dir.glob("screenshot_*.png")), (
+        "BrowserChecker still fabricates a 1x1 PNG as screenshot evidence"
+    )
 
 
 @pytest.mark.asyncio

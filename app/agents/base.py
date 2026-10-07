@@ -80,6 +80,50 @@ class BaseAgent(ABC):
         self.state.history.append({"prompt": prompt[:200], "response": response.content[:200]})
         return response
 
+    def _synthesize_offline(
+        self,
+        task_id: str,
+        goal: str,
+        requirements: list[str],
+        file_manifest: list[str],
+        engine,
+    ) -> list[str]:
+        """Write a deterministic, working project for `goal` and report the paths.
+
+        Returns the paths actually written, or an empty list when synthesis
+        produced nothing usable. Only invoked when no model provider was able to
+        author code, so it is the difference between "the agent built nothing" and
+        "the agent built something that works".
+        """
+        try:
+            from app.agents.synthesis import synthesize_files_for_goal
+
+            produced = synthesize_files_for_goal(
+                goal, manifest=file_manifest, requirements=requirements
+            )
+        except Exception as exc:
+            logger.warning(f"Deterministic synthesis failed for '{goal[:60]}': {exc}")
+            return []
+
+        if not produced:
+            return []
+
+        written: list[str] = []
+        for rel_path, content in produced.items():
+            if not rel_path or not isinstance(content, str) or not content.strip():
+                continue
+            try:
+                engine.fs.create_file(
+                    task_id=task_id,
+                    relative_path=rel_path,
+                    content=content,
+                    role=self.role_name,
+                )
+                written.append(rel_path)
+            except Exception as exc:
+                logger.warning(f"Could not write synthesised file {rel_path}: {exc}")
+        return written
+
     def apply_extracted_files(
         self,
         task_id: str,

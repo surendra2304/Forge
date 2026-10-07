@@ -3,9 +3,11 @@ Tool Permissions and Security Allowlist for Project FORGE Execution Engine.
 Enforces strict role-based tool authorization and filesystem sandbox confinement.
 """
 
+import hmac
 from enum import Enum
 from pathlib import Path
 
+from app.core.config import get_settings
 from app.core.logging import get_logger
 from app.core.workspace import canonical_path
 
@@ -121,6 +123,12 @@ DEFAULT_ROLE_PERMISSIONS: dict[str, set[ToolPermission]] = {
         ToolPermission.TERMINAL_EXEC,
         ToolPermission.GIT_READ,
         ToolPermission.GIT_WRITE,
+        ToolPermission.GIT_COMMIT,
+        # The release engineer's job is branch -> commit -> push -> PR. Without
+        # these two it could never complete its own workflow (roles.py
+        # ReleaseEngineerRole.execute_step).
+        ToolPermission.GIT_PUSH,
+        ToolPermission.PR_CREATE,
     },
 }
 
@@ -161,11 +169,27 @@ class PermissionManager:
             logger.warning(msg)
             raise UnauthorizedGitOperationError(msg)
 
+    @staticmethod
+    def _elevated_token_is_valid(push_token: str | None) -> bool:
+        """True only when `push_token` matches the configured FORGE_GIT_PUSH_TOKEN.
+
+        A presented token used to satisfy this gate on its own merely for being
+        non-empty, so any caller could push to a protected branch by passing
+        push_token="anything". The gate now fails closed: if no token is
+        configured, no presented token can validate.
+        """
+        if not push_token:
+            return False
+        configured = get_settings().git_push_token
+        if not configured:
+            return False
+        return hmac.compare_digest(push_token.encode("utf-8"), configured.encode("utf-8"))
+
     def check_git_push_authorized(
         self, authorized: bool, push_token: str | None = None
     ) -> None:
         """Raise UnauthorizedGitPushError if git push is not explicitly authorized."""
-        if not authorized and not push_token:
+        if not authorized and not self._elevated_token_is_valid(push_token):
             msg = "Security Violation: Git push requires explicit separate authorization"
             logger.warning(msg)
             raise UnauthorizedGitPushError(msg)

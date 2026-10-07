@@ -245,13 +245,24 @@ class StateStore:
             await conn.commit()
         return task
 
-    async def list_tasks(self, state: TaskState | None = None, limit: int = 50) -> list[TaskEntity]:
-        """List tasks ordered by created_at DESC with optional state filter."""
+    async def list_tasks(
+        self,
+        state: TaskState | None = None,
+        limit: int = 50,
+        since_timestamp: datetime | None = None,
+    ) -> list[TaskEntity]:
+        """List tasks ordered by created_at DESC with optional state/time filters."""
         query = "SELECT * FROM tasks"
         params: list[Any] = []
+        conditions: list[str] = []
         if state is not None:
-            query += " WHERE state = ?"
+            conditions.append("state = ?")
             params.append(state.value)
+        if since_timestamp is not None:
+            conditions.append("updated_at >= ?")
+            params.append(since_timestamp.isoformat())
+        if conditions:
+            query += " WHERE " + " AND ".join(conditions)
         query += " ORDER BY created_at DESC LIMIT ?"
         params.append(limit)
 

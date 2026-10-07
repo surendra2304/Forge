@@ -9,6 +9,7 @@ from typing import Any
 from app.core.logging import get_logger
 from app.core.workspace import WorkspaceManager, workspace_manager
 from app.execution.engine import ExecutionEngine, execution_engine
+from app.monitoring.production_monitor import production_monitor
 from app.verification.checkers import (
     BaseChecker,
     BuildChecker,
@@ -93,6 +94,7 @@ class VerificationEngine:
             evidence=evidence_list,
         )
 
+        production_monitor.record_verification(passed=report.all_passed)
         report_json = json.dumps(report.model_dump(mode="json"), indent=2)
         self.wm.save_artifact(task_id, "baseline_report.json", report_json)
         logger.info(
@@ -198,6 +200,10 @@ class VerificationEngine:
             evidence=evidence_list,
             baseline_comparison=baseline_comparison,
         )
+
+        # Feed the production monitor: record_verification() had no callers, so
+        # verification pass/fail ratios never reached /metrics.
+        production_monitor.record_verification(passed=all_passed)
 
         # Persist verification report in task artifacts
         report_json = json.dumps(report.model_dump(mode="json"), indent=2)

@@ -5,6 +5,7 @@ pins versions, auto-generates requirements.txt/package.json, and flags vulnerabl
 """
 
 import ast
+import json
 import re
 from pathlib import Path
 from typing import Any
@@ -237,9 +238,26 @@ PINNED_VERSIONS: dict[str, str] = {
 
 # Known high-risk or banned libraries (e.g., deprecated or inherently unsafe)
 KNOWN_VULNERABLE_OR_BANNED: dict[str, str] = {
+    # Python
     "telnetlib": "Insecure unencrypted remote access protocol.",
     "crypto": "Deprecated and unmaintained package (use pycryptodome or cryptography).",
     "pycrypto": "Unmaintained with known security vulnerabilities (use pycryptodome).",
+    # Node / npm
+    "event-stream": "Compromised npm package (flatmap-stream malicious payload, CVE-2018-16387).",
+    "flatmap-stream": "Malicious npm package used in the event-stream compromise.",
+    "ua-parser-js": "Widely compromised npm package (multiple malicious releases, CVE-2021-27292).",
+    "coa": "Compromised npm package (CVE-2021-23341).",
+    "rc": "Compromised npm package (CVE-2021-23341).",
+    "colors": "Compromised npm package (sabotaged release, CVE-2022-0122).",
+    "faker": "Compromised npm package (sabotaged release, CVE-2022-0122).",
+    "node-ipc": "Compromised npm package (protestware, CVE-2022-23812).",
+    "peacenotwar": "Protestware dependency.",
+    # Go
+    "github.com/unknwon/cae": "Known malicious Go module (CVE-2021-3845).",
+    # Java / Maven
+    "log4j:log4j": "Log4Shell (CVE-2021-44228) -- upgrade to log4j 2.17.1+.",
+    "org.apache.logging.log4j:log4j-core": "Log4Shell (CVE-2021-44228) -- upgrade to 2.17.1+.",
+    "com.fasterxml.jackson.core:jackson-databind": "Multiple deserialization RCE CVEs; pin >= 2.13.2.1.",
 }
 
 
@@ -272,12 +290,22 @@ class DependencyManager:
         return modules
 
     def detect_workspace_dependencies(self, project_dir: Path) -> set[str]:
-        """Scan all Python and JS files in project directory and collect external dependencies."""
+        """Scan all Python, JS/TS and manifest files for external dependencies.
+
+        This used to walk `**/*.py` only, so a JavaScript/TypeScript project
+        reported no dependencies at all and check_security() silently approved
+        every npm package -- including the compromised ones above.
+        """
         external_deps: set[str] = set()
         if not project_dir.exists():
             return external_deps
 
-        # Scan python files
+        # 0. Declared manifests are authoritative -- read them first.
+        external_deps |= self._read_package_json(project_dir)
+        external_deps |= self._read_requirements_txt(project_dir)
+        external_deps |= self._read_go_mod(project_dir)
+
+        # 1. Scan python files
         for py_file in project_dir.glob("**/*.py"):
             try:
                 code = py_file.read_text(encoding="utf-8", errors="ignore")
@@ -293,7 +321,86 @@ class DependencyManager:
             except Exception as e:
                 logger.debug(f"Error scanning {py_file} for dependencies: {e}")
 
+        # 2. Scan JS/TS sources for bare imports (complements package.json, and
+        #    catches dependencies used but never declared).
+        external_deps |= self._scan_js_imports(project_dir)
+
         return external_deps
+
+    @staticmethod
+    def _read_package_json(project_dir: Path) -> set[str]:
+        deps: set[str] = set()
+        manifest = project_dir / "package.json"
+        if not manifest.is_file():
+            return deps
+        try:
+            data = json.loads(manifest.read_text(encoding="utf-8", errors="ignore"))
+        except Exception as e:
+            logger.debug(f"Unable to parse {manifest}: {e}")
+            return deps
+        for section in ("dependencies", "devDependencies", "peerDependencies", "optionalDependencies"):
+            for name in (data.get(section) or {}):
+                if isinstance(name, str) and name:
+                    deps.add(name)
+        return deps
+
+    @staticmethod
+    def _read_requirements_txt(project_dir: Path) -> set[str]:
+        deps: set[str] = set()
+        manifest = project_dir / "requirements.txt"
+        if not manifest.is_file():
+            return deps
+        try:
+            for line in manifest.read_text(encoding="utf-8", errors="ignore").splitlines():
+                stripped = line.split("#", 1)[0].strip()
+                if not stripped or stripped.startswith("-"):
+                    continue
+                name = re.split(r"[=<>!~\[;]", stripped, maxsplit=1)[0].strip()
+                if name:
+                    deps.add(name)
+        except Exception as e:
+            logger.debug(f"Unable to parse {manifest}: {e}")
+        return deps
+
+    @staticmethod
+    def _read_go_mod(project_dir: Path) -> set[str]:
+        deps: set[str] = set()
+        manifest = project_dir / "go.mod"
+        if not manifest.is_file():
+            return deps
+        try:
+            for line in manifest.read_text(encoding="utf-8", errors="ignore").splitlines():
+                stripped = line.strip()
+                if stripped.startswith("require ") or stripped.startswith("\t"):
+                    parts = stripped.replace("require ", "", 1).split()
+                    if parts and "/" in parts[0]:
+                        deps.add(parts[0])
+        except Exception as e:
+            logger.debug(f"Unable to parse {manifest}: {e}")
+        return deps
+
+    @classmethod
+    def _scan_js_imports(cls, project_dir: Path) -> set[str]:
+        deps: set[str] = set()
+        for src in list(project_dir.glob("**/*.js")) + list(project_dir.glob("**/*.ts")):
+            if "node_modules" in str(src):
+                continue
+            try:
+                text = src.read_text(encoding="utf-8", errors="ignore")
+            except Exception:
+                continue
+            for match in re.finditer(
+                r"""(?:import\s+[^'"]*from\s*|require\(\s*|import\s*\(\s*)['"]([^'"]+)['"]""",
+                text,
+            ):
+                spec = match.group(1)
+                if spec.startswith(".") or spec.startswith("/"):
+                    continue
+                parts = spec.split("/")
+                pkg = "/".join(parts[:2]) if spec.startswith("@") else parts[0]
+                if pkg:
+                    deps.add(pkg)
+        return deps
 
     def generate_requirements_txt(self, dependencies: set[str]) -> str:
         """Generate formatted and pinned requirements.txt content."""

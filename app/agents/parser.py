@@ -111,15 +111,19 @@ class LLMResponseParser:
                 extracted.append(ExtractedFile(relative_path=file_path, content=file_content))
                 seen_paths.add(file_path)
 
-        if extracted:
-            return extracted
+        # NOTE: do NOT return early here. An XML-only match used to short-circuit
+        # the whole function, silently dropping every "### File:" markdown block
+        # in a mixed response. All patterns now accumulate and de-duplicate by
+        # normalized path.
 
         # 2. Markdown File Header Pattern:
         # e.g., "### File: src/main.py\n```python\n...\n```"
         # or "**File:** `src/main.py`\n```python\n...\n```"
         # or "File: src/main.py\n```python\n...\n```"
         header_pattern = re.compile(
-            r"(?:#{1,6}\s+|(?:\*{1,2}|_{1,2})?File(?:\*{1,2}|_{1,2})?:\s*|Target File:\s*)"
+            # The trailing (?:\*{1,2}|_{1,2})? consumes the closing emphasis of
+            # "**File:**" / "__File:__". Without it the bold form never matched.
+            r"(?:#{1,6}\s+|(?:\*{1,2}|_{1,2})?File(?:\*{1,2}|_{1,2})?:\s*(?:\*{1,2}|_{1,2})?\s*|Target File:\s*)"
             r"[`\"']?([a-zA-Z0-9_\-./\\]+\.[a-zA-Z0-9_\-]+)[`\"']?"
             r"(?:[^\n]*\n+)\s*"
             r"```([a-zA-Z0-9_\-#+]*)\s*\n"
@@ -136,9 +140,6 @@ class LLMResponseParser:
                     ExtractedFile(relative_path=file_path, content=file_content, language=lang)
                 )
                 seen_paths.add(file_path)
-
-        if extracted:
-            return extracted
 
         # 3. Code Block Info String Pattern:
         # e.g., ```python:src/main.py ... ```
@@ -160,11 +161,8 @@ class LLMResponseParser:
                 )
                 seen_paths.add(file_path)
 
-        if extracted:
-            return extracted
-
-        # 4. Fallback: Generic markdown code block with default filename
-        if default_filename:
+        # 4. Fallback: only when nothing structured was found at all.
+        if not extracted and default_filename:
             generic_code_blocks = re.findall(
                 r"```([a-zA-Z0-9_\-#+]*)\s*\n([\s\S]*?)\n```",
                 text,

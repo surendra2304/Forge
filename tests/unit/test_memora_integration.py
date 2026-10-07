@@ -124,3 +124,63 @@ def test_get_memora_client_singleton():
     c2 = get_memora_client()
     assert c1 is c2
     assert isinstance(c1, MemoraClient)
+
+
+# ---------------------------------------------------------------------------
+# Recall must survive hostile queries
+# ---------------------------------------------------------------------------
+
+
+def _make_local_db(tmp_path) -> str:
+    import sqlite3
+
+    db = tmp_path / "memora.db"
+    con = sqlite3.connect(str(db))
+    con.executescript(
+        """
+        CREATE TABLE agents (id TEXT PRIMARY KEY, name TEXT, namespace TEXT);
+        CREATE TABLE memory_records (
+            id TEXT PRIMARY KEY, owner_id TEXT, node_id TEXT, memory_type TEXT,
+            content_text TEXT, source TEXT, importance REAL,
+            lifecycle_state TEXT, namespace TEXT, created_at TEXT
+        );
+        INSERT INTO agents VALUES ('a1','forge','default');
+        INSERT INTO memory_records VALUES (
+            'm1','a1',NULL,'lesson',
+            'CLI apps must handle KeyboardInterrupt and expose --help',
+            'agent:forge',0.9,'active','default','2026-01-01'
+        );
+        """
+    )
+    con.commit()
+    con.close()
+    return str(db)
+
+
+def test_recall_survives_a_degenerate_query(tmp_path):
+    """A 2 000-word goal must not break recall.
+
+    The recall query built one LIKE clause per keyword, so a hostile goal
+    produced thousands of clauses and SQLite rejected the whole statement with
+    "Expression tree is too large (maximum depth 1000)". Recall then returned
+    nothing for those tasks -- silently.
+    """
+    from app.integrations.memora_client import MemoraClient
+
+    client = MemoraClient()
+    client.local_db_path = _make_local_db(tmp_path)
+
+    for hostile in ("app " * 2000, "x" * 5000, " ".join(f"w{i}" for i in range(3000))):
+        results = client._recall_locally("forge", hostile, 10)
+        assert isinstance(results, list)
+
+
+def test_recall_still_finds_the_real_memory(tmp_path):
+    """The cap must not cost recall for ordinary queries."""
+    from app.integrations.memora_client import MemoraClient
+
+    client = MemoraClient()
+    client.local_db_path = _make_local_db(tmp_path)
+    results = client._recall_locally("forge", "CLI apps KeyboardInterrupt", 10)
+    assert len(results) == 1
+    assert "KeyboardInterrupt" in results[0].content_text

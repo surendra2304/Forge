@@ -740,9 +740,22 @@ class DomainSynthesizer:
     fully dynamic, prompt-specific content models — zero hardcoded names, colors, or items."""
 
     @classmethod
-    def analyze_goal(cls, goal: str, memora_context: str = "") -> DomainBlueprint:
+    def analyze_goal(
+        cls,
+        goal: str,
+        memora_context: str = "",
+        requirements: list[str] | None = None,
+    ) -> DomainBlueprint:
+        """Classify a goal into a domain blueprint.
+
+        `requirements` used to be accepted by callers but never forwarded here, so
+        an explicit requirement such as "must be an e-commerce store" could not
+        influence the chosen architecture at all.
+        """
         # Incorporate remembered user preferences from Memora cognitive context if present
         combined_context = f"{goal} {memora_context}".strip() if memora_context else goal
+        if requirements:
+            combined_context = f"{combined_context} {' '.join(requirements)}".strip()
         g = combined_context.lower()
 
         # 0. E-Commerce

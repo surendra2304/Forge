@@ -8,8 +8,8 @@ from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import BaseModel, Field
 
 from app.analytics.templates import template_analytics
-from app.core.config import get_settings
 from app.core.logging import get_logger
+from app.core.workspace import canonical_path, workspace_manager
 from app.marketplace.models import (
     TemplateCategory,
     TemplateManifest,
@@ -89,22 +89,36 @@ async def build_task_from_template(template_id: str, payload: BuildFromTemplateR
             detail=f"Template '{template_id}' not found in registry.",
         )
 
-    # Generate workspace directory
-    settings = get_settings()
+    # Generate workspace directory through the WorkspaceManager so the root is
+    # anchored to settings.base_dir. Building it from the raw relative
+    # `settings.workspaces_dir` made the location depend on the process CWD, and
+    # writing template files directly into that root (no `project/` subdir) put
+    # generated code outside the sandbox every checker and the execution engine
+    # expect.
     import uuid
 
     task_id = f"task_{uuid.uuid4().hex[:8]}"
-    workspace_path = settings.workspaces_dir / task_id
-    workspace_path.mkdir(parents=True, exist_ok=True)
+    paths = workspace_manager.create_workspace(task_id)
+    workspace_path = canonical_path(paths.project)
+    workspace_root = canonical_path(paths.root)
 
     # Render files
     rendered_files = template_registry.render_template(template_id, payload.variables)
     created_file_list = []
 
     for rel_path, content in rendered_files.items():
-        file_path = workspace_path / rel_path
-        file_path.parent.mkdir(parents=True, exist_ok=True)
-        file_path.write_text(content, encoding="utf-8")
+        # Containment check: a template rel_path such as "../../evil.py" must not
+        # be able to write outside the task's project directory.
+        target = canonical_path(workspace_path / rel_path)
+        try:
+            target.relative_to(workspace_path)
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Template file path '{rel_path}' escapes the task workspace.",
+            ) from exc
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(content, encoding="utf-8")
         created_file_list.append(rel_path)
 
     # Record analytics usage
@@ -113,7 +127,7 @@ async def build_task_from_template(template_id: str, payload: BuildFromTemplateR
     return BuildFromTemplateResponse(
         task_id=task_id,
         template_id=template_id,
-        workspace_path=str(workspace_path),
+        workspace_path=str(workspace_root),
         files_created=created_file_list,
         message=f"Workspace instantiated from '{template.name}' with {len(created_file_list)} files.",
     )
