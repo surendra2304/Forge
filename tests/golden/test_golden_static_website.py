@@ -198,5 +198,19 @@ document.addEventListener("DOMContentLoaded", () => {
     artifacts_dir = wm.get_task_workspace_dir(task_id) / "artifacts"
     assert (artifacts_dir / "completion_report.json").exists()
     assert (artifacts_dir / "COMPLETION_REPORT.md").exists()
-    screenshots = list(artifacts_dir.glob("screenshot_*.png"))
-    assert len(screenshots) >= 1
+    # Browser evidence must be real. This golden benchmark used to assert a
+    # hardcoded 1x1 PNG that BrowserChecker wrote and called a "screenshot".
+    # The assertion now demands the honest contract: the fetched HTML is
+    # persisted and the metadata records that no screenshot was captured.
+    evidence_files = list(artifacts_dir.glob("browser_evidence_*.html"))
+    assert len(evidence_files) >= 1
+    assert evidence_files[0].stat().st_size > 0
+    meta_files = list(artifacts_dir.glob("browser_evidence_*.meta.json"))
+    assert len(meta_files) >= 1
+    import json as _json
+
+    _meta = _json.loads(meta_files[0].read_text(encoding="utf-8"))
+    assert _meta["screenshot"] is False
+    assert not list(artifacts_dir.glob("screenshot_*.png")), (
+        "BrowserChecker still fabricates a 1x1 PNG as screenshot evidence"
+    )
