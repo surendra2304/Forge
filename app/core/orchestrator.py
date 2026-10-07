@@ -4,13 +4,16 @@ Owns the end-to-end task lifecycle, coordinating Task Analyzer, Planner, Agent R
 """
 
 import asyncio
+import re
 from pathlib import Path
+from secrets import token_hex
 from typing import Any
 
 from app.agents.registry import AgentRegistry, agent_registry
 from app.core.analyzer import TaskAnalyzer, task_analyzer
 from app.core.context import ContextManager, context_manager
 from app.core.logging import get_logger
+from app.core.progress_tracker import ProgressTracker
 from app.core.workspace import WorkspaceManager, workspace_manager
 from app.execution.engine import ExecutionEngine, execution_engine
 from app.memory.db import db_manager
@@ -22,10 +25,40 @@ from app.memory.models import (
 )
 from app.memory.state_store import StateStore
 from app.memory.task_lifecycle import TaskStateMachine
+from app.monitoring.production_monitor import production_monitor
 from app.planning.graph import ExecutableTaskDAG
 from app.planning.planner import PlannerEngine, planner_engine
+from app.planning.tree import PipelineStage
+
+_STAGE_BY_NAME = {stage.value: stage for stage in PipelineStage}
 
 logger = get_logger("core.orchestrator")
+
+
+async def _finalize_tracker(task_id: str, success: bool) -> None:
+    """Close out the ProgressTracker for a finished task (best effort)."""
+    tracker = ProgressTracker.get_tracker(task_id)
+    if tracker is None:
+        return
+    try:
+        await tracker.complete_task(success=success)
+    except Exception:
+        logger.debug(f"Progress tracker finalization failed for task {task_id}", exc_info=True)
+
+
+_CONTROL_CHARS = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
+
+
+def _sanitize_text(value: str) -> str:
+    """Remove characters that cannot survive a prompt, a filename or a subprocess.
+
+    Newlines and tabs are legitimate in a goal and are kept; NUL and the other
+    control characters are not, and they are what actually break the run.
+    """
+    if not isinstance(value, str):
+        return ""
+    cleaned = _CONTROL_CHARS.sub("", value)
+    return cleaned.strip()
 
 
 class OrchestratorCore:
@@ -70,7 +103,17 @@ class OrchestratorCore:
         """
         from app.memory.models import generate_task_id
 
-        # Determine sequence number for new task
+        # Determine sequence number for new task.
+        #
+        # The old sequence was derived from COUNT(*) and then "checked" with
+        # get_task() in a loop. That is a textbook check-then-act race: two
+        # concurrent submissions both counted N tasks, both produced
+        # task{N+1}<timestamp>, both saw get_task() return None, and the second
+        # INSERT died with sqlite3.IntegrityError -> HTTP 500. Verified against a
+        # live uvicorn worker: 25 parallel POST /api/tasks produced 23x 500.
+        #
+        # The id now carries a per-process random suffix, and creation is retried
+        # on collision, so concurrency can never produce a duplicate id.
         if hasattr(self.store, "count_tasks"):
             total_count = await self.store.count_tasks()
         else:
@@ -78,10 +121,19 @@ class OrchestratorCore:
             total_count = len(tasks)
         task_seq = total_count + 1
         task_id = generate_task_id(task_seq)
+        attempts = 0
         while await self.store.get_task(task_id):
             task_seq += 1
             task_id = generate_task_id(task_seq)
+            attempts += 1
+            if attempts > 50:
+                # Fall back to a collision-proof id rather than looping forever.
+                task_id = generate_task_id(task_seq) + f"x{token_hex(3)}"
+                break
         req_list = requirements or []
+        # `context` (e.g. the CLI's {"memory_context": ...}) used to be accepted
+        # and then dropped on the floor, so Memora recall never reached planning.
+        intake_context = dict(context or {})
         logger.info(f"Orchestrator intaking task '{task_id}': {goal[:80]}...")
 
         # 1. Provision isolated workspace under workspaces/<task_id>/
@@ -92,6 +144,14 @@ class OrchestratorCore:
             repo_url=repo_url,
             local_path=local_path,
         )
+
+        # A goal is free text from a user. A NUL byte or other control character
+        # survives every downstream prompt and eventually raises
+        # ValueError: embedded null byte from an unrelated node -- verified live,
+        # where a goal containing \x00 crashed the release_engineer node and
+        # failed an otherwise successful build. Strip it once, here, so nothing
+        # downstream has to defend against it.
+        goal = _sanitize_text(goal)
 
         # 2. Persist initial task in PENDING state
         task = TaskEntity(
@@ -104,7 +164,19 @@ class OrchestratorCore:
             state=TaskState.PENDING,
             progress_percentage=0,
         )
-        await self.store.create_task(task)
+        try:
+            await self.store.create_task(task)
+        except Exception as exc:
+            # Last-resort guard against a lost race: retry once with a
+            # guaranteed-unique id before surfacing the error to the caller.
+            if "UNIQUE" not in str(exc).upper():
+                raise
+            logger.warning(f"Task id collision on '{task_id}'; retrying with a unique id")
+            task.id = generate_task_id(task_seq) + f"x{token_hex(4)}"
+            await self.store.create_task(task)
+        # Feed the production monitor: record_task_event() had no callers, so the
+        # task-failure-rate alert in check_alerts() could never fire.
+        production_monitor.record_task_event("submitted")
         await self.store.record_event(
             task_id=task_id,
             event_type="task.created",
@@ -138,6 +210,7 @@ class OrchestratorCore:
             goal=goal,
             requirements=req_list,
             has_existing_codebase=has_existing_codebase,
+            context=intake_context or None,
         )
         dag = ExecutableTaskDAG.from_tree(tree)
         dag_errors = dag.validate()
@@ -226,11 +299,15 @@ class OrchestratorCore:
                         event_type="task.failed",
                         payload={"reason": fallback_reason, "fallback_stub": True},
                     )
+                    production_monitor.record_task_event("failed")
+                    await _finalize_tracker(task_id, success=False)
                 else:
                     task = await self.lifecycle.transition(
                         task_id, TaskState.COMPLETED, progress_percentage=100
                     )
                     await self.store.record_event(task_id=task_id, event_type="task.completed")
+                    production_monitor.record_task_event("completed")
+                    await _finalize_tracker(task_id, success=True)
             return task, []
 
         # Execute all ready nodes concurrently in parallel wave
@@ -241,9 +318,22 @@ class OrchestratorCore:
             agent = self.registry.create_agent(role_name)
             dag.mark_running(node.id)
 
+            # Drive the fine-grained progress tracker. ProgressTracker.start_stage
+            # / complete_stage had no callers anywhere in the codebase, so every
+            # snapshot froze at current_stage=Project, progress_percentage=0.
+            tracker = ProgressTracker.get_or_create(task_id)
+            stage_name = node.metadata.get("stage")
+            stage = _STAGE_BY_NAME.get(stage_name)
+            if stage is not None:
+                try:
+                    await tracker.start_stage(stage, details={"node": node.title})
+                except Exception:
+                    logger.debug("Progress tracker start_stage failed", exc_info=True)
+
             logger.info(
                 f"[Parallel Wave] Dispatching node '{node.title}' to specialist agent '{role_name}' in task {task_id}"
             )
+
             context = self.context_manager.build_agent_context(
                 task_id=task_id,
                 role_name=role_name,
@@ -259,6 +349,11 @@ class OrchestratorCore:
                     context=context,
                     engine=self.engine,
                 )
+                if stage is not None:
+                    try:
+                        await tracker.complete_stage(stage, details={"node": node.title})
+                    except Exception:
+                        logger.debug("Progress tracker complete_stage failed", exc_info=True)
                 return node.id, True, result, None, role_name
             except Exception as e:
                 logger.error(f"Execution error on node '{node.title}': {e}")
@@ -317,6 +412,8 @@ class OrchestratorCore:
                 to_state=TaskState.FAILED,
                 error_message=first_error,
             )
+            production_monitor.record_task_event("failed")
+            await _finalize_tracker(task_id, success=False)
             return task, executed_nodes
 
         progress = dag.get_progress_percentage()
@@ -351,11 +448,13 @@ class OrchestratorCore:
                     event_type="task.failed",
                     payload={"reason": fallback_reason, "fallback_stub": True},
                 )
+                production_monitor.record_task_event("failed")
             else:
                 task = await self.lifecycle.transition(
                     task_id, TaskState.COMPLETED, progress_percentage=100
                 )
                 await self.store.record_event(task_id=task_id, event_type="task.completed")
+                production_monitor.record_task_event("completed")
         else:
             updated_task = await self.store.update_task_state(
                 task_id, state=task.state, progress_percentage=progress
@@ -368,6 +467,13 @@ class OrchestratorCore:
     async def run_task(self, task_id: str, max_iterations: int = 20) -> TaskEntity:
         """
         Run the full autonomous task execution loop until completion or terminal state.
+
+        This is the engine's own completion path, so it must also run the
+        objective verification battery and the self-repair loop. Previously only
+        the CLI called VerificationEngine, which meant any task driven through
+        the API (or any other embedder) reached a terminal state without ever
+        being verified: no verification_report.json, no record_verification()
+        telemetry, and no recovery attempt.
         """
         iterations = 0
         while iterations < max_iterations:
@@ -382,7 +488,69 @@ class OrchestratorCore:
                 break
             if not executed:
                 break
+
+        await self._verify_and_repair(task_id)
+        task = await self.store.get_task(task_id) or task
         return task
+
+    async def _verify_and_repair(self, task_id: str) -> None:
+        """Run the verification battery and attempt self-repair on failures."""
+        try:
+            from app.verification.engine import VerificationEngine
+
+            # The orchestrator's own execution engine and workspace manager are
+            # passed explicitly. Constructing VerificationEngine() with no
+            # arguments makes it fall back to the module-level singletons, which
+            # belong to whatever workspace the process was configured with at
+            # import time -- so any orchestrator built with an injected
+            # WorkspaceManager (tests, embders, isolated runs) verified and
+            # repaired the wrong directory. Proven live: an isolated run's task
+            # reached FAILED with zero verification events recorded against it.
+            engine = VerificationEngine(engine=self.engine, wm=self.wm)
+            report = await engine.verify_task(task_id)
+            logger.info(
+                f"Verification for '{task_id}': "
+                f"{report.passed_checks}/{report.total_checks} passed"
+            )
+            if report.all_passed:
+                return
+
+            from app.recovery.engine import RecoveryEngine
+
+            recovery = RecoveryEngine(exec_engine=self.engine, verifier=engine)
+            recovered_any = False
+            for evidence in report.evidence:
+                if evidence.passed:
+                    continue
+                recovered, message, _patch = await recovery.attempt_recovery(task_id, evidence)
+                if recovered:
+                    recovered_any = True
+                    logger.info(f"Self-repair succeeded for '{task_id}': {message}")
+                else:
+                    logger.warning(f"Self-repair did not fix '{task_id}': {message}")
+            if recovered_any:
+                await engine.verify_task(task_id)
+
+            # Peer review: specialist agents inspect each other's output and the
+            # fixers act on it. This is the collaboration loop that makes the
+            # run a team rather than a queue of independent specialists.
+            try:
+                from app.agents.coordinator import AgentCoordinator
+
+                coordinator = AgentCoordinator(engine=self.engine, max_rounds=2)
+                review = await coordinator.review_and_repair(task_id)
+                logger.info(
+                    f"Peer review for '{task_id}': {review.summary} "
+                    f"(repairs={review.repairs})"
+                )
+                if review.clean:
+                    logger.info(f"Peer review cleared all findings for '{task_id}'")
+            except Exception as exc:
+                logger.warning(f"Peer review failed for '{task_id}': {exc}")
+        except Exception as exc:
+            # Verification is a reporting gate, not a reason to kill a finished
+            # task: log loudly and leave the task in its terminal state.
+            logger.error(f"Verification/repair failed for '{task_id}': {exc}", exc_info=True)
 
 
 orchestrator = OrchestratorCore()

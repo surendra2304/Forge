@@ -4,8 +4,11 @@ Implements Build, Lint, TypeCheck, Test, and Runtime smoke checkers.
 """
 
 import ast
+import json
+import sys
 import time
 from abc import ABC, abstractmethod
+from datetime import UTC, datetime
 from typing import Any
 
 from app.core.logging import get_logger
@@ -305,8 +308,12 @@ class LintChecker(BaseChecker):
                 stdout="No source files require linting.",
             )
 
+        # --no-cache keeps .ruff_cache out of the delivered project. Without it
+        # every verified build shipped a .ruff_cache directory to the user.
         cmd_res = await engine.terminal.run_command(
-            task_id, "ruff check . --select=E,F --ignore=E501,F841", role="tester"
+            task_id,
+            "ruff check . --no-cache --select=E,F --ignore=E501,F841",
+            role="tester",
         )
         duration_ms = (time.perf_counter() - start_time) * 1000.0
         passed = cmd_res.exit_code == 0 or "command not found" in cmd_res.stderr.lower()
@@ -422,9 +429,14 @@ class TestChecker(BaseChecker):
                 stdout="No test files discovered in workspace.",
             )
 
+        # Two fixes in one line. `python` was a bare name resolved from PATH, so
+        # the checker could run a different interpreter (or none) than the one
+        # hosting FORGE; sys.executable is the one that actually has the deps.
+        # And -p no:cacheprovider stops pytest from writing .pytest_cache into
+        # the project it is verifying.
         cmd_res = await engine.terminal.run_command(
             task_id,
-            "python -B -m pytest -v",
+            f"{sys.executable} -B -m pytest -v -p no:cacheprovider",
             env_vars={"PYTHONPATH": ".", "PYTHONDONTWRITEBYTECODE": "1"},
             role="tester",
         )
@@ -699,10 +711,32 @@ class BrowserChecker(BaseChecker):
                         except Exception:
                             missing_assets.append(f"Failed to fetch asset: {asset}")
 
-                    # Save lightweight PNG placeholder artifact
-                    # 1x1 minimal transparent PNG byte header
-                    png_bytes = b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15c4\x00\x00\x00\rIDATx\x9cc`\x00\x00\x00\x02\x00\x01H\xaf\xa4q\x00\x00\x00\x00IEND\xaeB`\x82"
-                    screenshot_path.write_bytes(png_bytes)
+                    # Persist the fetched HTML as the evidence artifact instead
+                    # of a hardcoded 1x1 PNG. Writing a fabricated 1x1 pixel and
+                    # reporting it as "screenshot evidence" made the artifact
+                    #目录 look like real visual proof while proving nothing.
+                    evidence_path = paths.artifacts / f"browser_evidence_{int(time.time())}.html"
+                    try:
+                        evidence_path.write_text(resp.text, encoding="utf-8")
+                    except Exception:
+                        pass
+                    (paths.artifacts / f"browser_evidence_{int(time.time())}.meta.json").write_text(
+                        json.dumps(
+                            {
+                                "url": base_url,
+                                "status_code": resp.status_code,
+                                "captured_at": datetime.now(UTC).isoformat(),
+                                "capture_mode": "http_fetch_no_playwright",
+                                "screenshot": False,
+                                "note": (
+                                    "Playwright is not installed; no real screenshot "
+                                    "was captured. The fetched HTML is the evidence."
+                                ),
+                            },
+                            indent=2,
+                        ),
+                        encoding="utf-8",
+                    )
 
             # Compile issues
             if console_errors:
@@ -737,7 +771,9 @@ class BrowserChecker(BaseChecker):
                 artifacts_inspected.append(str(screenshot_path.relative_to(paths.root)))
 
             stdout = (
-                f"Browser verification completed on {base_url}. Screenshot saved to {screenshot_path.name}."
+                f"Browser verification completed on {base_url}. "
+                f"Evidence saved to {evidence_path.name} (HTTP fetch; Playwright "
+                f"unavailable, no screenshot captured)."
                 if passed
                 else ""
             )

@@ -20,6 +20,7 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from app.core.logging import get_logger
+from app.monitoring.production_monitor import production_monitor
 
 logger = get_logger("verification.security_scanner")
 
@@ -244,6 +245,12 @@ class OutputSecurityScanner:
 
         blocks = crit > 0 or high > 0
         passed = len(findings) == 0 or not blocks
+
+        # Feed the production monitor: record_security_scan() had no callers, so
+        # security-scan telemetry never reached /metrics.
+        production_monitor.record_security_scan(
+            passed=passed, blocked=blocks, findings_count=len(findings)
+        )
 
         return SecurityScanReport(
             workspace_path=str(self.workspace_path),
