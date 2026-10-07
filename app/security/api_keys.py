@@ -115,19 +115,22 @@ async def verify_api_key(
     key = x_api_key or (bearer_auth.credentials if bearer_auth else None)
     client_ip = request.client.host if request.client else "anonymous"
 
-    # Check for excessive failed auth attempts from client IP
-    if not rate_limiter.record_failed_auth(client_ip):
-        logger.warning(
-            f"Excessive failed authentication attempts from {client_ip}. Temporarily rate-limited."
-        )
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail="Too many failed authentication attempts. Please retry later.",
-        )
-
-    # Validate authentication
-    if not api_key_manager.validate_key(key):
+    # Validate FIRST, then account for failures. The old order recorded a failed
+    # attempt before the key was even checked, so every client -- including
+    # correctly authenticated ones -- was locked out with 429 after 10 requests
+    # per minute.
+    authenticated = api_key_manager.validate_key(key)
+    if not authenticated:
         logger.warning(f"Unauthorized API request attempt from {client_ip}")
+        # Check for excessive failed auth attempts from client IP
+        if not rate_limiter.record_failed_auth(client_ip):
+            logger.warning(
+                f"Excessive failed authentication attempts from {client_ip}. Temporarily rate-limited."
+            )
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail="Too many failed authentication attempts. Please retry later.",
+            )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or missing API key. Provide X-API-Key header or Bearer token.",

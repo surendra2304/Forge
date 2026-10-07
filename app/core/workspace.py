@@ -248,21 +248,72 @@ class WorkspaceManager:
 
     @staticmethod
     def validate_repository_url(repo_url: str) -> None:
-        """Validate repository URL against approved patterns."""
+        r"""Validate a repository source against the approved allowlist.
+
+        The previous allowlist ended with a bare `^[A-Za-z0-9_.\-\/\\]+$`
+        catch-all that also matched absolute host paths ("/etc"), traversal
+        payloads ("../../..") and git option-injection payloads ("-bare", "-c"),
+        so the allowlist filtered nothing at all.
+
+        Accepted sources:
+          * the documented remote hosts (github.com, gitlab.com, https or ssh), or
+          * a local directory that exists and lives inside the trusted
+            workspaces root.
+
+        Anything else -- including a leading dash, which git would parse as a
+        command-line option -- is rejected.
+        """
         import re
 
         clean_url = repo_url.strip()
-        ALLOWED_REPO_PATTERNS = [
-            r"^https:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+(\.git)?$",
-            r"^git@github\.com:[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+(\.git)?$",
-            r"^https:\/\/gitlab\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+(\.git)?$",
-            r"^file:\/\/\/?[A-Za-z0-9_.\-\/:]+$",
-            r"^[A-Za-z0-9_.\-\/\\]+$",
-        ]
-        if not any(re.match(p, clean_url) for p in ALLOWED_REPO_PATTERNS):
+        if not clean_url:
+            raise ValueError("Repository URL must not be empty")
+
+        # A leading dash would be parsed by git as a command-line option.
+        if clean_url.startswith("-"):
             raise ValueError(
                 f"Repository URL '{repo_url}' is not in the allowed repository allowlist"
             )
+
+        ALLOWED_REMOTE_PATTERNS = [
+            r"^https:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+(\.git)?$",
+            r"^git@github\.com:[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+(\.git)?$",
+            r"^https:\/\/gitlab\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+(\.git)?$",
+        ]
+        if any(re.match(pattern, clean_url) for pattern in ALLOWED_REMOTE_PATTERNS):
+            return
+
+        # Local source: a file:// URL or a bare filesystem path.
+        if clean_url.startswith("file://"):
+            local_part = clean_url[len("file://") :]
+        else:
+            local_part = clean_url
+
+        candidate = Path(local_part)
+        if not candidate.is_absolute():
+            raise ValueError(
+                f"Repository URL '{repo_url}' is not in the allowed repository allowlist"
+            )
+
+        normalized = Path(os.path.normpath(str(candidate)))
+        if ".." in normalized.parts:
+            raise ValueError(
+                f"Repository URL '{repo_url}' is not in the allowed repository allowlist"
+            )
+
+        if not normalized.is_dir():
+            raise ValueError(f"Repository path '{repo_url}' is not an existing directory")
+
+        # Local sources must stay inside the trusted workspaces root, matching
+        # the containment rule create_workspace() applies to `custom_base`.
+        trusted_root = canonical_path(get_settings().base_dir / get_settings().workspaces_dir)
+        resolved_local = canonical_path(normalized)
+        try:
+            resolved_local.relative_to(trusted_root)
+        except ValueError as exc:
+            raise ValueError(
+                f"Repository path '{repo_url}' is outside the trusted workspaces root"
+            ) from exc
 
     def create_snapshot(self, task_id: str, snapshot_name: str) -> Path:
         """Create a full filesystem snapshot of the project directory."""

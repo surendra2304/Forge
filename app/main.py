@@ -4,12 +4,16 @@ FastAPI initialization with lifespan lifecycle management, middleware, and route
 """
 
 import hmac
+import warnings
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from typing import Any
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.openapi.utils import get_openapi
 from fastapi.responses import JSONResponse
+from fastapi.routing import APIRoute
 
 from app.api.analytics import analytics_router
 from app.api.delegate import delegate_router
@@ -23,6 +27,7 @@ from app.core.config import get_settings
 from app.core.logging import get_logger, setup_logging
 from app.dashboard.routes import dashboard_router
 from app.memory.db import db_manager
+from app.monitoring.production_monitor import production_monitor
 from app.optimization.performance import performance_optimizer
 
 logger = get_logger("main")
@@ -48,6 +53,52 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.info(f"Shutting down {settings.app_name}...")
 
 
+# Largest accepted request body (8 MB). Guards the worker against unbounded
+# buffering of hostile payloads.
+MAX_REQUEST_BODY_BYTES = 8 * 1024 * 1024
+
+
+def _unique_operation_id(route: APIRoute) -> str:
+    """Build a deterministic, path-aware OpenAPI operationId.
+
+    Several routers are mounted at more than one prefix ("", /api, /api/v1).
+    FastAPI derives operationId from the endpoint function name alone, so every
+    multi-mounted endpoint emitted a duplicate operationId -- which violates the
+    OpenAPI spec and breaks strict client generators. Folding the full path into
+    the id makes each mount unique.
+    """
+    raw = f"{route.name}_{route.path_format}"
+    return "".join(ch if (ch.isalnum() or ch == "_") else "_" for ch in raw)
+
+
+def _dedupe_operation_ids(schema: dict[str, Any]) -> dict[str, Any]:
+    """Guarantee operationId uniqueness across (path, method) pairs.
+
+    FastAPI reuses a single `route.unique_id` for every HTTP method declared on a
+    route, so any route registered with methods=["GET", "HEAD"] emits two
+    operations sharing one operationId. The OpenAPI spec requires operationId to
+    be unique, so disambiguate the leftovers by method.
+    """
+    seen: set[str] = set()
+    for path_item in schema.get("paths", {}).values():
+        if not isinstance(path_item, dict):
+            continue
+        for method, operation in list(path_item.items()):
+            if not isinstance(operation, dict):
+                continue
+            op_id = operation.get("operationId")
+            if not op_id:
+                continue
+            candidate = op_id
+            suffix = 2
+            while candidate in seen:
+                candidate = f"{op_id}_{method}_{suffix}"
+                suffix += 1
+            operation["operationId"] = candidate
+            seen.add(candidate)
+    return schema
+
+
 def create_app() -> FastAPI:
     """Create and configure the FastAPI application instance."""
     settings = get_settings()
@@ -57,7 +108,27 @@ def create_app() -> FastAPI:
         version=settings.app_version,
         description="FORGE: Autonomous Software Engineering Engine for goal-driven software synthesis and verification.",
         lifespan=lifespan,
+        generate_unique_id_function=_unique_operation_id,
     )
+
+    def custom_openapi() -> dict[str, Any]:
+        if app.openapi_schema:
+            return app.openapi_schema
+        with warnings.catch_warnings():
+            # FastAPI warns for every id it sees twice *during* generation; the
+            # schema returned below is already de-duplicated, so the warning is
+            # pure noise on /openapi.json and in the logs.
+            warnings.filterwarnings("ignore", message="Duplicate Operation ID")
+            schema = get_openapi(
+                title=settings.app_name,
+                version=settings.app_version,
+                description=app.description,
+                routes=app.routes,
+            )
+        app.openapi_schema = _dedupe_operation_ids(schema)
+        return app.openapi_schema
+
+    app.openapi = custom_openapi  # type: ignore[method-assign]
 
     @app.middleware("http")
     async def require_production_api_key(request: Request, call_next):
@@ -66,8 +137,11 @@ def create_app() -> FastAPI:
 
         if production_settings.env != EnvironmentType.PRODUCTION:
             return await call_next(request)
+        # Keep the /api spellings in sync with the bare ones, otherwise the
+        # duplicate mounts make the auth-exempt set prefix-dependent.
         if request.url.path in {
             "/health", "/health/ready", "/docs", "/redoc", "/openapi.json",
+            "/api/health", "/api/health/ready", "/api/openapi.json",
         } or request.url.path.startswith("/static/"):
             return await call_next(request)
         if request.method in {"GET", "HEAD"} and request.url.path in {"/", "/dashboard"}:
@@ -101,6 +175,46 @@ def create_app() -> FastAPI:
             return JSONResponse(status_code=403, content={"error": "forbidden"})
         return await call_next(request)
 
+    @app.middleware("http")
+    async def limit_request_body(request: Request, call_next):
+        """Reject oversized bodies early instead of buffering them into memory.
+
+        A 10 MB goal used to be read in full before any validation ran, which
+        pinned the worker's memory and surfaced as a client ReadTimeout rather
+        than a clean 413.
+        """
+        declared = request.headers.get("content-length")
+        if declared is not None:
+            try:
+                if int(declared) > MAX_REQUEST_BODY_BYTES:
+                    return JSONResponse(
+                        status_code=413,
+                        content={
+                            "error": "payload_too_large",
+                            "detail": f"Request body exceeds {MAX_REQUEST_BODY_BYTES} bytes.",
+                        },
+                    )
+            except ValueError:
+                pass
+        return await call_next(request)
+
+    @app.middleware("http")
+    async def record_request_telemetry(request: Request, call_next):
+        """Feed the production monitor.
+
+        ProductionMonitor.record_request had no callers anywhere in the codebase,
+        so /metrics always exported forge_requests_total 0 and the error-rate
+        alert in check_alerts() could never fire.
+        """
+        response = await call_next(request)
+        try:
+            production_monitor.record_request(
+                request.url.path, is_error=response.status_code >= 400
+            )
+        except Exception:  # telemetry must never break a request
+            logger.debug("Failed to record request telemetry", exc_info=True)
+        return response
+
     # Configure CORS for local development and UI dashboards
     app.add_middleware(
         CORSMiddleware,
@@ -115,10 +229,26 @@ def create_app() -> FastAPI:
 
     # Register API routers
     app.include_router(health_router, tags=["Health & Diagnostics"])
+    # Health/metrics under /api too: the dashboard and docs/API_REFERENCE.md use
+    # the /api prefix, so /api/metrics and /api/health/ready 404'd while their
+    # bare equivalents worked.
+    app.include_router(health_router, prefix="/api", tags=["Health & Diagnostics"])
     app.include_router(api_router, tags=["Core API"])
     app.include_router(api_router, prefix="/api/v1", tags=["API v1"])
-    app.include_router(tasks_router, prefix="/api", tags=["Tasks"])
     app.include_router(tasks_router, prefix="/api/v1", tags=["Tasks v1"])
+
+    # /api is the prefix the dashboard and docs/API_REFERENCE.md actually use.
+    # Without a core-router mount here every endpoint only api_router owns
+    # (timeline, pause, resume, artifacts metadata, projects) 404'd under /api,
+    # leaving the dashboard's Timeline tab and lifecycle buttons dead.
+    #
+    # api_router and tasks_router overlap on POST /tasks, GET /tasks/{id} and
+    # POST /tasks/{id}/cancel. FastAPI resolves routes in registration order, so
+    # tasks_router is mounted first under /api to preserve the established /api
+    # contract (it is the richer handler: artifacts, logs, inspect, archive) and
+    # api_router only supplies the paths tasks_router does not implement.
+    app.include_router(tasks_router, prefix="/api", tags=["Tasks"])
+    app.include_router(api_router, prefix="/api", tags=["Core API"])
     app.include_router(delegate_router, prefix="/api/v1", tags=["FRIDAY Universe Forge Delegation"])
     app.include_router(analytics_router, prefix="/api", tags=["Analytics"])
     app.include_router(analytics_router, prefix="/api/v1", tags=["Analytics v1"])

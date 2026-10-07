@@ -6,6 +6,7 @@ Executes sandboxed shell commands with timeout enforcement, output streaming, an
 import asyncio
 import os
 import time
+from typing import Any
 
 from pydantic import BaseModel
 
@@ -17,6 +18,48 @@ from app.execution.permissions import (
     ToolPermission,
     permission_manager,
 )
+
+# Host environment variables a sandboxed build command is allowed to see.
+# Everything else is withheld, so a new secret added to the host cannot leak
+# into generated code by default.
+SAFE_HOST_ENV_ALLOWLIST: frozenset[str] = frozenset(
+    {
+        "PATH",
+        "HOME",
+        "TMPDIR",
+        "TEMP",
+        "TMP",
+        "LANG",
+        "LC_ALL",
+        "LC_CTYPE",
+        "USER",
+        "LOGNAME",
+        "SHELL",
+        "TERM",
+        "TZ",
+        "PYTHONPATH",
+        "PYTHONDONTWRITEBYTECODE",
+        "VIRTUAL_ENV",
+        "PIP_INDEX_URL",
+        "PIP_NO_INPUT",
+        "PIP_DISABLE_PIP_VERSION_CHECK",
+        "NODE_ENV",
+        "NODE_PATH",
+        "NPM_CONFIG_REGISTRY",
+        "GOPATH",
+        "GOROOT",
+        "GOFLAGS",
+        "CARGO_HOME",
+        "RUSTUP_HOME",
+        "JAVA_HOME",
+        "MAVEN_HOME",
+        "GRADLE_HOME",
+        "CI",
+        "FORGE_TASK_ID",
+        "FORGE_ROLE",
+    }
+)
+
 
 logger = get_logger("execution.terminal")
 
@@ -133,20 +176,18 @@ class TerminalTool:
         except ValueError as exc:
             raise SandboxViolationError(f"Working-directory confinement failure: {cwd}") from exc
 
-        # 2. Controlled Environment (filter out sensitive host keys)
-        SENSITIVE_HOST_ENV_KEYS = {
-            "AWS_SECRET_ACCESS_KEY",
-            "OPENAI_API_KEY",
-            "ANTHROPIC_API_KEY",
-            "GITHUB_TOKEN",
-            "GEMINI_API_KEY",
-            "GOOGLE_API_KEY",
-            "FRIDAY_API_KEY",
-            "SECRET_KEY",
-            "DATABASE_URL",
-        }
+        # 2. Controlled Environment.
+        # This used to be a denylist: every host variable was inherited except a
+        # fixed set of nine names, so any credential not on that list (AWS access
+        # key id, AZURE_CLIENT_SECRET, NPM_TOKEN, DATABASE_PASSWORD, a bespoke
+        # MY_APP_TOKEN, ...) leaked straight into sandboxed commands. An
+        # allowlist inverts the default: only what a build genuinely needs is
+        # passed through, and everything else -- including future secrets -- is
+        # dropped by default.
         controlled_env = {
-            k: v for k, v in os.environ.items() if k.upper() not in SENSITIVE_HOST_ENV_KEYS
+            key: os.environ[key]
+            for key in SAFE_HOST_ENV_ALLOWLIST
+            if key in os.environ
         }
         controlled_env["PYTHONIOENCODING"] = "utf-8"
         controlled_env["PYTHONUTF8"] = "1"
@@ -160,19 +201,26 @@ class TerminalTool:
         exit_code = -1
 
         try:
-            # Spawn process with its own process group
-            creation_flags = 0
+            # Spawn the command in its OWN session/process group.
+            #
+            # This is the root-cause fix for the self-kill bug: without
+            # start_new_session=True the child inherits the *caller's* process
+            # group, so the timeout handler below (os.killpg(os.getpgid(child)))
+            # signals the caller too -- which SIGKILLed FORGE's own uvicorn
+            # worker and its own pytest runner. With the child in a fresh
+            # session, killpg() only ever reaches the sandboxed command tree.
+            spawn_kwargs: dict[str, Any] = {
+                "stdout": asyncio.subprocess.PIPE,
+                "stderr": asyncio.subprocess.PIPE,
+                "cwd": str(cwd),
+                "env": controlled_env,
+            }
             if os.name == "nt":
-                creation_flags = subprocess.CREATE_NEW_PROCESS_GROUP
+                spawn_kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
+            else:
+                spawn_kwargs["start_new_session"] = True
 
-            process = await asyncio.create_subprocess_shell(
-                command,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-                cwd=str(cwd),
-                env=controlled_env,
-                creationflags=creation_flags if os.name == "nt" else 0,
-            )
+            process = await asyncio.create_subprocess_shell(command, **spawn_kwargs)
 
             try:
                 stdout_bytes, stderr_bytes = await asyncio.wait_for(
@@ -181,9 +229,12 @@ class TerminalTool:
                 exit_code = process.returncode if process.returncode is not None else 0
                 stdout_text = stdout_bytes.decode("utf-8", errors="replace")
                 stderr_text = stderr_bytes.decode("utf-8", errors="replace")
-            except TimeoutError:
+            except (asyncio.TimeoutError, TimeoutError):
                 timed_out = True
-                # Clean up entire process tree on timeout
+                # Clean up the *child's* process tree only. The child leads its
+                # own group (see spawn_kwargs above), so this can never reach
+                # the FORGE process that issued the command.
+                killed = False
                 try:
                     if os.name == "nt":
                         subprocess.run(
@@ -191,6 +242,7 @@ class TerminalTool:
                             capture_output=True,
                             timeout=5,
                         )
+                        killed = True
                     else:
                         import signal
 
@@ -199,11 +251,36 @@ class TerminalTool:
                         sigkill_val = getattr(signal, "SIGKILL", None)
                         if killpg_fn and getpgid_fn and sigkill_val:
                             killpg_fn(getpgid_fn(process.pid), sigkill_val)
+                            killed = True
                 except Exception:
+                    killed = False
+
+                if not killed:
                     try:
                         process.kill()
                     except Exception:
                         pass
+
+                # Reap the child so it does not linger as a zombie.
+                try:
+                    await asyncio.wait_for(process.wait(), timeout=5.0)
+                except Exception:
+                    pass
+
+                # communicate() was cancelled, so its stdout/stderr pipe
+                # transports are still open. Close them explicitly; otherwise
+                # they are only released at interpreter shutdown, which surfaces
+                # as "RuntimeError: Event loop is closed" from
+                # BaseSubprocessTransport.__del__ in the logs.
+                transport = getattr(process, "_transport", None)
+                if transport is not None:
+                    try:
+                        transport.close()
+                    except Exception:
+                        pass
+
+                stdout_bytes = b""
+                stderr_bytes = b""
                 exit_code = -9
                 stderr_text = f"Command timed out after {timeout_seconds} seconds"
 
@@ -218,18 +295,16 @@ class TerminalTool:
         stdout_text = redact(stdout_text)
         stderr_text = redact(stderr_text)
 
-        # 4. Output limits: Truncate output exceeding 200,000 characters
+        # 4. Output limits: Truncate output exceeding 200,000 characters.
+        # The suffix used to be appended AFTER the slice, so the returned string
+        # was 200_000 + len(suffix) characters and the limit was never actually
+        # honoured.
         MAX_OUTPUT_CHARS = 200_000
+        truncation_notice = "\n... [TRUNCATED - Output exceeded 200KB limit]"
         if len(stdout_text) > MAX_OUTPUT_CHARS:
-            stdout_text = (
-                stdout_text[:MAX_OUTPUT_CHARS]
-                + "\n... [TRUNCATED - Output exceeded 200KB limit]"
-            )
+            stdout_text = stdout_text[: MAX_OUTPUT_CHARS - len(truncation_notice)] + truncation_notice
         if len(stderr_text) > MAX_OUTPUT_CHARS:
-            stderr_text = (
-                stderr_text[:MAX_OUTPUT_CHARS]
-                + "\n... [TRUNCATED - Output exceeded 200KB limit]"
-            )
+            stderr_text = stderr_text[: MAX_OUTPUT_CHARS - len(truncation_notice)] + truncation_notice
 
         # Append command execution record to workspace logs
         log_entry = (

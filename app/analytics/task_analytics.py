@@ -73,6 +73,13 @@ class TaskAnalyticsService:
         else:
             return "script"
 
+    # Every state that is *not* a terminal one counts as active. Deriving active
+    # as total - completed - failed used to silently book CANCELLED, BLOCKED and
+    # PENDING tasks as "active".
+    NON_ACTIVE_STATES = frozenset(
+        {TaskState.COMPLETED, TaskState.FAILED, TaskState.CANCELLED, TaskState.BLOCKED}
+    )
+
     async def get_summary(self) -> AnalyticsSummary:
         """Compute high-level system summary."""
         tasks = await self.store.list_tasks(limit=1000)
@@ -82,7 +89,7 @@ class TaskAnalyticsService:
         total = len(tasks)
         completed = sum(1 for t in tasks if t.state == TaskState.COMPLETED)
         failed = sum(1 for t in tasks if t.state == TaskState.FAILED)
-        active = total - completed - failed
+        active = sum(1 for t in tasks if t.state not in self.NON_ACTIVE_STATES)
 
         durations = []
         for t in tasks:

@@ -117,8 +117,11 @@ class DeliveryPackager:
             except Exception as e:
                 logger.warning(f"Error reading verification report for delivery: {e}")
 
-        # 3. Browser Screenshots & Evidence
-        screenshots = [f.name for f in paths.artifacts.glob("screenshot_*.png")]
+        # 3. Browser Evidence
+        # BrowserChecker no longer fabricates a 1x1 PNG, so the delivery report
+        # now collects the real evidence artifacts (fetched HTML + capture
+        # metadata) instead of looking for a screenshot that never existed.
+        screenshots = [f.name for f in paths.artifacts.glob("browser_evidence_*")]
 
         # 4. Git Tagging and Diff Log
         git_log = ""
@@ -164,7 +167,7 @@ class DeliveryPackager:
         )
         limitations = "\n".join([f"- {lim}" for lim in data.known_limitations])
         evidence = (
-            "\n".join([f"- Screenshot: `{s}`" for s in data.browser_verification_evidence])
+            "\n".join([f"- Browser evidence: `{s}`" for s in data.browser_verification_evidence])
             or "- No visual browser assets."
         )
 

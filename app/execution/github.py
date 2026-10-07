@@ -64,6 +64,21 @@ class GitHubTool:
         # Initialize repo if needed
         await self.git.init_repo(task_id, role=role)
 
+        # Branch from the requested base. `base_branch` used to be accepted and
+        # then ignored, so every branch was cut from whatever HEAD happened to be.
+        code, current, _ = await self.git._run_git(task_id, ["rev-parse", "--abbrev-ref", "HEAD"])
+        if code == 0 and current.strip() and current.strip() != base_branch:
+            base_res = await self.terminal.run_command(
+                task_id=task_id,
+                command=f"git checkout -B {base_branch}",
+                role=role,
+            )
+            if base_res.exit_code != 0:
+                logger.warning(
+                    f"[Task {task_id}] Could not checkout base branch '{base_branch}': "
+                    f"{base_res.stderr.strip()}"
+                )
+
         # Checkout new branch
         cmd_res = await self.terminal.run_command(
             task_id=task_id,
@@ -76,6 +91,7 @@ class GitHubTool:
         return {
             "status": "success" if cmd_res.exit_code == 0 else "failed",
             "branch_name": branch_name,
+            "base_branch": base_branch,
             "stdout": cmd_res.stdout,
             "stderr": cmd_res.stderr,
         }

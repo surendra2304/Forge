@@ -85,9 +85,13 @@ def verify_ws_auth(websocket: WebSocket, api_key: str | None) -> bool:
 
     valid_keys = {k for k in valid_keys if k}
 
-    # In local testing without any configured keys, allow
+    # No keys configured at all: only allow when the deployment explicitly does
+    # not require authentication. This used to return True whenever the key set
+    # was empty regardless of policy, i.e. it failed OPEN for any deployment that
+    # forgot to set a key.
     if not valid_keys:
         from app.config.production import production_settings
+
         return not production_settings.api_key_required
 
     # Check query param

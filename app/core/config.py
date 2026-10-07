@@ -2,6 +2,7 @@
 FORGE Application Configuration using Pydantic Settings.
 """
 
+import os
 from functools import lru_cache
 from pathlib import Path
 
@@ -14,7 +15,14 @@ class Settings(BaseSettings):
     app_name: str = Field(default="Project FORGE", description="Application display name")
     app_version: str = Field(default="2.0.0", description="Application semantic version")
     debug: bool = Field(default=True, description="Enable debug mode")
-    env: str = Field(default="production", description="Environment stage")
+    # Keep this in lockstep with app.config.production.ProductionSettings.env,
+    # which reads FORGE_ENV and defaults to "development". Defaulting here to
+    # "production" while the production config said "development" made the two
+    # settings disagree about whether authentication was required.
+    env: str = Field(
+        default_factory=lambda: os.getenv("FORGE_ENV", "development").lower(),
+        description="Environment stage",
+    )
 
     # Network & Server
     host: str = Field(default="0.0.0.0", description="Server bind host")
@@ -137,6 +145,14 @@ class Settings(BaseSettings):
         default=None,
         validation_alias=AliasChoices("FORGE_API_KEY", "FORGE_MEMORA_API_KEY", "MEMORA_API_KEY", "memora_api_key"),
         description="Forge's named agent credential for Memora Cloud",
+    )
+    git_push_token: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("FORGE_GIT_PUSH_TOKEN", "git_push_token"),
+        description=(
+            "Elevated token that may stand in for explicit git-push authorization. "
+            "When unset, no presented token can satisfy the push gate."
+        ),
     )
 
     model_config = SettingsConfigDict(
