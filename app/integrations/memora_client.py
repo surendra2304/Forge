@@ -482,9 +482,30 @@ class MemoraClient:
             with sqlite3.connect(self.local_db_path, timeout=5.0) as conn:
                 conn.row_factory = sqlite3.Row
                 c = conn.cursor()
-                keywords = [k.strip() for k in query.split() if len(k.strip()) > 3]
+                # One LIKE clause per keyword. A hostile or degenerate query --
+                # a 5 000-character goal, or "app app app ..." repeated 2 000 times
+                # -- produced thousands of clauses and SQLite rejected the whole
+                # statement with "Expression tree is too large (maximum depth
+                # 1000)", so recall silently returned nothing for those tasks.
+                # Deduplicate, keep the most selective (longest) keywords, and cap
+                # the clause count: past a couple of dozen the extra terms add
+                # noise, not recall.
+                raw_keywords = [k.strip() for k in query.split() if len(k.strip()) > 3]
+                seen: set[str] = set()
+                keywords = []
+                for kw in sorted(set(raw_keywords), key=len, reverse=True):
+                    low = kw.lower()
+                    if low in seen:
+                        continue
+                    seen.add(low)
+                    keywords.append(kw)
+                    if len(keywords) >= _MAX_RECALL_KEYWORDS:
+                        break
                 if not keywords:
-                    keywords = [query.strip()]
+                    fallback = (query or "").strip()
+                    keywords = [fallback[:_MAX_RECALL_KEYWORDS * 8]] if fallback else []
+                if not keywords:
+                    return []
                 like_clauses = " OR ".join(["content_text LIKE ?" for _ in keywords])
                 params = [f"%{k}%" for k in keywords]
                 query_sql = f"""
@@ -501,6 +522,11 @@ class MemoraClient:
             logger.warning(f"Local SQLite memory recall failed: {e}")
             return []
 
+
+# Ceiling on LIKE clauses in a recall query. SQLite refuses a
+# statement whose expression tree is deeper than 1000, so an
+# unbounded keyword list silently returns nothing.
+_MAX_RECALL_KEYWORDS = 24
 
 _memora_client_instance: MemoraClient | None = None
 
