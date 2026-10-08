@@ -448,6 +448,7 @@ class ForgeWebStudio:
                 <h3 style="font-size: 1.4rem; margin-bottom: 0.5rem;">Order Successfully Dispatched!</h3>
                 <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 1.5rem;">Order tracking code: <strong id="order-id-display" class="gradient-text">ORD-94821</strong></p>
                 <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 1.5rem;">Your hardware has been allocated and is routing via autonomous freight.</p>
+                <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 1.5rem;" id="order-confirmation-recipient"></p>
                 <button id="order-done-btn" class="btn-modern btn-glass" style="width: 100%;">
                     <span>Return to Store</span>
                 </button>
@@ -734,11 +735,34 @@ document.addEventListener('DOMContentLoaded', () => {{
             const orderDisp = document.getElementById('order-id-display');
             if (orderDisp) orderDisp.textContent = orderId;
 
+            // Finding 26: cust-name/cust-email/cust-address were collected
+            // by the form (with native `required` validation) but never
+            // read anywhere -- the submit handler generated a random order
+            // id and showed a generic success message with zero reference
+            // to what the customer typed in. Live-reproduced via a
+            // generator-wide id-wiring sweep: these three inputs had no
+            // getElementById/selector reference anywhere in app.js. Now
+            // actually read and reflected back in the confirmation, so the
+            // customer sees their own submitted info was received.
+            const custNameEl = document.getElementById('cust-name');
+            const custEmailEl = document.getElementById('cust-email');
+            const custAddressEl = document.getElementById('cust-address');
+            const recipientEl = document.getElementById('order-confirmation-recipient');
+            if (recipientEl) {{
+                const name = custNameEl ? custNameEl.value.trim() : '';
+                const email = custEmailEl ? custEmailEl.value.trim() : '';
+                const address = custAddressEl ? custAddressEl.value.trim() : '';
+                recipientEl.textContent = name
+                    ? `Confirmation for ${{name}} will be sent to ${{email}} -- shipping to ${{address}}.`
+                    : '';
+            }}
+
             if (checkoutFormView) checkoutFormView.style.display = 'none';
             if (checkoutSuccessView) checkoutSuccessView.style.display = 'block';
 
             cart = [];
             updateCartUI();
+            checkoutForm.reset();
         }});
     }}
 

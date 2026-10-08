@@ -324,14 +324,51 @@ def test_dashboard_quick_diagnostics_button_has_a_click_handler():
     assert "diagBtn.addEventListener('click'" in js
 
 
+def test_ecommerce_checkout_reads_the_customer_info_it_collects():
+    """Finding 26 (live-reproduced): the ecommerce template's checkout form
+    collected a customer's name/email/address (with native `required`
+    validation on each <input>) but its submit handler never read any of
+    those three fields -- it only generated a random order id and showed a
+    generic "Order Successfully Dispatched!" message. A real user's
+    submitted contact/shipping info was silently discarded, never
+    validated beyond the browser's own HTML5 constraint, never reflected
+    back, never used. Found via a generator-wide id-wiring sweep extended to
+    cover <input>/<select> (not just <form>/<button>), which flagged
+    cust-name/cust-email/cust-address as having zero JS references anywhere
+    in app.js.
+    """
+    files = ForgeWebStudio.synthesize_website(
+        "Build a luxury minimalist e-commerce fashion store with a shopping cart and checkout"
+    )
+    html = files["index.html"]
+    js = files["app.js"]
+
+    for field_id in ("cust-name", "cust-email", "cust-address"):
+        assert f'id="{field_id}"' in html
+        assert f"getElementById('{field_id}')" in js, (
+            f"checkout field {field_id} is collected from the user but never read by any JS"
+        )
+    # The confirmation view must actually reflect what was submitted.
+    assert "order-confirmation-recipient" in html
+    assert "order-confirmation-recipient" in js
+
+
 def test_every_website_template_wires_up_its_interactive_elements():
     """Systematic, generator-wide guard for the "styled element with no
-    handler" bug family: every <form id="..."> and <button id="..."> emitted
-    by any of the four domain templates must have a matching
-    getElementById() lookup somewhere in that same template's generated
-    app.js. This is intentionally broad (not tied to one specific id) so a
-    *new* dead element introduced by a future template change is caught
+    handler" bug family: every <form id="...">, <button id="...">,
+    <input id="...">, and <select id="..."> emitted by any of the four
+    domain templates must have a matching getElementById() (or equivalent
+    selector) lookup somewhere in that same template's generated app.js.
+    This is intentionally broad (not tied to one specific id) so a *new*
+    dead element introduced by a future template change is caught
     automatically instead of needing its own one-off regression test.
+
+    Extended (originally forms/buttons only) after Finding 26: a sweep with
+    <input>/<select> included caught the ecommerce checkout form's
+    cust-name/cust-email/cust-address inputs, which were collected with
+    native `required` validation but never read by any JS anywhere -- see
+    `test_ecommerce_checkout_reads_the_customer_info_it_collects` below for
+    the live end-to-end (jsdom) verification of that specific fix.
     """
     import re
 
@@ -347,8 +384,11 @@ def test_every_website_template_wires_up_its_interactive_elements():
         html = files["index.html"]
         js = files["app.js"]
 
-        interactive_ids = set(re.findall(r'<form[^>]*\sid="([a-zA-Z0-9_-]+)"', html)) | set(
-            re.findall(r'<button[^>]*\sid="([a-zA-Z0-9_-]+)"', html)
+        interactive_ids = (
+            set(re.findall(r'<form[^>]*\sid="([a-zA-Z0-9_-]+)"', html))
+            | set(re.findall(r'<button[^>]*\sid="([a-zA-Z0-9_-]+)"', html))
+            | set(re.findall(r'<input[^>]*\sid="([a-zA-Z0-9_-]+)"', html))
+            | set(re.findall(r'<select[^>]*\sid="([a-zA-Z0-9_-]+)"', html))
         )
 
         def _is_wired_up(el_id: str) -> bool:

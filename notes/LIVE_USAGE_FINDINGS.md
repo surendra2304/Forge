@@ -731,6 +731,62 @@ exited 0.
 
 ---
 
+## Finding 26 — Ecommerce checkout form discards the customer info it collects
+
+**Severity:** Medium (misleading UX, no data loss of app state, but a user's submitted PII is silently thrown away)
+
+**Live reproduction:** Extended the existing generator-wide "dead
+interactive element" sweep (previously `<form>`/`<button>` only) to also
+cover `<input>`/`<select>` ids, across all four website templates. This
+flagged the ecommerce template's checkout form: `cust-name`, `cust-email`,
+and `cust-address` inputs (each with native `required` validation) had
+**zero** references anywhere in `app.js`. Reading the submit handler
+confirmed it: it generates a random order id, shows a generic "Order
+Successfully Dispatched!" message, and clears the cart — but never once
+reads `.value` on any of the three fields the customer just filled in and
+submitted. A real user's name, email, and shipping address are collected,
+validated for non-emptiness by the browser, and then thrown away.
+
+**Root cause:** The checkout form's submit handler in
+`_generate_ecommerce_js` (`app/templates/web_studio/generator.py`) was
+written to only synthesize a fake order id and flip between the form/success
+views — no code path ever called `document.getElementById('cust-name')` (or
+the other two fields).
+
+**Fix:** Added an `order-confirmation-recipient` element to the success
+view, and the submit handler now reads `cust-name`/`cust-email`/
+`cust-address`, trims them, and renders a real confirmation sentence
+("Confirmation for `<name>` will be sent to `<email>` -- shipping to
+`<address>`."). The form is also reset after a successful submit.
+
+**Verification:**
+- Live repro: regenerated the ecommerce site, verified via real jsdom DOM
+  execution (not a static string check) — filled all three inputs,
+  dispatched a real `submit` event on `checkout-form`, and confirmed
+  `order-confirmation-recipient`'s rendered text contains the exact name,
+  email, and address that were typed in.
+- (Test-harness note, not a product bug: an early verification attempt
+  manually re-dispatched a synthetic `DOMContentLoaded` *in addition to*
+  jsdom's own native one, double-registering every listener and making the
+  handler run twice per submit -- once with the real values, once with
+  stale/empty ones from the second registration's own element references
+  overwriting the first. Removing the manual redispatch and relying solely
+  on jsdom's native event fixed the test; documented here so a future
+  session doesn't mistake this jsdom double-fire quirk for a real bug
+  again.)
+- `node --check app.js`: clean.
+- Regression tests:
+  `tests/unit/test_web_studio.py::test_ecommerce_checkout_reads_the_customer_info_it_collects`
+  and the generator-wide sweep
+  `test_every_website_template_wires_up_its_interactive_elements`, now
+  extended to check `<input>`/`<select>` ids (previously `<form>`/`<button>`
+  only) across all four templates — this closes the exact coverage gap that
+  let Finding 26 hide, the same way the Finding 17/17b sweep closed the
+  form/button gap.
+- Full suite: 470 passed / 1 skipped / 0 failed (post-fix).
+
+---
+
 ## Next up (live-usage campaign continuing)
 - Pause/resume/cancel mid-execution races. (Cancel-route consistency itself
   already covered by Finding 13; true execution-time pause/resume races
