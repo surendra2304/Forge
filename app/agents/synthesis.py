@@ -1688,10 +1688,18 @@ _DOMAIN_BODIES = {
         ('def today() -> str:\n    """Today as YYYY-MM-DD (UTC)."""\n'
          '    from datetime import datetime, timezone\n\n'
          '    return datetime.now(timezone.utc).date().isoformat()\n'),
-        ('def days_between(start: str, end: str) -> int:\n    """Whole days from start to end; negative if reversed."""\n'
+        ('def days_between(start: str, end: str) -> int:\n'
+         '    """Whole days from start to end; negative if reversed.\n\n'
+         '    Raises ValueError naming the bad value when a date is not in\n'
+         '    YYYY-MM-DD form, instead of a raw, confusing\n'
+         '    ' + chr(39)*3 + 'invalid literal for int()' + chr(39)*3 + ' buried deep in parsing.\n'
+         '    """\n'
          '    from datetime import date\n\n'
          '    def parse(v: str) -> date:\n'
-         '        y, m, d = (int(x) for x in str(v).split("-"))\n'
+         '        parts = str(v).split("-")\n'
+         '        if len(parts) != 3 or not all(p.isdigit() for p in parts):\n'
+         '            raise ValueError(f"expected a YYYY-MM-DD date, got {v!r}")\n'
+         '        y, m, d = (int(x) for x in parts)\n'
          '        return date(y, m, d)\n\n'
          '    return (parse(end) - parse(start)).days\n'),
     ],

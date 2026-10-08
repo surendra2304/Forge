@@ -549,6 +549,45 @@ index. Removed the old broken `L.insert(3, ...)` patch entirely.
 
 ---
 
+## Finding 22 — `days_between` raised a raw, confusing error on a malformed date
+
+**Severity:** Low-medium (crash with a confusing message, not data loss)
+
+**Live reproduction:** Ran a systematic adversarial probe across all 17
+library entities/domains, calling every exported function with edge-case
+inputs (empty lists, `None` fields, unicode, malformed shapes). Every
+function handled its edge cases gracefully except one:
+`days_between("not-a-date", "2024-01-01")` raised
+`ValueError: invalid literal for int() with base 10: 'not'` — a message
+that names neither the argument nor the expected format, surfacing a
+Python-internals implementation detail (`int()` parsing) instead of a
+clear, actionable error.
+
+**Root cause:** `parse()` inside `days_between` (`_DOMAIN_BODIES["date"]` in
+`app/agents/synthesis.py`) called `int(x) for x in str(v).split("-")`
+directly with no validation that the split actually produced 3 numeric
+parts.
+
+**Fix:** `parse()` now validates the split has exactly 3 all-digit parts
+before converting, raising `ValueError(f"expected a YYYY-MM-DD date, got
+{v!r}")` when it doesn't.
+
+**Verification:**
+- Live repro: regenerated the date library, confirmed
+  `days_between("not-a-date", "2024-01-01")` now raises the clear message,
+  the happy path (`days_between("2024-01-01", "2024-01-11") == 10`) is
+  unaffected, and the generated `test_date.py` still passes.
+- Regression test:
+  `tests/unit/test_deterministic_synthesis.py::test_days_between_raises_a_clear_error_on_a_malformed_date`.
+- The broader adversarial sweep (empty lists, `None` fields, unicode,
+  malformed dict shapes across all 17 library entities) found no other
+  bugs — every other function already degrades gracefully (e.g. `total([{"amount":
+  None}])` → `0.0`, `active_users([{"active": None}])` → `[]`,
+  `longest_streak([])` → `0`).
+- Full suite: 460 passed / 1 skipped / 0 failed (post-fix).
+
+---
+
 ## Next up (live-usage campaign continuing)
 - Pause/resume/cancel mid-execution races. (Cancel-route consistency itself
   already covered by Finding 13; true execution-time pause/resume races

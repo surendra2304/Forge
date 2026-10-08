@@ -272,6 +272,24 @@ LIBRARY_ENTITY_GOALS: list[str] = [
 ]
 
 
+def test_days_between_raises_a_clear_error_on_a_malformed_date():
+    """Finding 22: `days_between` used to raise a raw, confusing
+    `ValueError: invalid literal for int() with base 10: 'not'` on a
+    malformed date string, with no indication of which argument was bad or
+    what format was expected. Live-reproduced via an adversarial sweep over
+    every library entity's functions (`days_between("not-a-date",
+    "2024-01-01")`). Fixed to validate the date shape up front and raise a
+    clear, actionable `ValueError` naming the bad value."""
+    files = synthesize_project("Build a Python date utility library with helper functions")
+    main = files["date.py"]
+    namespace: dict = {}
+    exec(compile(main, "date.py", "exec"), namespace)  # noqa: S102 - generated code under test
+    with pytest.raises(ValueError, match="expected a YYYY-MM-DD date"):
+        namespace["days_between"]("not-a-date", "2024-01-01")
+    # happy path must be unaffected
+    assert namespace["days_between"]("2024-01-01", "2024-01-11") == 10
+
+
 @pytest.mark.parametrize("goal", LIBRARY_ENTITY_GOALS, ids=[g[:40] for g in LIBRARY_ENTITY_GOALS])
 def test_every_library_entity_actually_runs(goal: str):
     """Every entity-specific code path in `_lib_main` must compile, import,
