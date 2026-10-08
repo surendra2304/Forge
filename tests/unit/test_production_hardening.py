@@ -95,7 +95,17 @@ async def test_prometheus_metrics_export():
         assert "forge_system_cpu_percent" in res.text
 
 
-def test_rate_limiter_sliding_window():
+def test_rate_limiter_sliding_window(monkeypatch):
+    # RateLimiter.is_allowed() defers to the global
+    # production_settings.rate_limit_enabled flag (which now defaults to
+    # "off" outside production, so the rest of the test suite's rapid-fire
+    # request patterns are never throttled). This test is exercising the
+    # limiter's own sliding-window logic directly, so it must opt in
+    # explicitly rather than relying on an ambient default.
+    from app.config.production import production_settings
+
+    monkeypatch.setattr(production_settings, "rate_limit_enabled", True)
+
     limiter = RateLimiter(limit_per_hour=3)
     client_id = "test_client_key"
 

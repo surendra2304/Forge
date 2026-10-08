@@ -132,10 +132,28 @@ def create_app() -> FastAPI:
 
     @app.middleware("http")
     async def require_production_api_key(request: Request, call_next):
-        """Protect data APIs while allowing the credential-free dashboard shell to load."""
-        from app.config.production import EnvironmentType, production_settings
+        """Protect data APIs while allowing the credential-free dashboard shell to load.
 
-        if production_settings.env != EnvironmentType.PRODUCTION:
+        Gating used to be based purely on `production_settings.env ==
+        PRODUCTION`, which completely ignored the dedicated
+        `api_key_required` setting (driven by the `API_KEY_REQUIRED` env
+        var). That meant the operator-facing escape hatch for running a
+        trusted/internal production deployment without API key enforcement
+        was silently unusable: `docker-compose.yml` ships with
+        `FORGE_ENV=production` + `API_KEY_REQUIRED=false` (and no
+        `FORGE_API_KEY` configured, since none was meant to be required) --
+        with the old logic, every request to `/api/*` after `docker compose
+        up` returned 503 "service_auth_unconfigured" regardless of the
+        explicit opt-out, locking operators out of their own fresh install.
+        `api_key_required` is the single dedicated setting for "should this
+        deployment enforce an API key" (and itself already defaults to True
+        whenever FORGE_ENV=production and no explicit override is given), so
+        it alone -- not a second, conflicting check against `env` -- should
+        decide whether this gate runs at all.
+        """
+        from app.config.production import production_settings
+
+        if not production_settings.api_key_required:
             return await call_next(request)
         # Keep the /api spellings in sync with the bare ones, otherwise the
         # duplicate mounts make the auth-exempt set prefix-dependent.
@@ -173,6 +191,47 @@ def create_app() -> FastAPI:
             accepted.append(caller_key)
         if not any(hmac.compare_digest(provided_key.encode(), key.encode()) for key in accepted):
             return JSONResponse(status_code=403, content={"error": "forbidden"})
+        return await call_next(request)
+
+    @app.middleware("http")
+    async def enforce_rate_limit(request: Request, call_next):
+        """Apply the sliding-window rate limiter to API traffic.
+
+        `RateLimiter` (app/security/api_keys.py) was a fully implemented,
+        tested-in-isolation sliding-window limiter with hourly and
+        per-minute burst thresholds -- but it, and the `verify_api_key`
+        FastAPI dependency built around it, were never attached to any
+        route or middleware anywhere in the application. No request has
+        ever actually been rate limited, regardless of
+        `rate_limit_enabled`/`default_rate_limit` configuration. This wires
+        the existing limiter in for real, scoped to `/api/*` traffic and
+        gated by `rate_limit_enabled` (which itself defaults to "on in
+        production, off elsewhere" so the dev/test experience and existing
+        test suite's rapid-fire request patterns are unaffected unless an
+        operator explicitly opts in via RATE_LIMIT_ENABLED).
+        """
+        from app.config.production import production_settings
+        from app.security.api_keys import rate_limiter
+
+        if not production_settings.rate_limit_enabled or not request.url.path.startswith("/api/"):
+            return await call_next(request)
+
+        api_key = request.headers.get("X-API-Key", "")
+        if not api_key:
+            authorization = request.headers.get("Authorization", "")
+            if authorization.lower().startswith("bearer "):
+                api_key = authorization[7:].strip()
+        client_identifier = api_key or (request.client.host if request.client else "anonymous")
+
+        if not rate_limiter.is_allowed(client_identifier):
+            logger.warning(f"Rate limit exceeded for client '{client_identifier[:8]}...'")
+            return JSONResponse(
+                status_code=429,
+                content={
+                    "error": "rate_limited",
+                    "detail": "Rate limit exceeded. Please retry later.",
+                },
+            )
         return await call_next(request)
 
     @app.middleware("http")

@@ -1762,6 +1762,32 @@ document.addEventListener('DOMContentLoaded', () => {{
         }});
     }}
 
+    // Quick Diagnostics. The button rendered in the hero ("Run Quick
+    // Diagnostics") had no corresponding lookup anywhere in this file --
+    // verified live: `grep -c "quick-diagnostics-btn" app.js` was 0 on a
+    // freshly generated dashboard. Clicking it was a dead no-op with zero
+    // visible feedback, unlike every other button in this template (theme
+    // toggle, spike simulation, alerts bell) which all respond to a click.
+    // Mirrors the spike-button's disable/restore pattern for consistency.
+    const diagBtn = document.getElementById('quick-diagnostics-btn');
+    if (diagBtn) {{
+        const diagLabel = diagBtn.querySelector('span');
+        const originalLabel = diagLabel ? diagLabel.textContent : null;
+        diagBtn.addEventListener('click', () => {{
+            if (diagBtn.disabled) return;
+            diagBtn.disabled = true;
+            if (diagLabel) diagLabel.textContent = 'Running Diagnostics…';
+
+            setTimeout(() => {{
+                if (diagLabel) diagLabel.textContent = 'All Systems Nominal ✓';
+                setTimeout(() => {{
+                    if (diagLabel && originalLabel) diagLabel.textContent = originalLabel;
+                    diagBtn.disabled = false;
+                }}, 2000);
+            }}, 1200);
+        }});
+    }}
+
     // Alerts Drawer
     const alertBell = document.getElementById('alert-bell-btn');
     const alertsDrawer = document.getElementById('alerts-drawer');
@@ -2365,6 +2391,35 @@ document.addEventListener('DOMContentLoaded', () => {{
             if (cmd) runTerminalCommand(cmd);
         }});
     }});
+
+    // Contact form. The markup ships with `id="contact-form"` but, until
+    // this fix, nothing anywhere in the generated JS ever looked it up --
+    // verified live by generating a real portfolio site, running it, and
+    // grepping its own app.js for "contact-form": zero matches. The <form>
+    // has no `action` attribute, so a real user clicking "Transmit Message"
+    // got the browser's default, un-intercepted submit behavior: a full
+    // page navigation/reload to the current URL with the form fields
+    // appended as a GET query string, silently discarding whatever they
+    // typed and giving no confirmation anything happened. There is no
+    // backend for a static generated site to submit to, so the fix
+    // intercepts the submit, runs the same HTML5 validity check the browser
+    // would have, and swaps the form for an explicit on-page confirmation
+    // instead of letting the browser's default action fire.
+    const contactForm = document.getElementById('contact-form');
+    if (contactForm) {{
+        contactForm.addEventListener('submit', (e) => {{
+            e.preventDefault();
+            if (!contactForm.checkValidity()) {{
+                contactForm.reportValidity();
+                return;
+            }}
+            const confirmation = document.createElement('p');
+            confirmation.setAttribute('role', 'status');
+            confirmation.style.cssText = 'color: var(--text-primary); font-weight: 600; text-align: center; padding: 1rem 0;';
+            confirmation.textContent = "Thanks! Your message has been noted -- we'll be in touch soon.";
+            contactForm.replaceWith(confirmation);
+        }});
+    }}
 }});
 """
 

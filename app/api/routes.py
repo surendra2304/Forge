@@ -25,6 +25,7 @@ from app.api.schemas import (
     TimelineEvent,
     TimelineResponse,
 )
+from app.api.tasks import execute_task_cancellation
 from app.core.config import Settings, get_settings
 from app.core.logging import get_logger
 from app.core.orchestrator import OrchestratorCore
@@ -285,26 +286,24 @@ async def cancel_task(
     lifecycle: TaskStateMachine = Depends(get_task_lifecycle),
     store: StateStore = Depends(get_state_store),
 ) -> TaskActionResponse:
-    """Cancel task execution and mark as CANCELLED."""
-    task = await store.get_task(task_id)
-    if not task:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail=f"Task '{task_id}' not found"
-        )
+    """Cancel task execution and mark as CANCELLED.
 
+    Delegates to `app.api.tasks.execute_task_cancellation` -- the single
+    canonical cancellation implementation. This handler and
+    `app.api.tasks.cancel_task` both get registered for the logical path
+    `/tasks/{task_id}/cancel` (under different prefixes: this router is
+    mounted bare and under `/api/v1`, `tasks_router` under `/api` and
+    `/api/v1`), and FastAPI resolves the overlap by registration order. They
+    used to contain two *independent* implementations -- this one only
+    transitioned state, while the other also fired progress-tracker
+    close-out, WebSocket broadcasts, and webhook dispatch. Live testing
+    confirmed `/api/v1/tasks/{id}/cancel` was silently landing on this
+    weaker implementation, so cancelling a task over the v1 API never
+    notified webhooks or WebSocket subscribers even though the non-v1 path
+    did. Sharing one implementation makes that divergence impossible.
+    """
     reason = action.reason if action and action.reason else "User requested cancel"
-    prev_state = task.state
-
-    try:
-        updated_task = await lifecycle.cancel(task_id=task_id, reason=reason)
-        return TaskActionResponse(
-            task_id=task_id,
-            previous_state=prev_state,
-            current_state=updated_task.state,
-            message="Task cancelled successfully",
-        )
-    except InvalidStateTransitionError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    return await execute_task_cancellation(task_id, reason, lifecycle, store)
 
 
 # --- Runs / Audit Events ---

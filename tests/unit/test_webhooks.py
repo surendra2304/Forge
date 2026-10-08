@@ -9,7 +9,7 @@ from httpx import ASGITransport, AsyncClient, Response
 
 from app.api.webhooks import webhook_dispatcher
 from app.main import app
-from app.memory.db import db_manager
+from app.memory.db import DatabaseManager
 
 
 @pytest.mark.asyncio
@@ -56,8 +56,10 @@ async def test_webhook_dispatch_retry_and_graceful_fail():
 
 
 @pytest.mark.asyncio
-async def test_task_creation_with_webhook_url():
-    await db_manager.init_db()
+async def test_task_creation_with_webhook_url(isolated_db_manager: DatabaseManager):
+    # Was hitting the real global app.memory.db.db_manager (data/forge.db)
+    # directly; see tests/conftest.py's isolated_db_manager fixture.
+    await isolated_db_manager.init_db()
 
     with patch.object(
         webhook_dispatcher, "dispatch_event", new_callable=AsyncMock

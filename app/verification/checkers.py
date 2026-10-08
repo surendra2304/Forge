@@ -310,13 +310,52 @@ class LintChecker(BaseChecker):
 
         # --no-cache keeps .ruff_cache out of the delivered project. Without it
         # every verified build shipped a .ruff_cache directory to the user.
+        #
+        # `ruff` used to be resolved as a bare name from the *subprocess's*
+        # PATH. TestChecker.run_check fixed the identical class of bug for
+        # pytest a few lines below ("python was a bare name resolved from
+        # PATH ... sys.executable is the one that actually has the deps"),
+        # but this lint check was never updated to match -- so whether lint
+        # ran at all silently depended on how the FORGE server process itself
+        # was launched (e.g. `.venv/bin/uvicorn ...` directly, with no venv
+        # activation, leaves `ruff` off PATH even though it is installed in
+        # the very same environment as the running interpreter). Reproduced
+        # live: booting via `.venv/bin/uvicorn` (PATH lacking `.venv/bin`)
+        # made every single generated build fail this check with
+        # `exit=127 .../sh: 1: ruff: not found`, which a human reviewing
+        # verification_report.json would read as a real lint failure.
+        # `{sys.executable} -m ruff` resolves ruff from the same environment
+        # as FORGE itself, independent of PATH.
         cmd_res = await engine.terminal.run_command(
             task_id,
-            "ruff check . --no-cache --select=E,F --ignore=E501,F841",
+            f"{sys.executable} -m ruff check . --no-cache --select=E,F --ignore=E501,F841",
             role="tester",
         )
         duration_ms = (time.perf_counter() - start_time) * 1000.0
-        passed = cmd_res.exit_code == 0 or "command not found" in cmd_res.stderr.lower()
+        # Treat "ruff genuinely isn't installed in this environment" (e.g. a
+        # production deploy built without the `[dev]` extra) as a skip, not a
+        # failure. The previous check only matched bash's
+        # "command not found" phrasing; POSIX `sh`/`dash` (the shell actually
+        # used by asyncio.create_subprocess_shell on Linux) emits
+        # "ruff: not found" with no "command" in it at all, so the leniency
+        # branch never actually triggered on this platform -- verified live.
+        missing_tool_markers = (
+            "command not found",
+            "no module named",
+            ": not found",
+            "not found\n",
+        )
+        ruff_missing = cmd_res.exit_code in (127, 126) and any(
+            marker in cmd_res.stderr.lower() for marker in missing_tool_markers
+        )
+        passed = cmd_res.exit_code == 0 or ruff_missing
+        stdout_text = cmd_res.stdout
+        if ruff_missing:
+            stdout_text = (
+                (cmd_res.stdout or "")
+                + "\n[FORGE] ruff is not installed in this environment; "
+                "lint check skipped rather than failed."
+            ).strip()
 
         return VerificationEvidence(
             check_name="Ruff / Static Code Linter",
@@ -325,7 +364,7 @@ class LintChecker(BaseChecker):
             exit_code=cmd_res.exit_code,
             passed=passed,
             duration_ms=round(duration_ms, 2),
-            stdout=cmd_res.stdout,
+            stdout=stdout_text,
             stderr=cmd_res.stderr,
             artifacts_inspected=py_files,
         )
@@ -492,17 +531,33 @@ class RuntimeChecker(BaseChecker):
             # 3. Check Python entrypoint
             else:
                 py_files = engine.fs.search_files(task_id, pattern="*.py", role="tester")
+                # Use sys.executable (the interpreter FORGE itself is running
+                # under, e.g. .venv/bin/python with all project dependencies
+                # installed) rather than a bare "python". A bare "python" is
+                # resolved via the subprocess's PATH, which may point at a
+                # system interpreter with none of the generated project's
+                # dependencies (fastapi, etc.) installed -- causing a
+                # spurious ModuleNotFoundError smoke-check failure even
+                # though the generated code is correct. This is the same bug
+                # class already fixed for TestChecker's pytest invocation and
+                # LintChecker's ruff invocation; live-reproduced here too
+                # (2026-10-07) when running the test suite with a minimal
+                # PATH that excludes .venv/bin: the FastAPI and full-stack
+                # golden benchmarks' Runtime Checker failed with
+                # "ModuleNotFoundError: No module named 'fastapi'" even
+                # though fastapi was installed and importable via
+                # sys.executable.
                 if "main.py" in py_files or "src/main.py" in py_files:
                     cmd = (
-                        "python main.py --help"
+                        f"{sys.executable} main.py --help"
                         if "main.py" in py_files
-                        else "python src/main.py --help"
+                        else f"{sys.executable} src/main.py --help"
                     )
                 elif "cli.py" in py_files or "src/cli.py" in py_files:
                     cmd = (
-                        "python cli.py --help"
+                        f"{sys.executable} cli.py --help"
                         if "cli.py" in py_files
-                        else "python src/cli.py --help"
+                        else f"{sys.executable} src/cli.py --help"
                     )
 
         if not cmd:
@@ -581,7 +636,12 @@ class BrowserChecker(BaseChecker):
             )
 
         port = self.port or self._find_free_port()
-        server_cmd = self.start_server_cmd or f"python -m http.server {port}"
+        # Same PATH-fragility bug class as LintChecker/TestChecker/
+        # RuntimeChecker: a bare "python" may not exist at all on minimal
+        # Linux images (only "python3" is guaranteed), or may resolve to a
+        # different interpreter than the one FORGE itself is running under.
+        # `sys.executable` is always correct and always exists.
+        server_cmd = self.start_server_cmd or f"{sys.executable} -m http.server {port}"
         process_id = f"dev_server_{port}"
 
         issues = []

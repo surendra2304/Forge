@@ -6,12 +6,19 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 
 from app.main import app
-from app.memory.db import db_manager
+from app.memory.db import DatabaseManager
 
 
 @pytest.mark.asyncio
-async def test_task_lifecycle_api():
-    await db_manager.init_db()
+async def test_task_lifecycle_api(isolated_db_manager: DatabaseManager):
+    # `isolated_db_manager` (tests/conftest.py) redirects every module-level
+    # `db_manager` binding -- including app.api.tasks's, which is what the
+    # real routes below actually use -- to a temp-file-backed database. This
+    # test used to call the *real* global `app.memory.db.db_manager`
+    # directly against `data/forge.db`, so running it polluted (and could be
+    # polluted by) whatever real tasks existed in a developer's local dev
+    # database.
+    await isolated_db_manager.init_db()
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:

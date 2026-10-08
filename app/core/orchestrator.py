@@ -34,6 +34,27 @@ _STAGE_BY_NAME = {stage.value: stage for stage in PipelineStage}
 
 logger = get_logger("core.orchestrator")
 
+# Serializes task-id allocation across ALL OrchestratorCore instances in this
+# process. OrchestratorCore is constructed fresh per HTTP request (see
+# app.api.tasks.get_orchestrator), so an instance attribute would do nothing
+# to stop concurrent requests from racing each other -- it has to be
+# module-level to actually protect the critical section below.
+#
+# Without this lock, live load testing reproduced the following with 100%
+# reliability: 20 concurrent POST /api/tasks all read the same count_tasks()
+# total before any of them had inserted, so all 20 computed the identical
+# task_id. Whichever one's INSERT won the DB race kept that id; the rest
+# detected the UNIQUE collision and silently persisted under a *different*
+# randomized id -- but every downstream step (record_event, planner.plan,
+# lifecycle.transition) kept using the original, stale `task_id` local
+# variable, not the corrected one. The net effect: all 20 HTTP responses
+# reported the single winning task's id and goal back to the caller, 19 of
+# the 20 real task rows were silently orphaned in PENDING forever (never
+# planned, never transitioned to READY, never executed), and their
+# workspaces were never cleanly separated either, since `create_workspace()`
+# was also called with the pre-retry, possibly-shared id.
+_TASK_ID_ALLOC_LOCK = asyncio.Lock()
+
 
 async def _finalize_tracker(task_id: str, success: bool) -> None:
     """Close out the ProgressTracker for a finished task (best effort)."""
@@ -103,47 +124,10 @@ class OrchestratorCore:
         """
         from app.memory.models import generate_task_id
 
-        # Determine sequence number for new task.
-        #
-        # The old sequence was derived from COUNT(*) and then "checked" with
-        # get_task() in a loop. That is a textbook check-then-act race: two
-        # concurrent submissions both counted N tasks, both produced
-        # task{N+1}<timestamp>, both saw get_task() return None, and the second
-        # INSERT died with sqlite3.IntegrityError -> HTTP 500. Verified against a
-        # live uvicorn worker: 25 parallel POST /api/tasks produced 23x 500.
-        #
-        # The id now carries a per-process random suffix, and creation is retried
-        # on collision, so concurrency can never produce a duplicate id.
-        if hasattr(self.store, "count_tasks"):
-            total_count = await self.store.count_tasks()
-        else:
-            tasks = await self.store.list_tasks(limit=1000)
-            total_count = len(tasks)
-        task_seq = total_count + 1
-        task_id = generate_task_id(task_seq)
-        attempts = 0
-        while await self.store.get_task(task_id):
-            task_seq += 1
-            task_id = generate_task_id(task_seq)
-            attempts += 1
-            if attempts > 50:
-                # Fall back to a collision-proof id rather than looping forever.
-                task_id = generate_task_id(task_seq) + f"x{token_hex(3)}"
-                break
         req_list = requirements or []
         # `context` (e.g. the CLI's {"memory_context": ...}) used to be accepted
         # and then dropped on the floor, so Memora recall never reached planning.
         intake_context = dict(context or {})
-        logger.info(f"Orchestrator intaking task '{task_id}': {goal[:80]}...")
-
-        # 1. Provision isolated workspace under workspaces/<task_id>/
-        custom_base = Path(custom_workspace) if custom_workspace else None
-        ws_paths = self.wm.create_workspace(
-            task_id,
-            custom_base=custom_base,
-            repo_url=repo_url,
-            local_path=local_path,
-        )
 
         # A goal is free text from a user. A NUL byte or other control character
         # survives every downstream prompt and eventually raises
@@ -153,27 +137,96 @@ class OrchestratorCore:
         # downstream has to defend against it.
         goal = _sanitize_text(goal)
 
-        # 2. Persist initial task in PENDING state
-        task = TaskEntity(
-            id=task_id,
-            goal=goal,
-            requirements=req_list,
-            mode=mode,
-            workspace_path=str(ws_paths.root.resolve()),
-            max_budget=max_budget,
-            state=TaskState.PENDING,
-            progress_percentage=0,
-        )
-        try:
-            await self.store.create_task(task)
-        except Exception as exc:
-            # Last-resort guard against a lost race: retry once with a
-            # guaranteed-unique id before surfacing the error to the caller.
-            if "UNIQUE" not in str(exc).upper():
-                raise
-            logger.warning(f"Task id collision on '{task_id}'; retrying with a unique id")
-            task.id = generate_task_id(task_seq) + f"x{token_hex(4)}"
-            await self.store.create_task(task)
+        # Determine the id, workspace, and DB row for the new task as a single
+        # atomic unit (see _TASK_ID_ALLOC_LOCK above for why this has to be
+        # process-wide, not per-instance).
+        #
+        # The old sequence was derived from COUNT(*) and then "checked" with
+        # get_task() in a loop -- a textbook check-then-act race: two
+        # concurrent submissions both counted N tasks, both produced
+        # task{N+1}<timestamp>, both saw get_task() return None, and the second
+        # INSERT died with sqlite3.IntegrityError. A per-id retry-with-suffix
+        # was added to stop that from surfacing as a 500, but it only fixed the
+        # DB row: everything downstream of the insert (record_event,
+        # planner.plan, lifecycle.transition, and the TaskResponse returned to
+        # the caller) kept referring to the original `task_id` local variable,
+        # not the corrected `task.id`. Live load testing showed the result:
+        # all concurrent callers got back the one task that happened to win
+        # the original id, while every other real submission was silently
+        # orphaned in PENDING with a DAG and workspace that nothing ever
+        # pointed back to. The lock below makes the collision essentially
+        # impossible in the common single-process deployment; the retry path
+        # is kept as defense-in-depth for multi-process deployments sharing
+        # one SQLite file, and now correctly resyncs `task_id` and the
+        # workspace to whatever id actually got persisted.
+        async with _TASK_ID_ALLOC_LOCK:
+            if hasattr(self.store, "count_tasks"):
+                total_count = await self.store.count_tasks()
+            else:
+                tasks = await self.store.list_tasks(limit=1000)
+                total_count = len(tasks)
+            task_seq = total_count + 1
+            task_id = generate_task_id(task_seq)
+            attempts = 0
+            while await self.store.get_task(task_id):
+                task_seq += 1
+                task_id = generate_task_id(task_seq)
+                attempts += 1
+                if attempts > 50:
+                    # Fall back to a collision-proof id rather than looping forever.
+                    task_id = generate_task_id(task_seq) + f"x{token_hex(3)}"
+                    break
+            logger.info(f"Orchestrator intaking task '{task_id}': {goal[:80]}...")
+
+            # 1. Provision isolated workspace under workspaces/<task_id>/
+            custom_base = Path(custom_workspace) if custom_workspace else None
+            ws_paths = self.wm.create_workspace(
+                task_id,
+                custom_base=custom_base,
+                repo_url=repo_url,
+                local_path=local_path,
+            )
+
+            # 2. Persist initial task in PENDING state
+            task = TaskEntity(
+                id=task_id,
+                goal=goal,
+                requirements=req_list,
+                mode=mode,
+                workspace_path=str(ws_paths.root.resolve()),
+                max_budget=max_budget,
+                state=TaskState.PENDING,
+                progress_percentage=0,
+            )
+            try:
+                await self.store.create_task(task)
+            except Exception as exc:
+                # Last-resort guard against a lost race (e.g. another process
+                # sharing this SQLite file): retry once with a guaranteed-unique
+                # id before surfacing the error to the caller.
+                if "UNIQUE" not in str(exc).upper():
+                    raise
+                logger.warning(f"Task id collision on '{task_id}'; retrying with a unique id")
+                task.id = generate_task_id(task_seq) + f"x{token_hex(4)}"
+                # The workspace already provisioned above was created under the
+                # stale, collided id. Re-provision it under the real id so
+                # `task.workspace_path` -- and everything that later writes
+                # generated files there -- actually matches the persisted row,
+                # instead of silently sharing a directory with whichever task
+                # won the original id.
+                ws_paths = self.wm.create_workspace(
+                    task.id,
+                    custom_base=custom_base,
+                    repo_url=repo_url,
+                    local_path=local_path,
+                )
+                task.workspace_path = str(ws_paths.root.resolve())
+                await self.store.create_task(task)
+            # Resync the local id used by every downstream step (events,
+            # planning, lifecycle transition) to whatever id was *actually*
+            # persisted. Without this line, a retry above silently detaches
+            # the rest of this function from the task it just created.
+            task_id = task.id
         # Feed the production monitor: record_task_event() had no callers, so the
         # task-failure-rate alert in check_alerts() could never fire.
         production_monitor.record_task_event("submitted")

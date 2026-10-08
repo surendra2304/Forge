@@ -89,7 +89,14 @@ def test_smart_template_matcher():
     assert res_scratch.use_hybrid_scaffold is False
 
 
-def test_marketplace_api_endpoints():
+async def test_marketplace_api_endpoints(isolated_db_manager):
+    # Building from a template writes real files via the global
+    # workspace_manager singleton (app/api/marketplace.py) keyed off a fresh
+    # uuid4-based task_id -- with no isolation this permanently left a
+    # `workspaces/task_<hex>` directory behind in the real repo checkout on
+    # every test run. isolated_db_manager (tests/conftest.py) redirects the
+    # shared Settings singleton's base_dir (which workspace_manager reads)
+    # into a temp directory for the duration of this test.
     client = TestClient(app)
 
     # 1. Browse templates

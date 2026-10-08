@@ -27,8 +27,27 @@ class ProductionSettings(BaseModel):
     slow_query_threshold_seconds: float = Field(default=1.0)
 
     # Rate Limiting
-    rate_limit_enabled: bool = Field(default=True)
-    default_rate_limit: int = Field(default=100)  # requests per hour
+    #
+    # This used to be a hardcoded `default=True` with no environment-variable
+    # binding at all (unlike every other security toggle in this class), and
+    # -- more importantly -- the `RateLimiter`/`verify_api_key` machinery in
+    # app/security/api_keys.py that reads this flag was never actually wired
+    # into any route or middleware. The net effect: rate limiting was
+    # entirely dead code, regardless of this setting's value. Both problems
+    # are fixed together: this field now follows the same
+    # explicit-env-var-overrides-a-production-aware-default pattern as
+    # `api_key_required` below, and `app/main.py` now has a real middleware
+    # that enforces it.
+    rate_limit_enabled: bool = Field(
+        default_factory=lambda: (
+            os.getenv("RATE_LIMIT_ENABLED", "").lower() in ["true", "1", "yes"]
+            if os.getenv("RATE_LIMIT_ENABLED") is not None
+            else os.getenv("FORGE_ENV", "development").lower() == "production"
+        )
+    )
+    default_rate_limit: int = Field(
+        default_factory=lambda: int(os.getenv("DEFAULT_RATE_LIMIT", "100"))
+    )  # requests per hour
 
     # API Security
     api_key_required: bool = Field(

@@ -231,3 +231,68 @@ def tempfile_project(files: dict[str, str]):
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(content, encoding="utf-8")
         yield root
+
+
+# Finding 21: the "contact" library entity's `search()` function used
+# `json.dumps(...)` but the module never actually imported `json` -- a prior
+# fix for this had patched `import json` into the generated source as plain
+# text spliced into index 3 of the output lines, which happened to land
+# *inside the module's docstring* rather than becoming a real import
+# statement, so every "contact" library crashed on its only exported
+# function with `NameError: name 'json' is not defined`. This slipped past
+# the existing CASES list above because it only ever exercised the "string"
+# and "number" library entities -- none of the other eleven entity-specific
+# code paths in `_lib_main` (note/todo/book/contact/expense/event/file/user/
+# password/url/recipe/habit) were ever generated-and-executed by a test.
+#
+# This sweep closes that coverage gap for good: it builds a goal for every
+# entity the generator recognises (mirroring the real keyword signals in
+# `DOMAIN_SIGNALS` / `ENTITY_SIGNALS`), actually generates the library, and
+# runs its own bundled test suite with a real interpreter -- the same
+# "no mocks, real execution" standard the CASES list already holds the
+# CLI/API/script/website kinds to.
+LIBRARY_ENTITY_GOALS: list[str] = [
+    "Build a Python string utility library with reverse and palindrome helpers",
+    "Build a Python number utility library with mean, median and mode helpers",
+    "Build a Python date utility library with helper functions",
+    "Build a Python path utility library with helper functions",
+    "Build a Python library for managing notes with helper functions",
+    "Build a Python library for managing a todo list with helper functions",
+    "Build a Python library for managing a collection of books with helper functions",
+    "Build a Python library for managing a contact list with helper functions",
+    "Build a Python library for tracking expenses with helper functions",
+    "Build a Python library for managing events with helper functions",
+    "Build a Python library for managing files with helper functions",
+    "Build a Python library for managing user accounts with helper functions",
+    "Build a Python library for managing passwords with helper functions",
+    "Build a Python library for managing bookmarked urls with helper functions",
+    "Build a Python library for managing recipes with helper functions",
+    "Build a Python library for tracking habits with helper functions",
+    "Build a Python library for managing generic records with helper functions",
+]
+
+
+@pytest.mark.parametrize("goal", LIBRARY_ENTITY_GOALS, ids=[g[:40] for g in LIBRARY_ENTITY_GOALS])
+def test_every_library_entity_actually_runs(goal: str):
+    """Every entity-specific code path in `_lib_main` must compile, import,
+    and pass its own generated tests when actually executed -- not just the
+    two entities ("string"/"number") the original CASES list happened to
+    cover."""
+    files = synthesize_project(goal)
+    py = {n: c for n, c in files.items() if n.endswith(".py")}
+    assert py, f"no Python generated for goal: {goal!r}"
+    for name, content in py.items():
+        compile(content, name, "exec")
+
+    tests = sorted(n for n in files if re.match(r"test_.*\.py$", n))
+    assert tests, f"no test suite generated for goal: {goal!r}"
+    with tempfile_project(files) as root:
+        proc = subprocess.run(
+            [sys.executable, "-m", "pytest", "-q", "--no-header", "-p", "no:cacheprovider",
+             *tests],
+            cwd=str(root), capture_output=True, text=True, timeout=120,
+        )
+    assert proc.returncode == 0, (
+        f"generated library tests failed for goal {goal!r}:\n"
+        f"{proc.stdout[-2500:]}\n{proc.stderr[-800:]}"
+    )
