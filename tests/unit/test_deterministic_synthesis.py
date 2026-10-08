@@ -86,6 +86,44 @@ CASES: list[tuple[str, ProjectKind, list[str]]] = [
 ]
 
 
+# Finding 23: ProjectKind.WEBSITE used to be checked second (right after
+# API) against a broad, generic keyword set including the bare word
+# "website". That made it swallow goals where "website" is merely the
+# OBJECT of some other action rather than the deliverable itself. Most
+# dramatically, "Write a script that scrapes a website and saves the data to
+# a file" matched "website" and was routed to the full HTML/CSS/JS website
+# generator -- a user asking for a Python scraper received a static landing
+# page with zero scraping logic and zero Python code. Fixed by checking
+# WEBSITE last, after every more-specific kind signal (CLI/LIBRARY/SCRIPT)
+# has had a chance to claim the goal.
+MISCLASSIFICATION_REGRESSION_CASES: list[tuple[str, ProjectKind]] = [
+    ("Write a script that scrapes a website and saves the data to a file", ProjectKind.SCRIPT),
+    ("Automate backing up my photos directory every day", ProjectKind.SCRIPT),
+    ("Write a batch script to process log files", ProjectKind.SCRIPT),
+    # Sanity: real website goals must still classify as WEBSITE.
+    ("Build a landing page website for a coffee shop with a menu section", ProjectKind.WEBSITE),
+    ("Build a personal 3D creative developer portfolio with a contact form", ProjectKind.WEBSITE),
+]
+
+
+@pytest.mark.parametrize(
+    "goal,kind", MISCLASSIFICATION_REGRESSION_CASES,
+    ids=[g[:40] for g, _ in MISCLASSIFICATION_REGRESSION_CASES],
+)
+def test_script_goals_mentioning_website_are_not_misrouted_to_the_website_generator(
+    goal: str, kind: ProjectKind
+):
+    spec = parse_goal(goal)
+    assert spec.kind is kind, f"{goal!r} classified as {spec.kind}, expected {kind}"
+    if kind is ProjectKind.SCRIPT:
+        files = synthesize_project(goal)
+        py = {n: c for n, c in files.items() if n.endswith(".py")}
+        assert py, f"expected real Python output for a script goal, got: {sorted(files)}"
+        assert "index.html" not in files, (
+            f"script goal {goal!r} was routed to the website generator: {sorted(files)}"
+        )
+
+
 @pytest.mark.parametrize(
     "goal,kind,commands", CASES, ids=[c[0][:28] for c in CASES]
 )

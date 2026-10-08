@@ -588,6 +588,50 @@ before converting, raising `ValueError(f"expected a YYYY-MM-DD date, got
 
 ---
 
+## Finding 23 — Scraper/automation scripts misrouted to the website generator
+
+**Severity:** Critical (completely wrong deliverable: zero Python code, zero requested logic)
+
+**Live reproduction:** Submitted the goal "Write a script that scrapes a
+website and saves the data to a file" (a very ordinary, realistic request)
+to `synthesize_project`. The output was `['README.md', 'app.js',
+'index.html', 'style.css']` — a static HTML/CSS/JS landing page, with no
+Python file at all and nothing resembling a scraper. Same misroute hits any
+script-ish goal that happens to mention "website" (e.g. "monitor a website
+for changes", "test a website's links").
+
+**Root cause:** `_detect_kind` (`app/agents/synthesis.py`) checked
+`ProjectKind.WEBSITE` second, immediately after `ProjectKind.API`, against
+a broad keyword set that includes the bare substring `"website"`. Because
+"website" appeared as the *object* of the goal's verb ("scrapes a
+**website**") rather than describing the deliverable, it matched before the
+SCRIPT-kind keyword `"scrape"` later in the same goal ever got a chance to
+be checked — WEBSITE's check came first and returned immediately.
+
+**Fix:** Reordered `_detect_kind`'s priority so the most generic, most
+false-positive-prone keyword set (WEBSITE: "website", "webpage", "page",
+"html") is checked **last**, after CLI, LIBRARY, and SCRIPT have each had a
+chance to claim the goal on their own, more specific/intentional keywords.
+API keeps top priority since its keywords ("fastapi", "rest api",
+"endpoint") never collide with the others.
+
+**Verification:**
+- Live repro: regenerated the scraper goal — now correctly produces a real
+  Python script project (`file.py` + `test_file.py`, generated tests pass)
+  instead of a static website.
+- Regression swept 12 goals across all 5 kinds (API/CLI/LIBRARY/SCRIPT/
+  WEBSITE, including the three ambiguous "mentions website but wants a
+  script" cases and two real website goals) — all classify correctly
+  post-fix, confirming the reorder introduces no new misclassifications.
+- Regression test:
+  `tests/unit/test_deterministic_synthesis.py::test_script_goals_mentioning_website_are_not_misrouted_to_the_website_generator`
+  (5 parametrized cases).
+- Full suite: 465 passed / 1 skipped / 0 failed (post-fix) — the pre-existing
+  `CASES` parametrized classification/compile/generated-tests-pass tests all
+  still pass unchanged, confirming zero regressions from the reorder.
+
+---
+
 ## Next up (live-usage campaign continuing)
 - Pause/resume/cancel mid-execution races. (Cancel-route consistency itself
   already covered by Finding 13; true execution-time pause/resume races

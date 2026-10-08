@@ -137,12 +137,24 @@ def _tokens(goal: str) -> list[str]:
 
 
 def _detect_kind(tokens: list[str], goal_l: str) -> ProjectKind:
+    # Finding 23: WEBSITE used to be checked second (right after API), on a
+    # broad set of substrings including the bare word "website"/"webpage"/
+    # "html". That made it swallow goals where "website" is merely the
+    # OBJECT of an unrelated action rather than the deliverable itself --
+    # most dramatically, "Write a script that scrapes a website and saves
+    # the data to a file" matched "website" and was classified as
+    # ProjectKind.WEBSITE, so the user asking for a Python scraper received
+    # a static index.html/app.js/style.css landing page with zero scraping
+    # logic instead. WEBSITE's keyword set is the most generic of the five
+    # kinds (ordinary English words like "page"/"html" show up in all sorts
+    # of unrelated goals), so it is now checked LAST, after every
+    # more-specific, more-intentional kind signal (CLI/LIBRARY/SCRIPT) has
+    # had a chance to claim the goal. API keeps top priority since its
+    # keywords ("fastapi", "rest api", "endpoint") are themselves highly
+    # specific and never collide with the others.
     if any(k in goal_l for k in ["rest api", "api", "fastapi", "endpoint", "backend",
                                  "microservice"]):
         return ProjectKind.API
-    if any(k in goal_l for k in ["website", "landing page", "web page", "webpage",
-                                 "portfolio", "homepage", "html"]):
-        return ProjectKind.WEBSITE
     if any(k in tokens for k in ["cli", "command", "commandline", "terminal", "argv"]):
         return ProjectKind.CLI
     if any(k in goal_l for k in ["library", "module", "package", "sdk", "helper functions"]):
@@ -150,6 +162,9 @@ def _detect_kind(tokens: list[str], goal_l: str) -> ProjectKind:
     if any(k in goal_l for k in ["script", "batch", "automate", "rename", "convert",
                                  "backup", "scrape"]):
         return ProjectKind.SCRIPT
+    if any(k in goal_l for k in ["website", "landing page", "web page", "webpage",
+                                 "portfolio", "homepage", "html"]):
+        return ProjectKind.WEBSITE
     return ProjectKind.UNKNOWN
 
 

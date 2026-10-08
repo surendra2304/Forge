@@ -16,8 +16,8 @@ write-ups). This file tracks the campaign checklist going forward.
 - [x] 1. Rebuild dev environment (`.venv` was not persisted across session) — done, full suite 459 passed/1 skipped/0 failed.
 - [x] 2. Commit + push Findings 17-21 batch (dead JS handlers, script data-loss bugs x3, broken contact library) — commit `260ddfb`, pushed.
 - [x] 3. Library generator adversarial audit: probed all 17 entities x edge-case inputs (empty/None/unicode/malformed). Found + fixed Finding 22 (`days_between` raw ValueError on malformed date). Everything else degrades gracefully. 460 passed/1 skipped.
-- [~] 4. Script generator: audit other goal phrasings that hit `_detect_kind` SCRIPT branch (scrape/convert/automate keywords) to see if they produce the same rename/backup/json2csv bundle or something goal-specific, and stress it. **Current step.**
-- [ ] 5. API (FastAPI) generator: adversarial live audit — malformed JSON bodies, huge payloads, concurrent requests, duplicate IDs, unicode entity names, wrong HTTP methods, path traversal in path params.
+- [x] 4. Script generator goal-phrasing audit. Found + fixed Finding 23 (critical): "scrapes a website" misrouted to the WEBSITE generator entirely, because `_detect_kind` checked WEBSITE's generic keywords before SCRIPT's. Reordered priority, added regression tests. 465 passed/1 skipped.
+- [~] 5. API (FastAPI) generator: adversarial live audit — malformed JSON bodies, huge payloads, concurrent requests, duplicate IDs, unicode entity names, wrong HTTP methods, path traversal in path params. **Current step.**
 - [ ] 6. CLI generator: adversarial live audit — huge argv, malformed persisted JSON db file, concurrent invocations writing to the same db file, unicode/newline-laden field values, missing db file / unwritable directory.
 - [ ] 7. Website generator: extend the "dead interactive element" sweep to `<a href>`, `<select>`, `<input type="range">`/other input types across all 4 templates.
 - [ ] 8. Orchestrator: pause/resume/cancel mid-execution races against a real long-running task (not just the cancel-route consistency already covered by Finding 13).
