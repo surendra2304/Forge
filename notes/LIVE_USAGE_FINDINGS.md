@@ -632,6 +632,43 @@ API keeps top priority since its keywords ("fastapi", "rest api",
 
 ---
 
+## Finding 24 — Generated REST API accepts unbounded string payloads (DoS vector)
+
+**Severity:** Medium (resource exhaustion, not data loss/crash)
+
+**Live reproduction:** Ran a 14-point adversarial probe against a real,
+running generated FastAPI app (via `TestClient`, no mocks): malformed JSON
+bodies, missing/wrong-typed fields, negative/absurdly-large/non-numeric
+ids, path traversal attempts, unsupported HTTP methods, duplicate unique
+fields, negative limit/offset, search with no query, double-delete,
+updating a nonexistent id, and 50 rapid sequential creates. Every case
+handled correctly **except**: POSTing a book with a 2MB `title` field
+returned `201 Created` and stored the full 2MB string, uncapped, in the
+in-memory `_DB` — trivially repeatable to exhaust server memory.
+
+**Root cause:** Generated string fields on both the response model and the
+`...Create` model had no `max_length` constraint — only `min_length=1` on
+the Create model's required string fields.
+
+**Fix:** Added `max_length=10_000` to every generated string field (both
+`Optional[str]` fields on the response model and required `str` fields on
+the Create model) — large enough for any realistic text field, small enough
+to make a resource-exhaustion attempt fail fast with a clean 422.
+
+**Verification:**
+- Live repro: regenerated the books API, re-ran the adversarial probe — the
+  2MB payload now returns 422 (`"String should have at most 10000
+  characters"`), a normal-sized payload still returns 201, and all 13 other
+  adversarial cases from the sweep continued to pass with zero regressions.
+- Regression tests:
+  `tests/unit/test_api_generator_routes.py::test_generated_api_rejects_pathological_string_payloads`
+  and `::test_generated_api_survives_an_adversarial_probe_without_crashing`
+  (the latter locks in all 13 non-size-related adversarial cases as a
+  standing regression guard against future API-generator changes).
+- Full suite: 467 passed / 1 skipped / 0 failed (post-fix).
+
+---
+
 ## Next up (live-usage campaign continuing)
 - Pause/resume/cancel mid-execution races. (Cancel-route consistency itself
   already covered by Finding 13; true execution-time pause/resume races

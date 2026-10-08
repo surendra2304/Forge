@@ -885,7 +885,7 @@ def _api_main(spec: GoalSpec) -> str:
         elif ftype == "list":
             a(f"    {fname}: list[str] = Field(default_factory=list)")
         else:
-            a(f"    {fname}: Optional[str] = None")
+            a(f"    {fname}: Optional[str] = Field(default=None, max_length=10_000)")
     a("")
     a("")
     a(f"class {model}Create(BaseModel):")
@@ -901,7 +901,15 @@ def _api_main(spec: GoalSpec) -> str:
         elif ftype == "list":
             a(f"    {fname}: list[str] = Field(default_factory=list)")
         else:
-            a(f"    {fname}: str = Field(..., min_length=1)")
+            # Finding 24: string fields had no upper bound at all. Live
+            # adversarial probe: POSTing a 2MB `title` to a generated books
+            # API was accepted with 201 and stored in memory uncapped --
+            # trivial to repeat into a resource-exhaustion DoS against the
+            # in-memory `_DB`. 10,000 chars comfortably covers any
+            # legitimate text field (titles, names, free-text notes) while
+            # rejecting pathological payloads with a clean 422 instead of
+            # silently accepting them.
+            a(f"    {fname}: str = Field(..., min_length=1, max_length=10_000)")
     a("")
     a("")
     a('_DB: dict[int, dict[str, Any]] = {}')

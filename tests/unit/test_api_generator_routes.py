@@ -25,6 +25,20 @@ Finding 15 -- the search route was completely unreachable:
     "search", and returned 422 from the wrong handler -- the search
     endpoint existed in the code and the OpenAPI schema and could never be
     reached. Live repro confirmed the exact 422 `int_parsing` error.
+
+Finding 24 -- string fields had no upper size bound:
+    An adversarial live probe (malformed bodies, huge payloads, unicode,
+    path traversal, double-deletes, rapid sequential creates, etc. against a
+    real running generated API via TestClient) found that string fields on
+    both the response and Create pydantic models had no `max_length` at
+    all. POSTing a 2MB `title` was accepted with 201 and stored, uncapped,
+    in the in-memory `_DB` -- trivially repeatable into a resource
+    exhaustion DoS. Every other adversarial case already degraded correctly
+    (malformed JSON, missing/wrong-typed fields, negative/huge/non-numeric
+    ids, path traversal, wrong HTTP methods, double-delete, updating a
+    nonexistent id, and 50 rapid sequential creates all returned the
+    expected status with no crash). Fixed by adding `max_length=10_000` to
+    every generated string field.
 """
 
 from __future__ import annotations
@@ -152,3 +166,75 @@ def test_generated_api_search_route_is_reachable():
     results = r.json()
     assert isinstance(results, list)
     assert any(item.get("name") == "widget" for item in results)
+
+
+def test_generated_api_rejects_pathological_string_payloads():
+    """Finding 24: an unbounded string field let a 2MB value through with a
+    201, uncapped, into the in-memory store -- a trivial resource-exhaustion
+    vector. A reasonable max_length must reject it with a clean 422."""
+    goal = "Build a REST API for managing books with CRUD endpoints using FastAPI"
+    spec = parse_goal(goal)
+    plural = spec.entity_plural
+    client = _load_generated_api(goal)
+
+    huge = client.post(
+        f"/{plural}",
+        json={"title": "A" * 2_000_000, "author": "x", "year": 2020, "isbn": "1"},
+    )
+    assert huge.status_code == 422, (
+        f"a 2MB string field was accepted (status {huge.status_code}) with no size limit"
+    )
+
+    # A reasonably-sized, realistic value must still work.
+    normal = client.post(
+        f"/{plural}",
+        json={"title": "Dune", "author": "Frank Herbert", "year": 1965, "isbn": "2"},
+    )
+    assert normal.status_code == 201, normal.text
+
+
+def test_generated_api_survives_an_adversarial_probe_without_crashing():
+    """Broader live stress sweep: malformed JSON, missing/wrong-typed
+    fields, negative/huge/non-numeric ids, path traversal, unsupported HTTP
+    methods, double-delete, updating a nonexistent id, and rapid sequential
+    creates must all return a sane HTTP status -- never an unhandled
+    500/crash."""
+    goal = "Build a REST API for managing books with CRUD endpoints using FastAPI"
+    spec = parse_goal(goal)
+    plural = spec.entity_plural
+    client = _load_generated_api(goal)
+
+    assert client.post(
+        f"/{plural}", content="{not valid json", headers={"Content-Type": "application/json"}
+    ).status_code == 422
+    assert client.post(f"/{plural}", json={}).status_code == 422
+    assert client.post(
+        f"/{plural}", json={"title": 123, "author": "x", "year": "nope", "isbn": "x"}
+    ).status_code == 422
+    assert client.get(f"/{plural}/-1").status_code == 404
+    assert client.get(f"/{plural}/99999999999999999999999999").status_code == 404
+    assert client.get(f"/{plural}/abc").status_code == 422
+    assert client.get(f"/{plural}/../../etc/passwd").status_code == 404
+    assert client.patch(f"/{plural}/1", json={}).status_code == 405
+    assert client.put(
+        f"/{plural}/999999", json={"title": "x", "author": "y", "year": 2020, "isbn": "z"}
+    ).status_code == 404
+
+    created = client.post(
+        f"/{plural}", json={"title": "ToDelete", "author": "x", "year": 2020, "isbn": "d1"}
+    )
+    assert created.status_code == 201
+    bid = created.json()["id"]
+    assert client.delete(f"/{plural}/{bid}").status_code == 204
+    assert client.get(f"/{plural}/{bid}").status_code == 404
+    assert client.delete(f"/{plural}/{bid}").status_code == 404  # double-delete must not crash
+
+    ids = []
+    for i in range(50):
+        r = client.post(
+            f"/{plural}",
+            json={"title": f"Book{i}", "author": "x", "year": 2020, "isbn": f"isbn{i}"},
+        )
+        assert r.status_code == 201
+        ids.append(r.json()["id"])
+    assert len(set(ids)) == len(ids), f"duplicate ids assigned across rapid creates: {ids}"
