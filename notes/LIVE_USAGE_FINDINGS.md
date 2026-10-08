@@ -669,6 +669,68 @@ to make a resource-exhaustion attempt fail fast with a clean 422.
 
 ---
 
+## Finding 25 — Generated CLI loses data and crashes under concurrent invocations
+
+**Severity:** Critical (silent data loss + crashes under an entirely realistic usage pattern)
+
+**Live reproduction:** Generated the CLI-kind project for a note-taking app
+and launched 20 `python main.py add "Note N"` invocations concurrently
+(`&` in a shell loop — exactly how a real user might batch-populate a CLI
+tool, or how two terminal tabs/a background job could collide by accident).
+Result: several invocations crashed with
+`FileNotFoundError: [Errno 2] No such file or directory:
+'note_data.json.tmp' -> 'note_data.json'`, duplicate ids were assigned
+(`Added note #8` printed three times, `#9` twice), and when the dust
+settled **only 12 of the 20 records actually existed on disk** — 8 were
+silently lost even though every invocation printed a success message and
+exited 0.
+
+**Root cause (two independent bugs in the same code path):**
+1. `Store.save()` always wrote to the exact same literal tmp filename
+   (`<db>.tmp`) before atomically replacing the real file. Two concurrent
+   writers share that identical tmp path, so one process's `tmp.replace()`
+   could consume or race another's in-flight `tmp.write_text()`, crashing
+   with `FileNotFoundError`.
+2. `add`/`delete`/`update`/`clear` each called `self.load()` then (after
+   mutating in memory) `self.save(...)` with **no locking** around the
+   pair. Two concurrent processes each load the same on-disk list, each
+   compute their own next id and append their own record, and each save
+   their own full in-memory copy — the last writer's save silently
+   discards every other concurrent writer's change (a classic
+   read-modify-write "lost update" race).
+
+**Fix:**
+1. `save()`'s tmp filename now includes `os.getpid()`, so concurrent
+   writers never share a tmp path.
+2. Added `Store._locked()`, a `@contextlib.contextmanager` that acquires a
+   blocking, exclusive, cross-process advisory lock (`fcntl.flock` on
+   POSIX, with a documented best-effort no-op fallback on non-POSIX
+   platforms where `fcntl` doesn't exist) on a sibling `.lock` file.
+   `add`/`delete`/`update`/`clear` now wrap their **entire**
+   load-modify-save cycle in `with self._locked():`, serializing concurrent
+   writers so no update is ever lost.
+3. (Minor, found while re-linting the fix) Commands with no further
+   argparse configuration (e.g. `list`, `clear`) were still assigned to an
+   unused `p_{cmd}` variable, tripping ruff's F841 on every generated CLI
+   that had such a command. Fixed to only bind the variable when a command
+   actually needs further configuration.
+
+**Verification:**
+- Live repro: regenerated the CLI, re-ran the exact 20-way concurrent `add`
+  stress test — **zero crashes, all 20 records present, zero duplicate
+  ids** (sequential 1-20). Pushed further to 50 concurrent adds (50/50
+  survived, zero duplicates) and a mixed concurrent add+update+delete
+  stress (no crashes, final state fully consistent with the operations
+  performed).
+- `ruff check` on the regenerated `main.py`: clean (previously had one
+  F841).
+- Regression tests (real subprocesses, real temp files, no mocks):
+  `tests/unit/test_cli_generator_concurrency.py::test_concurrent_add_invocations_never_lose_or_crash`
+  and `::test_concurrent_mixed_add_update_delete_do_not_crash`.
+- Full suite: 469 passed / 1 skipped / 0 failed (post-fix).
+
+---
+
 ## Next up (live-usage campaign continuing)
 - Pause/resume/cancel mid-execution races. (Cancel-route consistency itself
   already covered by Finding 13; true execution-time pause/resume races
