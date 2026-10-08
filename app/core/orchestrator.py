@@ -459,6 +459,34 @@ class OrchestratorCore:
         # Update saved graph and task progress
         await self.store.save_task_graph(dag.graph)
 
+        # Finding 27 (critical, live-reproduced): a concurrent pause() or
+        # cancel() can land on this task while the wave above was still
+        # executing (an agent's execute_step() can take a real LLM call, a
+        # file write, or any other await -- plenty of time for a user to
+        # hit pause/cancel from another request). Those calls persist
+        # BLOCKED/CANCELLED immediately, but every write that follows here
+        # used to stamp a *new* state derived from the stale, pre-wave
+        # `task` object (or compute a fresh COMPLETED/FAILED of its own)
+        # straight over whatever had since been persisted -- silently
+        # undoing the user's pause or cancel the instant the in-flight wave
+        # finished. Live repro: pausing (or cancelling) a task while its
+        # single in-flight node was still executing left the task
+        # persisted as BLOCKED/CANCELLED for the duration of that await,
+        # but step_task()'s own return value -- and the row in the DB --
+        # flipped straight back to RUNNING once the wave completed, and
+        # run_task()'s loop (which only stops on a terminal/BLOCKED state)
+        # happily kept executing a task the user believed they had
+        # cancelled. Re-read the live state now and, if it has moved to
+        # BLOCKED or CANCELLED behind our back, respect that and stop
+        # here instead of resurrecting it.
+        current = await self.store.get_task(task_id)
+        if current and current.state in (TaskState.CANCELLED, TaskState.BLOCKED):
+            logger.info(
+                f"Task {task_id} was {current.state.value} by a concurrent request while its "
+                "DAG wave was executing; not overwriting with a post-wave state."
+            )
+            return current, executed_nodes
+
         if has_failed:
             task = await self.lifecycle.transition(
                 task_id=task_id,

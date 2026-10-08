@@ -787,8 +787,81 @@ view, and the submit handler now reads `cust-name`/`cust-email`/
 
 ---
 
+## Finding 27 — Pause/cancel racing an in-flight DAG wave gets silently discarded (critical)
+
+**Severity:** Critical. A user's explicit `cancel()` could be silently undone
+and the task kept running and burning budget after they believed it was
+dead; `pause()` suffered the same fate.
+
+**Live reproduction:** `OrchestratorCore.step_task()` dispatches a wave of
+ready DAG nodes concurrently via `asyncio.gather`. Each node's
+`agent.execute_step()` can take a real LLM call, file I/O, or any other
+`await` — plenty of wall-clock time for a user to call `POST
+/tasks/{id}/pause` or `/cancel` from another request while the wave is
+in flight. Those endpoints persist `BLOCKED`/`CANCELLED` immediately via
+`TaskStateMachine`. But once the wave finished, every downstream write in
+`step_task()` — the "more work remains" branch, the failure branch, and the
+DAG-complete branch — unconditionally derived its next write from either a
+**stale, pre-wave-start** `task.state` local variable, or a brand new
+state of its own, and persisted that over whatever had since landed in the
+DB. Built a deterministic repro (no wall-clock race needed): an injected
+fake agent calls `lifecycle.pause()` / `lifecycle.cancel()` from *inside*
+`execute_step()` (standing in for "a concurrent user action landed while
+this await was in flight"), then returns normally.
+- Pausing mid-wave: `pause()` correctly set `BLOCKED` in the DB, but
+  `step_task()`'s own return value — and the persisted row — flipped right
+  back to `RUNNING` the instant the wave completed. The user's pause was
+  discarded with no error of any kind.
+- Cancelling mid-wave: same thing, but worse — a `CANCELLED` task was
+  resurrected to `RUNNING`, and `run_task()`'s own loop (which only stops on
+  a terminal/`BLOCKED` state) kept calling `step_task()` and executing
+  further waves of a task the user explicitly told it to stop.
+- Edge case found along the way: if the *same* node that triggered the
+  concurrent cancel then itself raised an exception (plausible — e.g. an
+  LLM call failing right after the cancel was recorded), the failure branch
+  tried to transition `CANCELLED -> FAILED`, which isn't a legal transition
+  in `TaskStateMachine.TRANSITION_MATRIX` and crashed with an unhandled
+  `InvalidStateTransitionError` instead of a clean "already cancelled, no-op."
+
+**Root cause:** `step_task()`'s post-wave bookkeeping trusted its own local
+`task` variable (captured before the wave ran) rather than re-checking the
+live, currently-persisted state before deciding what to write next.
+
+**Fix:** In `app/core/orchestrator.py`, right after the wave's results are
+folded in and the graph is saved, `step_task()` now re-reads the task's
+live state. If it has moved to `BLOCKED` or `CANCELLED` since the wave
+started, `step_task()` returns that state as-is and skips every subsequent
+write (the failure branch, the DAG-complete branch, and the progress-update
+branch) instead of overwriting it.
+
+**Verification:**
+- Live repro scripts proved the bug for both pause and cancel, and the
+  cancel-then-fail crash, before the fix; all three were clean after.
+- Added three permanent regression tests to
+  `tests/unit/test_orchestrator_concurrency.py`:
+  `test_pause_mid_wave_is_not_silently_undone_by_step_task`,
+  `test_cancel_mid_wave_is_not_silently_undone_by_step_task` (also checks
+  `run_task()` doesn't keep driving a cancelled task), and
+  `test_cancel_mid_wave_survives_a_subsequent_node_failure`. Confirmed all
+  three fail against the pre-fix code (one with the raw
+  `InvalidStateTransitionError` crash) and pass after.
+- Test-hygiene note (caught by this work, not a product bug): the first
+  draft of these tests monkeypatched `orch.registry.create_agent` directly.
+  `OrchestratorCore.registry` defaults to the *module-level singleton*
+  `app.agents.registry.agent_registry`, not a per-instance copy, so that
+  mutation permanently broke real agent creation for every other test in
+  the rest of the session (observed live as unrelated orchestrator tests
+  elsewhere in the suite failing with "Task ... not found"). Fixed by
+  constructing a dedicated `registry=` object per test and passing it into
+  `OrchestratorCore(...)` instead of mutating the shared singleton —
+  documented here so a future session doesn't reach for the same shortcut.
+- Full suite: 473 passed / 1 skipped / 0 failed (up from 470 — 3 new tests,
+  zero regressions).
+
+---
+
 ## Next up (live-usage campaign continuing)
-- Pause/resume/cancel mid-execution races. (Cancel-route consistency itself
+- Idempotent/double-submit handling. (Cancel-route consistency itself
   already covered by Finding 13; true execution-time pause/resume races
   against a long-running task remain untested.)
 - Repeated/idempotent submissions of the same goal.
