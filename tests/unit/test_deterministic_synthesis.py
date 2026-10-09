@@ -86,6 +86,44 @@ CASES: list[tuple[str, ProjectKind, list[str]]] = [
 ]
 
 
+# Finding 23: ProjectKind.WEBSITE used to be checked second (right after
+# API) against a broad, generic keyword set including the bare word
+# "website". That made it swallow goals where "website" is merely the
+# OBJECT of some other action rather than the deliverable itself. Most
+# dramatically, "Write a script that scrapes a website and saves the data to
+# a file" matched "website" and was routed to the full HTML/CSS/JS website
+# generator -- a user asking for a Python scraper received a static landing
+# page with zero scraping logic and zero Python code. Fixed by checking
+# WEBSITE last, after every more-specific kind signal (CLI/LIBRARY/SCRIPT)
+# has had a chance to claim the goal.
+MISCLASSIFICATION_REGRESSION_CASES: list[tuple[str, ProjectKind]] = [
+    ("Write a script that scrapes a website and saves the data to a file", ProjectKind.SCRIPT),
+    ("Automate backing up my photos directory every day", ProjectKind.SCRIPT),
+    ("Write a batch script to process log files", ProjectKind.SCRIPT),
+    # Sanity: real website goals must still classify as WEBSITE.
+    ("Build a landing page website for a coffee shop with a menu section", ProjectKind.WEBSITE),
+    ("Build a personal 3D creative developer portfolio with a contact form", ProjectKind.WEBSITE),
+]
+
+
+@pytest.mark.parametrize(
+    "goal,kind", MISCLASSIFICATION_REGRESSION_CASES,
+    ids=[g[:40] for g, _ in MISCLASSIFICATION_REGRESSION_CASES],
+)
+def test_script_goals_mentioning_website_are_not_misrouted_to_the_website_generator(
+    goal: str, kind: ProjectKind
+):
+    spec = parse_goal(goal)
+    assert spec.kind is kind, f"{goal!r} classified as {spec.kind}, expected {kind}"
+    if kind is ProjectKind.SCRIPT:
+        files = synthesize_project(goal)
+        py = {n: c for n, c in files.items() if n.endswith(".py")}
+        assert py, f"expected real Python output for a script goal, got: {sorted(files)}"
+        assert "index.html" not in files, (
+            f"script goal {goal!r} was routed to the website generator: {sorted(files)}"
+        )
+
+
 @pytest.mark.parametrize(
     "goal,kind,commands", CASES, ids=[c[0][:28] for c in CASES]
 )
@@ -231,3 +269,86 @@ def tempfile_project(files: dict[str, str]):
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(content, encoding="utf-8")
         yield root
+
+
+# Finding 21: the "contact" library entity's `search()` function used
+# `json.dumps(...)` but the module never actually imported `json` -- a prior
+# fix for this had patched `import json` into the generated source as plain
+# text spliced into index 3 of the output lines, which happened to land
+# *inside the module's docstring* rather than becoming a real import
+# statement, so every "contact" library crashed on its only exported
+# function with `NameError: name 'json' is not defined`. This slipped past
+# the existing CASES list above because it only ever exercised the "string"
+# and "number" library entities -- none of the other eleven entity-specific
+# code paths in `_lib_main` (note/todo/book/contact/expense/event/file/user/
+# password/url/recipe/habit) were ever generated-and-executed by a test.
+#
+# This sweep closes that coverage gap for good: it builds a goal for every
+# entity the generator recognises (mirroring the real keyword signals in
+# `DOMAIN_SIGNALS` / `ENTITY_SIGNALS`), actually generates the library, and
+# runs its own bundled test suite with a real interpreter -- the same
+# "no mocks, real execution" standard the CASES list already holds the
+# CLI/API/script/website kinds to.
+LIBRARY_ENTITY_GOALS: list[str] = [
+    "Build a Python string utility library with reverse and palindrome helpers",
+    "Build a Python number utility library with mean, median and mode helpers",
+    "Build a Python date utility library with helper functions",
+    "Build a Python path utility library with helper functions",
+    "Build a Python library for managing notes with helper functions",
+    "Build a Python library for managing a todo list with helper functions",
+    "Build a Python library for managing a collection of books with helper functions",
+    "Build a Python library for managing a contact list with helper functions",
+    "Build a Python library for tracking expenses with helper functions",
+    "Build a Python library for managing events with helper functions",
+    "Build a Python library for managing files with helper functions",
+    "Build a Python library for managing user accounts with helper functions",
+    "Build a Python library for managing passwords with helper functions",
+    "Build a Python library for managing bookmarked urls with helper functions",
+    "Build a Python library for managing recipes with helper functions",
+    "Build a Python library for tracking habits with helper functions",
+    "Build a Python library for managing generic records with helper functions",
+]
+
+
+def test_days_between_raises_a_clear_error_on_a_malformed_date():
+    """Finding 22: `days_between` used to raise a raw, confusing
+    `ValueError: invalid literal for int() with base 10: 'not'` on a
+    malformed date string, with no indication of which argument was bad or
+    what format was expected. Live-reproduced via an adversarial sweep over
+    every library entity's functions (`days_between("not-a-date",
+    "2024-01-01")`). Fixed to validate the date shape up front and raise a
+    clear, actionable `ValueError` naming the bad value."""
+    files = synthesize_project("Build a Python date utility library with helper functions")
+    main = files["date.py"]
+    namespace: dict = {}
+    exec(compile(main, "date.py", "exec"), namespace)  # noqa: S102 - generated code under test
+    with pytest.raises(ValueError, match="expected a YYYY-MM-DD date"):
+        namespace["days_between"]("not-a-date", "2024-01-01")
+    # happy path must be unaffected
+    assert namespace["days_between"]("2024-01-01", "2024-01-11") == 10
+
+
+@pytest.mark.parametrize("goal", LIBRARY_ENTITY_GOALS, ids=[g[:40] for g in LIBRARY_ENTITY_GOALS])
+def test_every_library_entity_actually_runs(goal: str):
+    """Every entity-specific code path in `_lib_main` must compile, import,
+    and pass its own generated tests when actually executed -- not just the
+    two entities ("string"/"number") the original CASES list happened to
+    cover."""
+    files = synthesize_project(goal)
+    py = {n: c for n, c in files.items() if n.endswith(".py")}
+    assert py, f"no Python generated for goal: {goal!r}"
+    for name, content in py.items():
+        compile(content, name, "exec")
+
+    tests = sorted(n for n in files if re.match(r"test_.*\.py$", n))
+    assert tests, f"no test suite generated for goal: {goal!r}"
+    with tempfile_project(files) as root:
+        proc = subprocess.run(
+            [sys.executable, "-m", "pytest", "-q", "--no-header", "-p", "no:cacheprovider",
+             *tests],
+            cwd=str(root), capture_output=True, text=True, timeout=120,
+        )
+    assert proc.returncode == 0, (
+        f"generated library tests failed for goal {goal!r}:\n"
+        f"{proc.stdout[-2500:]}\n{proc.stderr[-800:]}"
+    )

@@ -38,7 +38,7 @@ from app.execution.permissions import (
 )
 from app.execution.terminal import TerminalTool
 from app.main import app
-from app.memory.db import db_manager
+from app.memory.db import DatabaseManager
 from app.memory.models import TaskEntity, TaskState
 from app.recovery.classifier import FailureClass
 from app.recovery.loop_guard import AntiLoopController, RepairLoopDetectedError
@@ -51,8 +51,13 @@ from app.verification.evidence import (
 
 
 @pytest.fixture(autouse=True)
-async def setup_db():
-    await db_manager.init_db()
+async def setup_db(isolated_db_manager: DatabaseManager):
+    # Every test in this file used to call the real global
+    # app.memory.db.db_manager directly (data/forge.db on disk).
+    # isolated_db_manager (tests/conftest.py) redirects every module-level
+    # db_manager binding plus the shared Settings singleton's base_dir into
+    # an isolated temp directory for the duration of each test.
+    await isolated_db_manager.init_db()
     yield
 
 

@@ -635,16 +635,28 @@ async def download_task_artifact(
     )
 
 
-@tasks_router.post(
-    "/{task_id}/cancel", response_model=TaskActionResponse, summary="Cancel Running Task"
-)
-async def cancel_task(
+async def execute_task_cancellation(
     task_id: str,
-    request: TaskActionRequest | None = None,
-    lifecycle: TaskStateMachine = Depends(get_task_lifecycle),
-    store: StateStore = Depends(get_state_store),
+    reason: str,
+    lifecycle: TaskStateMachine,
+    store: StateStore,
 ) -> TaskActionResponse:
-    """Gracefully cancel a running task and cleanup background resources."""
+    """Cancel a task and fire every side effect a cancellation should have:
+    state transition, progress-tracker close-out, WebSocket broadcast, and
+    webhook dispatch.
+
+    This used to live inline inside `tasks_router`'s `/{task_id}/cancel`
+    handler, while `app/api/routes.py` registered a second, independent
+    `cancel_task` for the exact same logical path -- one that only called
+    `lifecycle.cancel()` and skipped the progress tracker, WebSocket
+    broadcast, and webhook dispatch entirely. Because FastAPI resolves
+    overlapping routes by registration order, `/api/tasks/{id}/cancel` and
+    `/api/v1/tasks/{id}/cancel` silently ran *different* handlers: live
+    testing confirmed cancelling the same task via the v1 path never
+    notified webhooks or WebSocket subscribers, while the non-v1 path did.
+    Factoring the real implementation out here and having both routers call
+    it removes the possibility of the two paths ever diverging again.
+    """
     task = await store.get_task(task_id)
     if not task:
         raise HTTPException(
@@ -652,7 +664,6 @@ async def cancel_task(
         )
 
     prev_state = task.state
-    reason = request.reason if request else "Cancelled via FRIDAY management API"
 
     try:
         await lifecycle.transition(
@@ -702,6 +713,20 @@ async def cancel_task(
         )
     except InvalidStateTransitionError as e:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
+
+
+@tasks_router.post(
+    "/{task_id}/cancel", response_model=TaskActionResponse, summary="Cancel Running Task"
+)
+async def cancel_task(
+    task_id: str,
+    request: TaskActionRequest | None = None,
+    lifecycle: TaskStateMachine = Depends(get_task_lifecycle),
+    store: StateStore = Depends(get_state_store),
+) -> TaskActionResponse:
+    """Gracefully cancel a running task and cleanup background resources."""
+    reason = request.reason if request else "Cancelled via FRIDAY management API"
+    return await execute_task_cancellation(task_id, reason, lifecycle, store)
 
 
 @tasks_router.delete("/{task_id}", summary="Archive Task (Soft Delete)")

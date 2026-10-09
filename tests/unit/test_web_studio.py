@@ -299,3 +299,142 @@ def test_portfolio_domain_synthesis():
     assert "runTerminalCommand" in js
 
 
+def test_dashboard_quick_diagnostics_button_has_a_click_handler():
+    """Finding 17b (live-reproduced, same bug family as the portfolio
+    contact form): the dashboard template's "Run Quick Diagnostics" button
+    (`id="quick-diagnostics-btn"`) had zero corresponding JavaScript -- a
+    plain dead button with no visible response to a click, unlike every
+    other interactive control in the same template (theme toggle, spike
+    simulation, alerts bell). Verified by actually running the generated
+    app.js against a real DOM (jsdom): before the fix the button's label
+    never changed on click; after the fix it flips to "Running
+    Diagnostics…" and the button disables for the duration.
+    """
+    files = ForgeWebStudio.synthesize_website(
+        "Build a real-time IoT sensor telemetry dashboard with alerts"
+    )
+    html = files["index.html"]
+    js = files["app.js"]
+
+    assert 'id="quick-diagnostics-btn"' in html
+    assert "getElementById('quick-diagnostics-btn')" in js, (
+        "quick-diagnostics-btn exists in the HTML but nothing in app.js looks "
+        "it up -- clicking it does nothing"
+    )
+    assert "diagBtn.addEventListener('click'" in js
+
+
+def test_ecommerce_checkout_reads_the_customer_info_it_collects():
+    """Finding 26 (live-reproduced): the ecommerce template's checkout form
+    collected a customer's name/email/address (with native `required`
+    validation on each <input>) but its submit handler never read any of
+    those three fields -- it only generated a random order id and showed a
+    generic "Order Successfully Dispatched!" message. A real user's
+    submitted contact/shipping info was silently discarded, never
+    validated beyond the browser's own HTML5 constraint, never reflected
+    back, never used. Found via a generator-wide id-wiring sweep extended to
+    cover <input>/<select> (not just <form>/<button>), which flagged
+    cust-name/cust-email/cust-address as having zero JS references anywhere
+    in app.js.
+    """
+    files = ForgeWebStudio.synthesize_website(
+        "Build a luxury minimalist e-commerce fashion store with a shopping cart and checkout"
+    )
+    html = files["index.html"]
+    js = files["app.js"]
+
+    for field_id in ("cust-name", "cust-email", "cust-address"):
+        assert f'id="{field_id}"' in html
+        assert f"getElementById('{field_id}')" in js, (
+            f"checkout field {field_id} is collected from the user but never read by any JS"
+        )
+    # The confirmation view must actually reflect what was submitted.
+    assert "order-confirmation-recipient" in html
+    assert "order-confirmation-recipient" in js
+
+
+def test_every_website_template_wires_up_its_interactive_elements():
+    """Systematic, generator-wide guard for the "styled element with no
+    handler" bug family: every <form id="...">, <button id="...">,
+    <input id="...">, and <select id="..."> emitted by any of the four
+    domain templates must have a matching getElementById() (or equivalent
+    selector) lookup somewhere in that same template's generated app.js.
+    This is intentionally broad (not tied to one specific id) so a *new*
+    dead element introduced by a future template change is caught
+    automatically instead of needing its own one-off regression test.
+
+    Extended (originally forms/buttons only) after Finding 26: a sweep with
+    <input>/<select> included caught the ecommerce checkout form's
+    cust-name/cust-email/cust-address inputs, which were collected with
+    native `required` validation but never read by any JS anywhere -- see
+    `test_ecommerce_checkout_reads_the_customer_info_it_collects` below for
+    the live end-to-end (jsdom) verification of that specific fix.
+    """
+    import re
+
+    goals = {
+        "portfolio": "Build a personal 3D creative developer portfolio with a contact form",
+        "ecommerce": "Build a luxury minimalist e-commerce fashion store with a shopping cart and checkout",
+        "saas": "Create a modern AI SaaS analytics platform with pricing plans and a signup form",
+        "dashboard": "Build a real-time IoT sensor telemetry dashboard with alerts",
+    }
+
+    for domain, goal in goals.items():
+        files = ForgeWebStudio.synthesize_website(goal, [])
+        html = files["index.html"]
+        js = files["app.js"]
+
+        interactive_ids = (
+            set(re.findall(r'<form[^>]*\sid="([a-zA-Z0-9_-]+)"', html))
+            | set(re.findall(r'<button[^>]*\sid="([a-zA-Z0-9_-]+)"', html))
+            | set(re.findall(r'<input[^>]*\sid="([a-zA-Z0-9_-]+)"', html))
+            | set(re.findall(r'<select[^>]*\sid="([a-zA-Z0-9_-]+)"', html))
+        )
+
+        def _is_wired_up(el_id: str) -> bool:
+            # Most elements are looked up directly...
+            if f"getElementById('{el_id}')" in js or f'getElementById("{el_id}")' in js:
+                return True
+            # ...but some are wired up as part of a shared CSS-selector list,
+            # e.g. `document.querySelectorAll('#a, #b, .some-class')`.
+            return f"#{el_id}" in js
+
+        missing = [el_id for el_id in interactive_ids if not _is_wired_up(el_id)]
+        assert not missing, (
+            f"{domain} template has interactive element(s) with no JS handler: "
+            f"{missing} -- these will be dead/no-op when a real user clicks them"
+        )
+
+
+def test_portfolio_contact_form_has_a_submit_handler():
+    """Finding 17 (live-reproduced): the portfolio template's contact form
+    (`id="contact-form"`) had zero corresponding JavaScript anywhere in the
+    generated app.js. The <form> has no `action`, so a real user submitting
+    it got the browser's un-intercepted default behavior -- a full page
+    reload with the form fields silently discarded and no confirmation.
+    Verified by actually running the generated site's app.js against a real
+    DOM (jsdom) and firing a submit event: before the fix, nothing happened
+    to intercept it; after the fix, the submit is prevented and the form is
+    replaced with an on-page confirmation. This test asserts the static
+    precondition for that behavior -- that the generator actually emits a
+    handler wired to the exact id the HTML uses -- so a future refactor that
+    silently drops the handler (or renames one side without the other) fails
+    immediately instead of only being caught by someone manually running the
+    output in a browser.
+    """
+    files = ForgeWebStudio.synthesize_website(
+        "Build a personal 3D creative developer portfolio with a contact form"
+    )
+    html = files["index.html"]
+    js = files["app.js"]
+
+    assert 'id="contact-form"' in html, "portfolio template should render a contact form"
+    assert "getElementById('contact-form')" in js, (
+        "contact-form exists in the HTML but nothing in app.js looks it up -- "
+        "submitting it will fall through to the browser's default (page-reload) "
+        "behavior instead of being handled client-side"
+    )
+    assert "contactForm.addEventListener('submit'" in js
+    assert "preventDefault" in js.split("getElementById('contact-form')")[1][:500]
+
+

@@ -86,35 +86,27 @@ def test_pause_and_resume_endpoints_reach_the_handler(tmp_path, monkeypatch):
             )
 
 
-def test_api_tasks_post_uses_the_tasks_router_handler(tmp_path, monkeypatch):
+async def test_api_tasks_post_uses_the_tasks_router_handler(tmp_path, monkeypatch, isolated_db_manager):
     """The two routers overlap on POST /tasks; the richer one must win.
 
     api_router.create_task drops `task_metadata`; tasks_router.create_task keeps
     it. Mounting order decides which handler answers, so pin the contract.
+
+    This used to hand-roll its own isolation by monkeypatching the
+    `get_settings` *function* and a handful of named `db_manager` bindings,
+    but missed that `workspace_manager`/`orchestrator` (app.core.workspace,
+    app.core.orchestrator) are long-lived singletons that captured the
+    *original* `get_settings()` object's attributes at import time --
+    replacing the function didn't change what those singletons already held,
+    so `POST /api/tasks` here actually created a real task row+workspace
+    under the real data/forge.db and workspaces/ in the repo checkout
+    (confirmed live: a stray `workspaces/task<timestamp>` directory was left
+    behind after every test run). `isolated_db_manager` (tests/conftest.py)
+    mutates the shared Settings singleton's `base_dir` attribute in place,
+    which both `workspace_manager` and `orchestrator` resolve their on-disk
+    paths from dynamically, so it actually takes effect.
     """
-    from app.api import routes as routes_module
-    from app.memory import db as db_module
-    from app.memory.db import DatabaseManager
-    from app.memory.state_store import StateStore
-
-    manager = DatabaseManager(db_path=tmp_path / "precedence.db")
-    asyncio.run(manager.init_db())
-
-    monkeypatch.setattr(db_module, "db_manager", manager)
-    monkeypatch.setattr(routes_module, "db_manager", manager)
-    monkeypatch.setattr(
-        "app.api.tasks.db_manager", manager
-    )
-    monkeypatch.setattr(
-        "app.api.tasks.get_state_store", lambda: StateStore(manager)
-    )
-
-    settings = Settings()
-    settings.workspaces_dir = tmp_path / "workspaces"
-    settings.data_dir = tmp_path / "data"
-    settings.database_path = tmp_path / "precedence.db"
-    settings.ensure_directories()
-    monkeypatch.setattr("app.core.config.get_settings", lambda: settings)
+    await isolated_db_manager.init_db()
 
     app = create_app()
     with TestClient(app) as client:

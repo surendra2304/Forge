@@ -97,7 +97,34 @@ class DeliveryPackager:
             "manifest": all_project_files,
         }
 
-        # 2. Test & Build Status (from verification_report.json if present)
+        # 2. Test & Build Status.
+        #
+        # This used to only *read* artifacts/verification_report.json if it
+        # happened to already exist, and silently default to
+        # {"all_passed": True, "total_checks": 0, ...} otherwise. The Release
+        # stage (this method, invoked by ReleaseEngineerRole) runs as a DAG
+        # node *before* OrchestratorCore.run_task's post-DAG
+        # `_verify_and_repair()` step ever calls VerificationEngine for the
+        # first time -- so on every single first-pass build,
+        # verification_report.json did not exist yet when this ran, and the
+        # shipped completion_report.json unconditionally claimed
+        # "all_passed": true with zero checks run.
+        #
+        # Reproduced live (2026-10-07, task5107102026091432, goal "Build a
+        # CLI todo app"): completion_report.json was written at 09:15:05.578
+        # claiming all_passed=true/total_checks=0; verification_report.json
+        # was written ~300ms later (09:15:05.862+) and actually showed
+        # all_passed=false, 8/10 passed. A caller trusting
+        # completion_report.json -- exactly the artifact this project's own
+        # README calls out as "Evidence Over Model Confidence" -- was told a
+        # broken build had fully passed.
+        #
+        # The fix: always run the real verification battery here, synchronously,
+        # and use ITS result. This makes the completion report correct
+        # regardless of pipeline ordering, and is idempotent/cheap to re-run
+        # if the orchestrator's own post-DAG verification pass runs again
+        # afterward (it will simply overwrite verification_report.json with
+        # an equivalent or updated result).
         report_file = paths.artifacts / "verification_report.json"
         test_status = {
             "all_passed": True,
@@ -105,17 +132,45 @@ class DeliveryPackager:
             "passed_checks": 0,
             "failed_checks": 0,
         }
-        if report_file.exists():
-            try:
-                rep_data = json.loads(report_file.read_text(encoding="utf-8"))
-                test_status = {
-                    "all_passed": rep_data.get("all_passed", True),
-                    "total_checks": rep_data.get("total_checks", 0),
-                    "passed_checks": rep_data.get("passed_checks", 0),
-                    "failed_checks": rep_data.get("failed_checks", 0),
-                }
-            except Exception as e:
-                logger.warning(f"Error reading verification report for delivery: {e}")
+        try:
+            from app.verification.engine import VerificationEngine
+
+            verifier = VerificationEngine(engine=self.engine, wm=self.wm)
+            fresh_report = await verifier.verify_task(task_id)
+            test_status = {
+                "all_passed": fresh_report.all_passed,
+                "total_checks": fresh_report.total_checks,
+                "passed_checks": fresh_report.passed_checks,
+                "failed_checks": fresh_report.failed_checks,
+            }
+        except Exception as e:
+            # Verification itself must never block packaging -- but if it
+            # failed to even run, the report must say so instead of silently
+            # claiming success. Fall back to whatever was last persisted on
+            # disk (if anything), which is strictly more honest than a hard
+            # True default.
+            logger.warning(
+                f"Fresh verification run failed while packaging delivery for "
+                f"'{task_id}': {e}. Falling back to last persisted report, if any."
+            )
+            if report_file.exists():
+                try:
+                    rep_data = json.loads(report_file.read_text(encoding="utf-8"))
+                    test_status = {
+                        "all_passed": rep_data.get("all_passed", False),
+                        "total_checks": rep_data.get("total_checks", 0),
+                        "passed_checks": rep_data.get("passed_checks", 0),
+                        "failed_checks": rep_data.get("failed_checks", 0),
+                    }
+                except Exception as read_exc:
+                    logger.warning(
+                        f"Error reading stale verification report for delivery: {read_exc}"
+                    )
+                    test_status["all_passed"] = False
+            else:
+                # No verification ever ran and we could not run one now:
+                # report unverified, not "passed".
+                test_status["all_passed"] = False
 
         # 3. Browser Evidence
         # BrowserChecker no longer fabricates a 1x1 PNG, so the delivery report

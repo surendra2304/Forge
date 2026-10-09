@@ -137,12 +137,24 @@ def _tokens(goal: str) -> list[str]:
 
 
 def _detect_kind(tokens: list[str], goal_l: str) -> ProjectKind:
+    # Finding 23: WEBSITE used to be checked second (right after API), on a
+    # broad set of substrings including the bare word "website"/"webpage"/
+    # "html". That made it swallow goals where "website" is merely the
+    # OBJECT of an unrelated action rather than the deliverable itself --
+    # most dramatically, "Write a script that scrapes a website and saves
+    # the data to a file" matched "website" and was classified as
+    # ProjectKind.WEBSITE, so the user asking for a Python scraper received
+    # a static index.html/app.js/style.css landing page with zero scraping
+    # logic instead. WEBSITE's keyword set is the most generic of the five
+    # kinds (ordinary English words like "page"/"html" show up in all sorts
+    # of unrelated goals), so it is now checked LAST, after every
+    # more-specific, more-intentional kind signal (CLI/LIBRARY/SCRIPT) has
+    # had a chance to claim the goal. API keeps top priority since its
+    # keywords ("fastapi", "rest api", "endpoint") are themselves highly
+    # specific and never collide with the others.
     if any(k in goal_l for k in ["rest api", "api", "fastapi", "endpoint", "backend",
                                  "microservice"]):
         return ProjectKind.API
-    if any(k in goal_l for k in ["website", "landing page", "web page", "webpage",
-                                 "portfolio", "homepage", "html"]):
-        return ProjectKind.WEBSITE
     if any(k in tokens for k in ["cli", "command", "commandline", "terminal", "argv"]):
         return ProjectKind.CLI
     if any(k in goal_l for k in ["library", "module", "package", "sdk", "helper functions"]):
@@ -150,6 +162,9 @@ def _detect_kind(tokens: list[str], goal_l: str) -> ProjectKind:
     if any(k in goal_l for k in ["script", "batch", "automate", "rename", "convert",
                                  "backup", "scrape"]):
         return ProjectKind.SCRIPT
+    if any(k in goal_l for k in ["website", "landing page", "web page", "webpage",
+                                 "portfolio", "homepage", "html"]):
+        return ProjectKind.WEBSITE
     return ProjectKind.UNKNOWN
 
 
@@ -220,6 +235,20 @@ def _detect_commands(tokens: list[str]) -> list[str]:
                 if cmd not in found:
                     found.append(cmd)
                 break
+
+    # "CRUD" is the single most common phrase a real user types when they
+    # want Create/Read/Update/Delete ("build a CRUD API for books"), but it
+    # does not contain any of the individual words in COMMAND_SIGNALS, so it
+    # silently matched nothing beyond whatever else happened to be in the
+    # goal. Verified live: "Build a REST API for managing books with CRUD
+    # endpoints" produced commands=['add', 'list', 'delete'] -- update was
+    # missing entirely, and the generated API shipped with no PUT route and
+    # no way to edit an existing record, despite the goal explicitly naming
+    # all four CRUD operations.
+    if _match_signal(joined, "crud"):
+        for cmd in ("add", "list", "update", "delete"):
+            if cmd not in found:
+                found.append(cmd)
     return found
 
 
@@ -369,7 +398,9 @@ def _cli_main(spec: GoalSpec) -> str:
     a("from __future__ import annotations")
     a("")
     a("import argparse")
+    a("import contextlib")
     a("import json")
+    a("import os")
     a("import sys")
     a("from datetime import datetime, timezone")
     a("from pathlib import Path")
@@ -423,21 +454,69 @@ def _cli_main(spec: GoalSpec) -> str:
     a("")
     a("    def save(self, items: list[dict[str, Any]]) -> None:")
     a("        self.filepath.parent.mkdir(parents=True, exist_ok=True)")
-    a("        tmp = self.filepath.with_suffix(self.filepath.suffix + \".tmp\")")
+    # Finding 25 (part 1): every writer used the exact same literal tmp
+    # filename (`<db>.tmp`). Under concurrent invocations (two terminal
+    # tabs, a background job, a loop with `&` -- an entirely realistic way
+    # to use a local CLI tool) one process's `tmp.replace()` could consume
+    # or race another process's in-flight `tmp.write_text()`, crashing with
+    # `FileNotFoundError: ... '<db>.tmp' -> '<db>'`. Live-reproduced: 20
+    # concurrent `add` invocations threw this exact traceback from multiple
+    # processes. Including the writer's pid in the tmp filename makes
+    # concurrent writers' temp files independent of each other.
+    a("        tmp = self.filepath.with_suffix(self.filepath.suffix + f\".{os.getpid()}.tmp\")")
     a("        tmp.write_text(json.dumps(items, indent=2), encoding=\"utf-8\")")
     a("        tmp.replace(self.filepath)")
+    a("")
+    a("    @contextlib.contextmanager")
+    a("    def _locked(self):")
+    a('        """Exclusive, blocking, cross-process lock for one full')
+    a("        load-modify-save cycle.")
+    a("")
+    a("        Finding 25 (part 2): `add`/`delete`/`update`/`clear` used to")
+    a("        call `self.load()` and `self.save(...)` with no locking")
+    a("        around the pair. Two concurrent invocations each load the")
+    a("        same on-disk list, each compute their own next id and append")
+    a("        their own record, and each `save()` their own full in-memory")
+    a("        copy -- the last writer's save silently discards every other")
+    a("        concurrent writer's change, even though every invocation")
+    a("        still prints success and exits 0. Live-reproduced: 20")
+    a("        concurrent `add` invocations against a fresh store (no")
+    a("        locking) left only 12 of the 20 records on disk -- 8 were")
+    a("        silently lost to this race (on top of the separate crash")
+    a("        fixed in `save()` above). A blocking OS-level advisory lock")
+    a("        held for the entire load+save critical section serializes")
+    a("        concurrent writers so no update is ever lost.")
+    a('        """')
+    a("        lock_path = self.filepath.with_suffix(self.filepath.suffix + \".lock\")")
+    a("        self.filepath.parent.mkdir(parents=True, exist_ok=True)")
+    a('        handle = open(lock_path, "a+")')
+    a("        try:")
+    a("            try:")
+    a("                import fcntl")
+    a("                fcntl.flock(handle, fcntl.LOCK_EX)")
+    a("            except ImportError:")
+    a("                pass  # non-POSIX platform: best effort, no cross-process lock")
+    a("            yield")
+    a("        finally:")
+    a("            try:")
+    a("                import fcntl")
+    a("                fcntl.flock(handle, fcntl.LOCK_UN)")
+    a("            except ImportError:")
+    a("                pass")
+    a("            handle.close()")
     a("")
     a("    def next_id(self, items: list[dict[str, Any]]) -> int:")
     a("        return max((int(i.get(\"id\", 0)) for i in items), default=0) + 1")
     a("")
     a("    def add(self, **fields: Any) -> dict[str, Any]:")
-    a("        items = self.load()")
-    a('        record = {"id": self.next_id(items), "created": _now()}')
-    a("        record.update(_DEFAULTS)")
-    a("        record.update(fields)")
-    a("        items.append(record)")
-    a("        self.save(items)")
-    a("        return record")
+    a("        with self._locked():")
+    a("            items = self.load()")
+    a('            record = {"id": self.next_id(items), "created": _now()}')
+    a("            record.update(_DEFAULTS)")
+    a("            record.update(fields)")
+    a("            items.append(record)")
+    a("            self.save(items)")
+    a("            return record")
     a("")
     a("    def find(self, item_id: int) -> dict[str, Any] | None:")
     a("        for item in self.load():")
@@ -446,26 +525,29 @@ def _cli_main(spec: GoalSpec) -> str:
     a("        return None")
     a("")
     a("    def delete(self, item_id: int) -> bool:")
-    a("        items = self.load()")
-    a("        kept = [i for i in items if int(i.get(\"id\", -1)) != int(item_id)]")
-    a("        if len(kept) == len(items):")
-    a("            return False")
-    a("        self.save(kept)")
-    a("        return True")
+    a("        with self._locked():")
+    a("            items = self.load()")
+    a("            kept = [i for i in items if int(i.get(\"id\", -1)) != int(item_id)]")
+    a("            if len(kept) == len(items):")
+    a("                return False")
+    a("            self.save(kept)")
+    a("            return True")
     a("")
     a("    def update(self, item_id: int, **fields: Any) -> dict[str, Any] | None:")
-    a("        items = self.load()")
-    a("        for item in items:")
-    a("            if int(item.get(\"id\", -1)) == int(item_id):")
-    a("                item.update({k: v for k, v in fields.items() if v is not None})")
-    a("                self.save(items)")
-    a("                return item")
-    a("        return None")
+    a("        with self._locked():")
+    a("            items = self.load()")
+    a("            for item in items:")
+    a("                if int(item.get(\"id\", -1)) == int(item_id):")
+    a("                    item.update({k: v for k, v in fields.items() if v is not None})")
+    a("                    self.save(items)")
+    a("                    return item")
+    a("            return None")
     a("")
     a("    def clear(self) -> int:")
-    a("        count = len(self.load())")
-    a("        self.save([])")
-    a("        return count")
+    a("        with self._locked():")
+    a("            count = len(self.load())")
+    a("            self.save([])")
+    a("            return count")
     a("")
     a("")
     a("def _now() -> str:")
@@ -474,7 +556,15 @@ def _cli_main(spec: GoalSpec) -> str:
     a("")
     a("def _print_table(items: list[dict[str, Any]]) -> None:")
     a("    if not items:")
-    a('        print(f"No ' + plural + ' yet. Use \'add\' to create one.")')
+    # NOTE: this is a plain string, not an f-string -- `plural` is already
+    # baked in at generation time, so there is nothing left to interpolate.
+    # A previous version wrote `print(f"No {plural...}...")` with `plural`
+    # concatenated in rather than substituted, which produced a syntactically
+    # valid but placeholder-free f-string in the GENERATED file and tripped
+    # ruff's F541 ("f-string without any placeholders") on every single CLI
+    # build, silently, because the lint check used to never actually run
+    # (see checkers.py LintChecker PATH-fragility fix).
+    a('        print("No ' + plural + " yet. Use 'add' to create one.\")")
     a("        return")
     a("    keys = list(items[0].keys())")
     a("    widths = {k: max(len(str(k)), *(len(str(i.get(k, \"\"))) for i in items)) for k in keys}")
@@ -498,7 +588,17 @@ def _cli_main(spec: GoalSpec) -> str:
         help_text = _CLI_CMD_HELP.get(cmd, f"{cmd} {plural}").format(
             entity=ent, plural=plural
         )
-        a(f'    p_{cmd} = sub.add_parser("{cmd}", help={json.dumps(help_text)})')
+        # Finding 25 (part 3, minor): commands with no further configuration
+        # (e.g. "list", "clear") used to still be assigned to a `p_{cmd}`
+        # variable that nothing ever read afterwards, tripping ruff's F841
+        # ("local variable assigned but never used") on every generated CLI
+        # that had such a command -- caught by re-linting the generator's
+        # own output while verifying the Finding 25 locking fix above.
+        needs_handle = cmd in ("add", "delete", "update", "complete", "search")
+        if needs_handle:
+            a(f'    p_{cmd} = sub.add_parser("{cmd}", help={json.dumps(help_text)})')
+        else:
+            a(f'    sub.add_parser("{cmd}", help={json.dumps(help_text)})')
         if cmd == "add":
             for fname, ftype in spec.fields:
                 if fname in ("id", "created"):
@@ -535,6 +635,87 @@ def _cli_main(spec: GoalSpec) -> str:
     a("    return parser")
     a("")
     a("")
+    # NOTE: command dispatch used to be one long if/elif chain inside
+    # main() itself, which pushed main()'s cyclomatic complexity to 20
+    # (CodeQualityComplexityChecker's threshold is 15) on every generated
+    # CLI -- flagged live but previously invisible because the PATH-fragile
+    # ruff checker never actually ran (see checkers.py fix). Splitting each
+    # command into its own `_cmd_*` handler and dispatching through a dict
+    # keeps main() itself trivial while preserving identical behavior.
+    a("def _cmd_add(store, args):")
+    a("    fields = {k: v for k, v in vars(args).items()")
+    a("              if k not in (\"command\", \"db\", \"func\", \"positional\") and v is not None}")
+    a("    if not fields and getattr(args, \"positional\", None):")
+    a(f'        fields = {{"{spec.fields[0][0]}": " ".join(args.positional)}}')
+    a("    record = store.add(**fields)")
+    a('    print("Added ' + ent + ' #" + str(record["id"]))')
+    a("    return 0")
+    a("")
+    a("")
+    a("def _cmd_list(store, args):")
+    a("    _print_table(store.load())")
+    a("    return 0")
+    a("")
+    a("")
+    a("def _cmd_delete(store, args):")
+    a("    if store.delete(args.id):")
+    a(f'        print(f"Deleted {ent} #{{args.id}}")')
+    a("        return 0")
+    a(f'    print(f"No {ent} with id {{args.id}}", file=sys.stderr)')
+    a("    return 1")
+    a("")
+    a("")
+    a("def _cmd_update(store, args):")
+    a("    fields = {k: v for k, v in vars(args).items()")
+    a("              if k not in (\"command\", \"db\", \"func\", \"id\") and v is not None}")
+    a("    item = store.update(args.id, **fields)")
+    a("    if item is None:")
+    a(f'        print(f"No {ent} with id {{args.id}}", file=sys.stderr)')
+    a("        return 1")
+    a(f'    print(f"Updated {ent} #{{args.id}}")')
+    a("    return 0")
+    a("")
+    a("")
+    a("def _cmd_complete(store, args):")
+    a("    item = store.update(args.id, done=True)")
+    a("    if item is None:")
+    a(f'        print(f"No {ent} with id {{args.id}}", file=sys.stderr)')
+    a("        return 1")
+    a(f'    print(f"Completed {ent} #{{args.id}}")')
+    a("    return 0")
+    a("")
+    a("")
+    a("def _cmd_clear(store, args):")
+    a("    n = store.clear()")
+    a(f'    print(f"Cleared {{n}} {plural}")')
+    a("    return 0")
+    a("")
+    a("")
+    a("def _cmd_search(store, args):")
+    a("    needle = args.keyword.lower()")
+    a("    hits = [i for i in store.load()")
+    a("            if needle in json.dumps(i, default=str).lower()]")
+    a("    _print_table(hits)")
+    a("    return 0 if hits else 1")
+    a("")
+    a("")
+    a("def _cmd_count(store, args):")
+    a(f'    print(f"{{len(store.load())}} {plural}")')
+    a("    return 0")
+    a("")
+    a("")
+    a("_COMMAND_HANDLERS = {")
+    a('    "add": _cmd_add,')
+    a('    "list": _cmd_list,')
+    a('    "delete": _cmd_delete,')
+    a('    "update": _cmd_update,')
+    a('    "complete": _cmd_complete,')
+    a('    "clear": _cmd_clear,')
+    a('    "search": _cmd_search,')
+    a('    "count": _cmd_count,')
+    a("}")
+    a("")
+    a("")
     a("def main(argv: list[str] | None = None) -> int:")
     a("    parser = build_parser()")
     a("    args = parser.parse_args(argv)")
@@ -542,63 +723,11 @@ def _cli_main(spec: GoalSpec) -> str:
     a("        parser.print_help()")
     a("        return 1")
     a(f"    store = {store_cls}(args.db)")
-    a("")
-    a('    if args.command == "add":')
-    a("        fields = {k: v for k, v in vars(args).items()")
-    a("                  if k not in (\"command\", \"db\", \"func\", \"positional\") and v is not None}")
-    a("        if not fields and getattr(args, \"positional\", None):")
-    a(f'            fields = {{"{spec.fields[0][0]}": " ".join(args.positional)}}')
-    a("        record = store.add(**fields)")
-    a('        print("Added ' + ent + ' #" + str(record["id"]))')
-    a("        return 0")
-    a("")
-    a('    if args.command == "list":')
-    a("        _print_table(store.load())")
-    a("        return 0")
-    a("")
-    a('    if args.command == "delete":')
-    a("        if store.delete(args.id):")
-    a(f'            print(f"Deleted {ent} #{{args.id}}")')
-    a("            return 0")
-    a(f'        print(f"No {ent} with id {{args.id}}", file=sys.stderr)')
+    a("    handler = _COMMAND_HANDLERS.get(args.command)")
+    a("    if handler is None:")
+    a("        parser.print_help()")
     a("        return 1")
-    a("")
-    a('    if args.command == "update":')
-    a("        fields = {k: v for k, v in vars(args).items()")
-    a("                  if k not in (\"command\", \"db\", \"func\", \"id\") and v is not None}")
-    a("        item = store.update(args.id, **fields)")
-    a("        if item is None:")
-    a(f'            print(f"No {ent} with id {{args.id}}", file=sys.stderr)')
-    a("            return 1")
-    a(f'        print(f"Updated {ent} #{{args.id}}")')
-    a("        return 0")
-    a("")
-    a('    if args.command == "complete":')
-    a("        item = store.update(args.id, done=True)")
-    a("        if item is None:")
-    a(f'            print(f"No {ent} with id {{args.id}}", file=sys.stderr)')
-    a("            return 1")
-    a(f'        print(f"Completed {ent} #{{args.id}}")')
-    a("        return 0")
-    a("")
-    a('    if args.command == "clear":')
-    a("        n = store.clear()")
-    a(f'        print(f"Cleared {{n}} {plural}")')
-    a("        return 0")
-    a("")
-    a('    if args.command == "search":')
-    a("        needle = args.keyword.lower()")
-    a("        hits = [i for i in store.load()")
-    a("                if needle in json.dumps(i, default=str).lower()]")
-    a("        _print_table(hits)")
-    a("        return 0 if hits else 1")
-    a("")
-    a('    if args.command == "count":')
-    a(f'        print(f"{{len(store.load())}} {plural}")')
-    a("        return 0")
-    a("")
-    a("    parser.print_help()")
-    a("    return 1")
+    a("    return handler(store, args)")
     a("")
     a("")
     a('if __name__ == "__main__":')
@@ -616,7 +745,14 @@ def _cli_tests(spec: GoalSpec) -> str:
     a(f"Tests for {spec.name}.")
     a('"""')
     a("")
-    a("import json")
+    # NOTE: `json` used to be imported here unconditionally even though
+    # nothing in the generated test body ever references it (the only
+    # `json.dumps(...)` call involved is evaluated in THIS generator at
+    # synthesis time, to build an f-string -- it never appears in the
+    # emitted source). That produced a guaranteed ruff F401 ("imported but
+    # unused") on every generated CLI test file, which went unnoticed
+    # because the lint checker could not even locate `ruff` (see the
+    # LintChecker PATH-fragility fix in checkers.py).
     a("from pathlib import Path")
     a("")
     a("import pytest")
@@ -812,7 +948,7 @@ def _api_main(spec: GoalSpec) -> str:
         elif ftype == "list":
             a(f"    {fname}: list[str] = Field(default_factory=list)")
         else:
-            a(f"    {fname}: Optional[str] = None")
+            a(f"    {fname}: Optional[str] = Field(default=None, max_length=10_000)")
     a("")
     a("")
     a(f"class {model}Create(BaseModel):")
@@ -828,7 +964,15 @@ def _api_main(spec: GoalSpec) -> str:
         elif ftype == "list":
             a(f"    {fname}: list[str] = Field(default_factory=list)")
         else:
-            a(f"    {fname}: str = Field(..., min_length=1)")
+            # Finding 24: string fields had no upper bound at all. Live
+            # adversarial probe: POSTing a 2MB `title` to a generated books
+            # API was accepted with 201 and stored in memory uncapped --
+            # trivial to repeat into a resource-exhaustion DoS against the
+            # in-memory `_DB`. 10,000 chars comfortably covers any
+            # legitimate text field (titles, names, free-text notes) while
+            # rejecting pathological payloads with a clean 422 instead of
+            # silently accepting them.
+            a(f"    {fname}: str = Field(..., min_length=1, max_length=10_000)")
     a("")
     a("")
     a('_DB: dict[int, dict[str, Any]] = {}')
@@ -855,7 +999,35 @@ def _api_main(spec: GoalSpec) -> str:
     a("    return record")
     a("")
     a("")
-    a(f'@app.get("/{ent}/{{{spec.entity}_id}}", response_model={model}, tags=["{ent}"])')
+    # The "search" route is a literal path (`/{plural}/search`), while the
+    # "get by id" route below is a parameterized path (`/{plural}/{id}`) on
+    # the exact same prefix. FastAPI/Starlette matches routes in registration
+    # order and does NOT fall through to a later route if an earlier one
+    # matches the URL shape but fails parameter validation -- so if
+    # `/{plural}/{id}` were registered first, a real request to
+    # `/{plural}/search` would match it with "search" as the id, fail int
+    # conversion, and return 422 from the wrong handler. The search endpoint
+    # would exist in the code, be listed in the OpenAPI schema, and still be
+    # 100% unreachable. Verified live: generating an API with both
+    # "get by id" and "search" and hitting GET /item/search returned
+    # `{"detail": [{"type": "int_parsing", "loc": ["path", "item_id"], ...}]}`
+    # with status 422 -- the search handler never ran. Registering the
+    # literal path first fixes this the standard FastAPI way.
+    if "search" in spec.commands:
+        a(f'@app.get("/{plural}/search", response_model=list[{model}], tags=["{ent}"])')
+        a(f"def search_{spec.entity}(q: str = \"\") -> list[dict[str, Any]]:")
+        a('    needle = q.lower()')
+        a("    return [i for i in _DB.values() if needle in json.dumps(i, default=str).lower()]")
+        a("")
+        a("")
+    # Item-level routes use the same plural prefix as the collection routes
+    # above (`/{plural}/{id}`, not `/{singular}/{id}`). Mixing singular and
+    # plural prefixes on the same resource is non-standard REST and silently
+    # breaks any client that (reasonably) assumes one consistent base path --
+    # verified live: GET /books/1 (plural, the path any standard REST client
+    # would guess) 404'd, while only GET /book/1 (singular) worked, even
+    # though POST /books (plural) had just created that very record.
+    a(f'@app.get("/{plural}/{{{spec.entity}_id}}", response_model={model}, tags=["{ent}"])')
     a(f"def get_{spec.entity}({spec.entity}_id: int) -> dict[str, Any]:")
     a("    if item_id not in _DB:".replace("item_id", f"{spec.entity}_id"))
     a(f'        raise HTTPException(status_code=404, detail="{ent} not found")')
@@ -863,7 +1035,7 @@ def _api_main(spec: GoalSpec) -> str:
     a("")
     a("")
     if "update" in spec.commands:
-        a(f'@app.put("/{ent}/{{{spec.entity}_id}}", response_model={model}, tags=["{ent}"])')
+        a(f'@app.put("/{plural}/{{{spec.entity}_id}}", response_model={model}, tags=["{ent}"])')
         a(f"def update_{spec.entity}({spec.entity}_id: int, payload: {model}Create) -> dict[str, Any]:")
         a(f'    if {spec.entity}_id not in _DB:')
         a(f'        raise HTTPException(status_code=404, detail="{ent} not found")')
@@ -872,18 +1044,11 @@ def _api_main(spec: GoalSpec) -> str:
         a("")
         a("")
     if "delete" in spec.commands:
-        a(f'@app.delete("/{ent}/{{{spec.entity}_id}}", status_code=status.HTTP_204_NO_CONTENT, tags=["{ent}"])')
+        a(f'@app.delete("/{plural}/{{{spec.entity}_id}}", status_code=status.HTTP_204_NO_CONTENT, tags=["{ent}"])')
         a(f"def delete_{spec.entity}({spec.entity}_id: int) -> None:")
         a(f'    if {spec.entity}_id not in _DB:')
         a(f'        raise HTTPException(status_code=404, detail="{ent} not found")')
         a(f'    del _DB[{spec.entity}_id]')
-        a("")
-        a("")
-    if "search" in spec.commands:
-        a(f'@app.get("/{ent}/search", response_model=list[{model}], tags=["{ent}"])')
-        a(f"def search_{spec.entity}(q: str = \"\") -> list[dict[str, Any]]:")
-        a('    needle = q.lower()')
-        a("    return [i for i in _DB.values() if needle in json.dumps(i, default=str).lower()]")
         a("")
         a("")
     a("")
@@ -898,7 +1063,7 @@ def _api_main(spec: GoalSpec) -> str:
 
 
 def _api_tests(spec: GoalSpec) -> str:
-    ent, plural = spec.entity, spec.entity_plural
+    plural = spec.entity_plural
     L: list[str] = []
     a = L.append
     a('"""')
@@ -948,30 +1113,43 @@ def _api_tests(spec: GoalSpec) -> str:
     a("")
     a("def test_get_by_id(client):")
     a(f"    cid = client.post(\"/{plural}\", json={{{payload}}}).json()[\"id\"]")
-    a(f'    r = client.get(f"/{ent}/{{cid}}")')
+    a(f'    r = client.get(f"/{plural}/{{cid}}")')
     a("    assert r.status_code == 200")
     a('    assert r.json()["id"] == cid')
     a("")
     a("")
     a("def test_get_missing_is_404(client):")
-    a(f'    r = client.get("/{ent}/999999")')
+    a(f'    r = client.get("/{plural}/999999")')
     a("    assert r.status_code == 404")
     a("")
     a("")
     if "delete" in spec.commands:
         a("def test_delete(client):")
         a(f"    cid = client.post(\"/{plural}\", json={{{payload}}}).json()[\"id\"]")
-        a(f'    r = client.delete(f"/{ent}/{{cid}}")')
+        a(f'    r = client.delete(f"/{plural}/{{cid}}")')
         a("    assert r.status_code == 204")
-        a(f'    assert client.get(f"/{ent}/{{cid}}").status_code == 404')
+        a(f'    assert client.get(f"/{plural}/{{cid}}").status_code == 404')
         a("")
         a("")
     if "update" in spec.commands:
         a("def test_update(client):")
         a(f"    cid = client.post(\"/{plural}\", json={{{payload}}}).json()[\"id\"]")
-        a(f'    r = client.put(f"/{ent}/{{cid}}", json={{{payload}}})')
+        a(f'    r = client.put(f"/{plural}/{{cid}}", json={{{payload}}})')
         a("    assert r.status_code == 200, r.text")
         a('    assert r.json()["id"] == cid')
+        a("")
+        a("")
+    if "search" in spec.commands:
+        a("def test_search_route_is_reachable(client):")
+        a("    # Regression guard: the search route used to be registered")
+        a("    # *after* the parameterized get-by-id route on the same")
+        a("    # prefix, so GET /<plural>/search structurally matched")
+        a("    # /<plural>/{id} first and failed int-parsing with a 422")
+        a("    # before the search handler ever ran.")
+        a(f"    client.post(\"/{plural}\", json={{{payload}}})")
+        a(f'    r = client.get("/{plural}/search", params={{"q": "x"}})')
+        a("    assert r.status_code == 200, r.text")
+        a("    assert isinstance(r.json(), list)")
         a("")
         a("")
     a("def test_validation_rejects_empty(client):")
@@ -1006,6 +1184,19 @@ _LIB_FUNCS = {
 
 
 def _lib_main(spec: GoalSpec) -> str:
+    # `search` (the "contact" entity's only function) needs `json`. This used
+    # to be patched in after the fact with `L.insert(3, "import json")`, which
+    # silently landed *inside* the module docstring (index 3 is the
+    # "Generated by Project FORGE..." line, not the import block) instead of
+    # emitting a real import statement. The result: every "contact" library
+    # this generator produced crashed every call to `search()` with
+    # `NameError: name 'json' is not defined` -- live-reproduced by generating
+    # a contact library and calling `search()`, which raised immediately (and
+    # the library's own generated test caught it as a failure too, so a real
+    # user running `pytest` on the delivered project would see a broken
+    # library out of the box). Needed imports are now computed up front and
+    # emitted as real top-level `import` statements in the header.
+    needs_json = spec.entity == "contact"
     L: list[str] = []
     a = L.append
     a('"""')
@@ -1016,6 +1207,8 @@ def _lib_main(spec: GoalSpec) -> str:
     a("")
     a("from __future__ import annotations")
     a("")
+    if needs_json:
+        a("import json")
     a("from typing import Any")
     a("")
     names = _domain_funcs(spec.entity) if spec.entity in _DOMAIN_BODIES else [
@@ -1096,8 +1289,6 @@ def _lib_main(spec: GoalSpec) -> str:
         a('    return [c for c in contacts if n in json.dumps(c, default=str).lower()]')
         a("")
         a("")
-        if "import json" not in "\n".join(L):
-            L.insert(3, "import json")
     if spec.entity == "url":
         a("def domain(address: str) -> str:")
         a('    """The host part of a URL."""')
@@ -1264,6 +1455,7 @@ def _script_main(spec: GoalSpec) -> str:
     a("")
     a("import argparse")
     a("import csv")
+    a("import io")
     a("import json")
     a("import shutil")
     a("import sys")
@@ -1287,23 +1479,61 @@ def _script_main(spec: GoalSpec) -> str:
     a("")
     a("")
     a("def rename_lower(directory: Path, apply: bool = False) -> list[tuple[Path, Path]]:")
-    a('    """Planned (or applied) lowercase renames."""')
-    a("    plan: list[tuple[Path, Path]] = []")
+    a('    """Planned (or applied) lowercase renames.')
+    a("")
+    a("    Two differently-cased files in the same directory (e.g. README.MD and")
+    a("    readme.md on a case-sensitive filesystem, or any pair of names that")
+    a("    collide once lowercased) can normalize to the same target name.")
+    a("    `Path.rename()` silently overwrites an existing destination on POSIX,")
+    a("    so renaming blindly would destroy one of the two files with no error")
+    a("    and no way to recover it. Live-reproduced: a directory with both")
+    a("    README.MD and readme.md went from 4 files to 3 after `rename --apply`,")
+    a("    silently deleting readme.md's original content. Any rename whose target")
+    a("    already exists (as another file in the directory, or as the computed")
+    a("    target of an earlier entry in this same pass) is skipped and reported")
+    a("    instead of applied.")
+    a('    """')
     a("    if not directory.is_dir():")
     a('        raise NotADirectoryError(str(directory))')
+    a("    existing = {p.name for p in directory.iterdir()}")
+    a("    claimed_targets: set[str] = set()")
+    a("    plan: list[tuple[Path, Path]] = []")
+    a("    skipped: list[tuple[Path, Path]] = []")
     a("    for path in sorted(directory.iterdir()):")
     a("        if not path.is_file():")
     a("            continue")
     a("        target = path.with_name(path.name.lower())")
-    a("        if target != path:")
-    a("            plan.append((path, target))")
-    a("            if apply:")
-    a("                path.rename(target)")
+    a("        if target == path:")
+    a("            continue")
+    a("        collides_with_existing = target.name in existing and target.name != path.name")
+    a("        collides_with_plan = target.name in claimed_targets")
+    a("        if collides_with_existing or collides_with_plan:")
+    a("            skipped.append((path, target))")
+    a("            continue")
+    a("        plan.append((path, target))")
+    a("        claimed_targets.add(target.name)")
+    a("        if apply:")
+    a("            path.rename(target)")
+    a("    if skipped:")
+    a("        for src, dst in skipped:")
+    a('            print(f"skip: {src.name} -> {dst.name} (target already exists)", file=sys.stderr)')
     a("    return plan")
     a("")
     a("")
     a("def backup_today(source: Path, target: Path) -> list[Path]:")
-    a('    """Copy files modified today from source into target."""')
+    a('    """Copy files modified today from source into target.')
+    a("")
+    a("    Mirrors each file's path relative to `source`, instead of flattening")
+    a("    every match to `target / path.name`. `source.rglob(\"*\")` walks")
+    a("    subdirectories, so two files with the same basename in different")
+    a("    subdirectories (e.g. sub1/data.txt and sub2/data.txt) used to both")
+    a("    resolve to the identical flat destination `target/data.txt` and the")
+    a("    second copy silently overwrote the first -- `copied` still reported")
+    a("    both as successfully backed up while one was actually destroyed.")
+    a("    Live-reproduced: backing up a tree with sub1/data.txt and")
+    a("    sub2/data.txt reported \"copied 2 file(s)\" but the backup folder only")
+    a("    ever contained one data.txt, with the other file's content gone.")
+    a('    """')
     a("    target.mkdir(parents=True, exist_ok=True)")
     a("    copied: list[Path] = []")
     a('    today = datetime.now(timezone.utc).date()')
@@ -1312,25 +1542,62 @@ def _script_main(spec: GoalSpec) -> str:
     a("            continue")
     a('        mtime = datetime.fromtimestamp(path.stat().st_mtime, timezone.utc).date()')
     a("        if mtime == today:")
-    a("            dest = target / path.name")
+    a("            dest = target / path.relative_to(source)")
+    a("            dest.parent.mkdir(parents=True, exist_ok=True)")
     a("            shutil.copy2(path, dest)")
     a("            copied.append(dest)")
     a("    return copied")
     a("")
     a("")
     a("def json_to_csv(source: Path, target: Path) -> int:")
-    a('    """Write a JSON array of flat objects to CSV. Returns the row count."""')
+    a('    """Write a JSON array of flat objects to CSV. Returns the row count.')
+    a("")
+    a("    Two bugs were found by actually running this against real-world")
+    a("    JSON shapes instead of only the happy path:")
+    a("")
+    a("    1. A non-dict array item (e.g. a bare string) used to raise an")
+    a('       unhandled "AttributeError: \'str\' object has no attribute')
+    a('       \'keys\'\" with a raw internal traceback instead of a clean,')
+    a("       actionable error.")
+    a("    2. `fieldnames` was taken only from the first row's keys. If a")
+    a("       later row had an extra key not present in the first row (a very")
+    a("       common real-world shape for loosely-structured JSON exports),")
+    a('       `csv.DictWriter.writerows` raised `ValueError: dict contains')
+    a("       fields not in fieldnames` partway through -- but by then the")
+    a("       header and every row before the mismatch had already been")
+    a("       written straight to `target`, leaving a truncated, silently")
+    a("       corrupted CSV file on disk even though the command reported an")
+    a("       error and exited non-zero.")
+    a("")
+    a("    Both are fixed by validating every row is a dict up front (with a")
+    a("    clear ValueError naming the offending index) and collecting the")
+    a("    union of every row's keys -- in first-seen order -- as the header,")
+    a("    so differently-shaped rows no longer crash the writer. The CSV is")
+    a("    also built in memory and written to `target` in one atomic")
+    a("    operation, so a failure can never leave a partially-written file")
+    a("    behind.")
+    a('    """')
     a('    rows = json.loads(source.read_text(encoding="utf-8"))')
     a("    if not isinstance(rows, list):")
     a('        raise ValueError("expected a JSON array")')
     a("    if not rows:")
     a('        target.write_text("", encoding="utf-8")')
     a("        return 0")
-    a('    fieldnames = list(rows[0].keys())')
-    a("    with target.open(\"w\", newline=\"\", encoding=\"utf-8\") as fh:")
-    a("        writer = csv.DictWriter(fh, fieldnames=fieldnames)")
-    a("        writer.writeheader()")
-    a("        writer.writerows(rows)")
+    a("    for index, row in enumerate(rows):")
+    a("        if not isinstance(row, dict):")
+    a('            raise ValueError(f"row {index} is not a JSON object: {row!r}")')
+    a("    fieldnames: list[str] = []")
+    a("    seen = set()")
+    a("    for row in rows:")
+    a("        for key in row:")
+    a("            if key not in seen:")
+    a("                seen.add(key)")
+    a("                fieldnames.append(key)")
+    a("    buffer = io.StringIO()")
+    a("    writer = csv.DictWriter(buffer, fieldnames=fieldnames)")
+    a("    writer.writeheader()")
+    a("    writer.writerows(rows)")
+    a('    target.write_text(buffer.getvalue(), newline="", encoding="utf-8")')
     a("    return len(rows)")
     a("")
     a("")
@@ -1341,7 +1608,8 @@ def _script_main(spec: GoalSpec) -> str:
     a("            plan = rename_lower(args.directory, apply=args.apply)")
     a('            for src, dst in plan:')
     a('                print(f"{src.name} -> {dst.name}")')
-    a('            print(f"{len(plan)} file(s) would be renamed")')
+    a('            verb = "renamed" if args.apply else "would be renamed"')
+    a('            print(f"{len(plan)} file(s) {verb}")')
     a('            return 0')
     a('        if args.command == "backup":')
     a("            copied = backup_today(args.source, args.target)")
@@ -1506,10 +1774,18 @@ _DOMAIN_BODIES = {
         ('def today() -> str:\n    """Today as YYYY-MM-DD (UTC)."""\n'
          '    from datetime import datetime, timezone\n\n'
          '    return datetime.now(timezone.utc).date().isoformat()\n'),
-        ('def days_between(start: str, end: str) -> int:\n    """Whole days from start to end; negative if reversed."""\n'
+        ('def days_between(start: str, end: str) -> int:\n'
+         '    """Whole days from start to end; negative if reversed.\n\n'
+         '    Raises ValueError naming the bad value when a date is not in\n'
+         '    YYYY-MM-DD form, instead of a raw, confusing\n'
+         '    ' + chr(39)*3 + 'invalid literal for int()' + chr(39)*3 + ' buried deep in parsing.\n'
+         '    """\n'
          '    from datetime import date\n\n'
          '    def parse(v: str) -> date:\n'
-         '        y, m, d = (int(x) for x in str(v).split("-"))\n'
+         '        parts = str(v).split("-")\n'
+         '        if len(parts) != 3 or not all(p.isdigit() for p in parts):\n'
+         '            raise ValueError(f"expected a YYYY-MM-DD date, got {v!r}")\n'
+         '        y, m, d = (int(x) for x in parts)\n'
          '        return date(y, m, d)\n\n'
          '    return (parse(end) - parse(start)).days\n'),
     ],

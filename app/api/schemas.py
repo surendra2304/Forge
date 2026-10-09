@@ -27,9 +27,26 @@ class TaskMetadata(BaseModel):
 
 
 class TaskCreateRequest(BaseModel):
-    goal: str = Field(..., description="High-level engineering objective", min_length=3)
+    # `goal` used to have no upper bound at all -- only the global 8 MB
+    # request-body middleware limit (app/main.py) applied. Live-reproduced
+    # (2026-10-07): a single 500 KB goal took ~7 seconds for plain task
+    # *intake* alone (before any synthesis/execution even starts), because
+    # the raw text is repeatedly scanned by goal classification, keyword
+    # matching, and template detection. A client submitting even a handful
+    # of such requests concurrently could starve the whole process. 20,000
+    # characters is already far more than any legitimate engineering brief
+    # needs (the deterministic synthesizer itself only ever uses the first
+    # 200 characters of `raw` in generated docstrings/descriptions).
+    goal: str = Field(
+        ...,
+        description="High-level engineering objective",
+        min_length=3,
+        max_length=20_000,
+    )
     requirements: list[str] = Field(
-        default_factory=list, description="Explicit constraints or requirements"
+        default_factory=list,
+        description="Explicit constraints or requirements",
+        max_length=200,
     )
     mode: TaskMode = Field(default=TaskMode.AUTONOMOUS, description="Execution mode")
     workspace: str | None = Field(

@@ -16,13 +16,21 @@ from app.cli import (
     handle_resume,
     handle_status,
 )
-from app.memory.db import db_manager
+from app.memory.db import DatabaseManager
 from app.memory.models import TaskState
 from app.memory.state_store import StateStore
 
 
 @pytest.mark.asyncio
-async def test_cli_build_and_status(temp_dir: Path):
+async def test_cli_build_and_status(temp_dir: Path, isolated_db_manager: DatabaseManager):
+    # app.cli's handlers (handle_build, handle_status, ...) go through the
+    # real global app.cli.db_manager / orchestrator / workspace_manager
+    # singletons. isolated_db_manager (tests/conftest.py) redirects all of
+    # those -- db_manager bindings across every module that imports it, plus
+    # the shared Settings singleton's base_dir -- into a temp directory for
+    # the duration of this test, so running it never touches the real
+    # data/forge.db or workspaces/ directory on disk.
+    db_manager = isolated_db_manager
     await db_manager.init_db()
 
     goal = "Create a minimal CLI todo tool"
@@ -65,7 +73,8 @@ async def test_cli_build_and_status(temp_dir: Path):
 
 
 @pytest.mark.asyncio
-async def test_cli_pause_resume_cancel(temp_dir: Path):
+async def test_cli_pause_resume_cancel(temp_dir: Path, isolated_db_manager: DatabaseManager):
+    db_manager = isolated_db_manager
     await db_manager.init_db()
     store = StateStore(db_manager)
 
