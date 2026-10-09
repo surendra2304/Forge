@@ -20,7 +20,6 @@ Bug #4   `POST /api/tasks/from-template/{id}` built its workspace from the raw
          workspace root instead of `project/`, and never validated `rel_path`.
 """
 
-import asyncio
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
