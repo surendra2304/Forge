@@ -3,6 +3,8 @@ Unified Execution Engine for Project FORGE.
 Dispatches filesystem, terminal, process, and git actions while enforcing permission boundaries.
 """
 
+import asyncio
+
 from app.core.logging import get_logger
 from app.core.workspace import WorkspaceManager, workspace_manager
 from app.execution.filesystem import FilesystemTool
@@ -38,6 +40,14 @@ class ExecutionEngine:
     def check_permission(self, role: str, permission: ToolPermission) -> None:
         """Check role permissions."""
         self.pm.check_permission(role, permission)
+
+    async def terminate_all_sandboxes(self, timeout: float = 4.0) -> None:
+        """Halt all active background and foreground sandbox processes within timeout seconds."""
+        await asyncio.gather(
+            self.process.stop_all_processes(timeout=timeout),
+            self.terminal.terminate_all_processes(timeout=timeout),
+            return_exceptions=True,
+        )
 
 
 execution_engine = ExecutionEngine()

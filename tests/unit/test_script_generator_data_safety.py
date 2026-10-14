@@ -77,6 +77,10 @@ def generated_script(tmp_path):
     return _load_generated_script(tmp_path / "module_src", GOAL)
 
 
+@pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="Filesystem is case-insensitive on Windows; two files differing only in case cannot coexist in the same directory",
+)
 def test_rename_lower_never_silently_destroys_a_colliding_file(tmp_path, generated_script):
     work = tmp_path / "files"
     work.mkdir()

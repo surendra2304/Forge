@@ -68,7 +68,12 @@ class ProductionSettings(BaseModel):
     # Network
     cors_origins: list[str] = Field(
         default_factory=lambda: [
-            o.strip() for o in os.getenv("CORS_ORIGINS", "*").split(",") if o.strip()
+            o.strip()
+            for o in os.getenv(
+                "CORS_ORIGINS",
+                "https://friday-universe.duckdns.org,http://localhost:8000,http://127.0.0.1:8000,http://localhost:8002,http://localhost:3000",
+            ).split(",")
+            if o.strip()
         ]
     )
 

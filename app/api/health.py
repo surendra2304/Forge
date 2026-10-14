@@ -24,6 +24,7 @@ def _observed_at() -> str:
 
 class LivenessResponse(BaseModel):
     status: str = "ok"
+    service: str = "forge"
     version: str = "0.1.0"
     uptime_seconds: float
     database_connected: bool
@@ -33,6 +34,8 @@ class LivenessResponse(BaseModel):
 
 class ReadinessResponse(BaseModel):
     status: str = "ready"
+    service: str = "forge"
+    version: str = "0.1.0"
     database_connected: bool = True
     workspaces_writable: bool = True
     evidence_class: str = "dependency_readiness"
@@ -41,6 +44,7 @@ class ReadinessResponse(BaseModel):
 
 class DiagnosticResponse(BaseModel):
     status: str = "healthy"
+    service: str = "forge"
     version: str = "0.1.0"
     environment: str = "development"
     database: dict[str, Any]
@@ -70,9 +74,11 @@ async def health_liveness():
         db_ok = False
     return LivenessResponse(
         status="ok",
+        service="forge",
         version=settings.app_version,
         uptime_seconds=sys_m["uptime_seconds"],
         database_connected=db_ok,
+        evidence_class="process_liveness",
         observed_at=_observed_at(),
     )
 
@@ -82,6 +88,13 @@ async def health_liveness():
     methods=["GET", "HEAD"],
     response_model=ReadinessResponse,
     summary="Readiness Probe",
+)
+@health_router.api_route(
+    "/ready",
+    methods=["GET", "HEAD"],
+    response_model=ReadinessResponse,
+    summary="Readiness Probe Alias",
+    include_in_schema=False,
 )
 async def health_readiness():
     """Readiness probe checking database connectivity and workspace filesystem write access."""
@@ -117,6 +130,7 @@ async def health_readiness():
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail={
                 "status": "not_ready",
+                "service": "forge",
                 "database_connected": db_ok,
                 "workspaces_writable": ws_ok,
                 "evidence_class": "dependency_readiness",
@@ -126,6 +140,8 @@ async def health_readiness():
 
     return ReadinessResponse(
         status="ready",
+        service="forge",
+        version=settings.app_version,
         database_connected=db_ok,
         workspaces_writable=ws_ok,
         observed_at=_observed_at(),
@@ -134,6 +150,9 @@ async def health_readiness():
 
 @health_router.get(
     "/health/detailed", response_model=DiagnosticResponse, summary="Detailed Diagnostics"
+)
+@health_router.get(
+    "/status", response_model=DiagnosticResponse, summary="Detailed Diagnostics Alias", include_in_schema=False
 )
 async def health_detailed():
     """Comprehensive diagnostic diagnostics across storage, AI-Universe, and system resources."""
@@ -168,6 +187,7 @@ async def health_detailed():
 
     return DiagnosticResponse(
         status=overall_status,
+        service="forge",
         version=settings.app_version,
         environment=settings.env,
         database={

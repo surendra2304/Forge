@@ -183,5 +183,27 @@ class ProcessManagerTool:
                     results.append(inspected)
         return results
 
+    async def stop_all_processes(self, timeout: float = 4.0) -> int:
+        """Halt all active background sandbox processes cleanly within timeout seconds."""
+        stopped = 0
+        for key, proc in list(self._processes.items()):
+            if proc.returncode is None:
+                parts = key.split(":", 1)
+                task_id = parts[0]
+                proc_id = parts[1] if len(parts) > 1 else key
+                try:
+                    await asyncio.wait_for(
+                        self.stop_process(task_id, proc_id, role="developer"),
+                        timeout=timeout,
+                    )
+                    stopped += 1
+                except Exception as e:
+                    logger.warning(f"Error halting process {key}: {e}")
+                    try:
+                        proc.kill()
+                    except Exception:
+                        pass
+        return stopped
+
 
 process_manager_tool = ProcessManagerTool()

@@ -57,6 +57,19 @@ SAFE_HOST_ENV_ALLOWLIST: frozenset[str] = frozenset(
         "CI",
         "FORGE_TASK_ID",
         "FORGE_ROLE",
+        "SYSTEMROOT",
+        "SystemRoot",
+        "SYSTEMDRIVE",
+        "WINDIR",
+        "COMSPEC",
+        "PATHEXT",
+        "APPDATA",
+        "LOCALAPPDATA",
+        "PROGRAMDATA",
+        "COMMONPROGRAMFILES",
+        "PROGRAMFILES",
+        "PROGRAMFILES(X86)",
+        "ALLUSERSPROFILE",
     }
 )
 
@@ -84,6 +97,7 @@ class TerminalTool:
     ):
         self.wm = wm or workspace_manager
         self.pm = pm or permission_manager
+        self._active_processes: set[asyncio.subprocess.Process] = set()
 
     async def run_command(
         self,
@@ -221,6 +235,7 @@ class TerminalTool:
                 spawn_kwargs["start_new_session"] = True
 
             process = await asyncio.create_subprocess_shell(command, **spawn_kwargs)
+            self._active_processes.add(process)
 
             try:
                 stdout_bytes, stderr_bytes = await asyncio.wait_for(
@@ -283,6 +298,8 @@ class TerminalTool:
                 stderr_bytes = b""
                 exit_code = -9
                 stderr_text = f"Command timed out after {timeout_seconds} seconds"
+            finally:
+                self._active_processes.discard(process)
 
         except Exception as e:
             logger.error(f"Error executing command '{command}' in task {task_id}: {e}")
@@ -363,3 +380,35 @@ class TerminalTool:
             timed_out=False,
             cwd=str(project_dir),
         )
+
+    async def terminate_all_processes(self, timeout: float = 4.0) -> int:
+        """Halt all active sandboxed terminal processes cleanly within timeout seconds."""
+        stopped = 0
+        for proc in list(self._active_processes):
+            if proc.returncode is None:
+                try:
+                    if os.name == "nt":
+                        import subprocess
+
+                        subprocess.run(
+                            ["taskkill", "/F", "/T", "/PID", str(proc.pid)],
+                            capture_output=True,
+                            timeout=2,
+                        )
+                    else:
+                        import signal
+
+                        try:
+                            pgid = os.getpgid(proc.pid)
+                            os.killpg(pgid, signal.SIGTERM)
+                        except Exception:
+                            proc.terminate()
+                    stopped += 1
+                except Exception as e:
+                    logger.warning(f"Error terminating terminal process {proc.pid}: {e}")
+                    try:
+                        proc.kill()
+                    except Exception:
+                        pass
+        return stopped
+

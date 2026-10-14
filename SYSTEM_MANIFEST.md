@@ -17,65 +17,65 @@
 | **Authentication Header** | Authorization: Bearer <configured API key> |
 | **Configured database topology (runtime unverified)** | Local File Workspace / Connected to Memora Cloud |
 | **Configured database URL or namespace (not a secret)** | memora://forge/private |
-| **Configured host (plan, region, and runtime unverified)** | Render service configured (current plan, region, and deployment unverified) |
+| **Configured host (plan, region, and runtime unverified)** | Oracle Cloud Always Free (Ampere A1 ARM64 / AMD x86_64), Caddy Reverse Proxy, friday_mesh |
 
 ---
 
 ## 🎯 2. Purpose & Responsibilities
 
 ### What Forge IS:
-* Forge is a local autonomous software engineering engine. It synthesizes code templates, implements features, runs pytest test generation suites, and manages self-improvement clusters directly on your computer.
+* Forge is the autonomous code synthesis, execution sandbox, linting, and automated refactoring engine for the FRIDAY Universe. It synthesizes full projects, implements features, runs rigorous test generation suites, and executes self-repair cycles within isolated process sandboxes.
 
 ### What Forge DOES:
-* Operates as the **Local Autonomous Software Engineering Engine, Code Synthesizer & Test Suite Generator** within the 9-agent FRIDAY Universe.
-* Communicates directly with peer agents via authenticated REST and WebSocket protocols.
-* Persists private long-term memory records to **Memora** under memora://forge/private.
+* Operates as the **Autonomous Code Synthesis, Execution Sandbox, & Self-Repair Agent** within the 9-agent FRIDAY Universe.
+* Communicates directly with peer agents via authenticated REST and WebSocket protocols over the unified `friday_mesh` private network.
+* Integrates with **Memora** for persistent lessons and execution history.
 
 ---
 
 ## 🌐 3. Ecosystem endpoint configuration
 
-These variable names and URLs are references only; they do not prove live communication. Set real credentials in secret environments.
+Configured private container mesh endpoints within `friday_mesh`:
 
 ```env
 # ============================================================================== #
 #               FRIDAY UNIVERSE MASTER ECOSYSTEM CONFIGURATION                  #
 # ============================================================================== #
 
-# 1. ⚡ Inference AI Multi-Model Gateway (25 Keys)
-INFERENCE_URL=https://inference-h7bn.onrender.com
+# 1. ⚡ Inference AI Multi-Model Gateway
+INFERENCE_URL=http://inference:8000
 INFERENCE_API_KEY=<configure in secret environment>
 
-# 2. Memora cloud memory service (active backend/capacity not verified)
-MEMORA_URL=https://memora-cavc.onrender.com
+# 2. 🧠 Memora Cloud Memory Service
+MEMORA_URL=http://memora:8000
 MEMORA_API_KEY=<configure in secret environment>
 
-# 3. 📈 Stratex Paper/Testnet Strategy Platform (Binance Futures)
-STRATEX_URL=https://stratex-8wj1.onrender.com
+# 3. 📈 Stratex Algorithmic Trading Platform
+STRATEX_URL=http://stratex:8000
 STRATEX_API_KEY=<configure in secret environment>
 
-# 4. IntelX research service (active storage backend not verified)
-INTELX_URL=https://intelx-mygl.onrender.com
+# 4. 🧠 IntelX Evidence & Intelligence Research Engine
+INTELX_URL=http://intelx:8000
 INTELX_API_KEY=<configure in secret environment>
 
 # 5. 🔮 Futuris Calibrated Predictive Forecasting Engine
-FUTURIS_URL=https://futuris-th6f.onrender.com
+FUTURIS_URL=http://futuris:8000
 FUTURIS_API_KEY=<configure in secret environment>
 
 # 6. 🌐 Cortex Autonomous Web Operations & Intelligence
-CORTEX_URL=https://cortex-0m7c.onrender.com
+CORTEX_URL=http://cortex:8000
 CORTEX_API_KEY=<configure in secret environment>
 
 # 7. 🛠️ Forge Local Software Engineering Engine
-FORGE_URL=https://forge-e9kl.onrender.com
+FORGE_URL=http://forge:8000
 FORGE_API_KEY=<configure in secret environment>
 
-# 8. 🛡️ Sentinel Local Cybersecurity & Threat Defense Shield
-SENTINEL_URL=https://sentinel-a861.onrender.com
+# 8. 🛡️ Sentinel Cybersecurity & Threat Defense Shield
+SENTINEL_URL=http://sentinel:8000
 SENTINEL_API_KEY=<configure in secret environment>
 
-# 9. 🤖 FRIDAY Central Desktop Operating System
-FRIDAY_URL=https://friday-zw59.onrender.com
+# 9. 🤖 FRIDAY Central Desktop Operating System Gateway
+FRIDAY_URL=http://friday:10000
 FRIDAY_API_KEY=<configure in secret environment>
 ```
 

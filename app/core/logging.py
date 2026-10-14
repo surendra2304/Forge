@@ -1,30 +1,30 @@
 """
-Structured and colored logging configuration for FORGE.
+Structured and timestamped logging configuration for FORGE.
 """
 
 import logging
-
-from rich.logging import RichHandler
+import sys
 
 
 def setup_logging(debug: bool = True) -> None:
-    """Configure structured console logging using Rich."""
+    """Configure structured, timestamped logging for Forge."""
     level = logging.DEBUG if debug else logging.INFO
-    logging.basicConfig(
-        level=level,
-        format="%(message)s",
-        datefmt="[%X]",
-        handlers=[
-            RichHandler(
-                rich_tracebacks=True,
-                markup=True,
-                show_time=True,
-                show_path=False,
-            )
-        ],
+    formatter = logging.Formatter(
+        fmt="[%(asctime)s] [%(levelname)s] [forge]: %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
     )
+    handler = logging.StreamHandler(sys.stdout)
+    handler.setFormatter(formatter)
+
+    root_logger = logging.getLogger()
+    root_logger.setLevel(level)
+    for h in list(root_logger.handlers):
+        root_logger.removeHandler(h)
+    root_logger.addHandler(handler)
+
     # Silence overly verbose third-party loggers
     logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
+    logging.getLogger("uvicorn.error").setLevel(logging.INFO)
 
 
 def get_logger(name: str) -> logging.Logger:

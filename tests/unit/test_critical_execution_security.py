@@ -63,6 +63,7 @@ async def test_timeout_does_not_kill_the_calling_process(sandboxed_terminal: Ter
     assert os.getpid() > 0
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX process groups not supported on Windows")
 async def test_child_is_spawned_in_its_own_process_group(sandboxed_terminal: TerminalTool):
     """The spawned command must lead a process group distinct from the caller's."""
     task_id = "crit_pgid_probe"

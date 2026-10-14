@@ -82,7 +82,7 @@ class FuturisBuildClient:
     ):
         settings = get_settings()
         self.base_url = str(
-            base_url or getattr(settings, "futuris_url", "https://sentinel-a861.onrender.com") or ""
+            base_url or getattr(settings, "futuris_url", "http://futuris:8000") or ""
         ).rstrip("/")
         self.api_key = api_key or getattr(settings, "futuris_api_key", None)
         self.timeout = timeout

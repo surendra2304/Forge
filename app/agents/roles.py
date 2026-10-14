@@ -1209,7 +1209,7 @@ class TesterRole(BaseAgent):
         # the user. Use the hosting interpreter, and disable both caches.
         cmd_res = await engine.terminal.run_command(
             task_id=task_id,
-            command=f"{sys.executable} -B -m pytest -v -p no:cacheprovider",
+            command=f'"{sys.executable}" -B -m pytest -v -p no:cacheprovider',
             env_vars={"PYTHONPATH": ".", "PYTHONDONTWRITEBYTECODE": "1"},
             role=self.role_name,
         )

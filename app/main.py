@@ -3,7 +3,9 @@ FORGE Application Entry Point.
 FastAPI initialization with lifespan lifecycle management, middleware, and routers.
 """
 
+import asyncio
 import hmac
+import sys
 import warnings
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
@@ -23,6 +25,7 @@ from app.api.marketplace import marketplace_router, task_template_router
 from app.api.routes import router as api_router
 from app.api.tasks import tasks_router
 from app.api.websocket import ws_router
+from app.config.production import production_settings
 from app.core.config import get_settings
 from app.core.logging import get_logger, setup_logging
 from app.dashboard.routes import dashboard_router
@@ -48,9 +51,36 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     await performance_optimizer.optimize_sqlite_pragmas(db_manager)
     logger.info("Database schemas initialized and performance PRAGMAs tuned.")
 
+    # Signal trapping for graceful shutdown in Unix/Linux container environments
+    if sys.platform != "win32":
+        import signal
+
+        loop = asyncio.get_running_loop()
+        for sig in (signal.SIGTERM, signal.SIGINT):
+            try:
+                loop.add_signal_handler(
+                    sig,
+                    lambda s=sig: logger.info(f"Received signal {s}. Triggering graceful shutdown..."),
+                )
+            except (NotImplementedError, RuntimeError):
+                pass
+
     yield
 
     logger.info(f"Shutting down {settings.app_name}...")
+    # Safe cleanup of in-flight execution sandboxes within 5 seconds
+    try:
+        from app.execution.engine import execution_engine
+
+        logger.info("Halting all in-flight sandbox execution processes (5s grace period)...")
+        await asyncio.wait_for(
+            execution_engine.terminate_all_sandboxes(timeout=4.0),
+            timeout=5.0,
+        )
+        logger.info("All in-flight sandboxes cleanly halted.")
+    except Exception as e:
+        logger.warning(f"Sandbox cleanup notice: {e}")
+
 
 
 # Largest accepted request body (8 MB). Guards the worker against unbounded
@@ -158,8 +188,8 @@ def create_app() -> FastAPI:
         # Keep the /api spellings in sync with the bare ones, otherwise the
         # duplicate mounts make the auth-exempt set prefix-dependent.
         if request.url.path in {
-            "/health", "/health/ready", "/docs", "/redoc", "/openapi.json",
-            "/api/health", "/api/health/ready", "/api/openapi.json",
+            "/health", "/health/ready", "/ready", "/status", "/metrics", "/docs", "/redoc", "/openapi.json",
+            "/api/health", "/api/health/ready", "/api/ready", "/api/status", "/api/metrics", "/api/openapi.json",
         } or request.url.path.startswith("/static/"):
             return await call_next(request)
         if request.method in {"GET", "HEAD"} and request.url.path in {"/", "/dashboard"}:
@@ -274,10 +304,22 @@ def create_app() -> FastAPI:
             logger.debug("Failed to record request telemetry", exc_info=True)
         return response
 
-    # Configure CORS for local development and UI dashboards
+    # Configure CORS with explicit whitelist
+    cors_whitelist = [
+        "https://friday-universe.duckdns.org",
+        "http://localhost:8000",
+        "http://127.0.0.1:8000",
+        "http://localhost:8002",
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ]
+    for origin in production_settings.cors_origins:
+        if origin and origin not in cors_whitelist:
+            cors_whitelist.append(origin)
+
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
+        allow_origins=cors_whitelist,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],

@@ -1,59 +1,43 @@
-name: Forge CI
+name: Forge CI/CD Pipeline
 
 on:
   push:
-    branches: [main]
+    branches: [main, master]
   pull_request:
-    branches: [main]
+    branches: [main, master]
   workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
-  quality:
-    name: Lint and tests (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 30
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, windows-latest]
+  ci:
+    name: Build, Lint, Test & Container Verification
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Set up Python
+      - name: Set up Python 3.11
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
           cache: pip
           cache-dependency-path: pyproject.toml
 
-      - name: Install declared development dependencies
-        run: python -m pip install --upgrade pip && python -m pip install -e ".[dev]"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+          python -m pip install -e ".[dev]"
 
-      - name: Lint
+      - name: Linting check (Ruff)
         run: ruff check .
 
-      - name: Import check (Linux)
-        # The 7 GB ubuntu runner OOM-killed pytest even serially (exit 137,
-        # three runs of retained-log evidence). Until a larger free Linux
-        # runner exists, Linux gates imports/lint; the full test gate runs on
-        # windows (16 GB), which completes the suite in ~65s.
-        if: runner.os == 'Linux'
-        run: python -c "import app.main, app.core.orchestrator, app.verification.engine; print('core imports OK')"
+      - name: Run pytest test suite
+        run: python -m pytest tests/ -v --timeout=180
 
-      - name: Run tests (Windows, parallel units)
-        # Development platform and the runner with enough memory for the
-        # suite; failures here are real and get fixed, not skipped.
-        # Golden end-to-end benchmarks spawn nested subprocess trees and are
-        # run serially in the next step: under xdist a worker crashed on
-        # test_golden_benchmark_automated_debugging_loop, and on the Linux
-        # runner they contributed to the OOM kills.
-        if: runner.os == 'Windows'
-        run: python -m pytest -n 2 --timeout=120 --timeout-method=thread tests --ignore=tests/golden -v
-
-      - name: Run golden benchmarks (Windows, serial)
-        if: runner.os == 'Windows'
-        run: python -m pytest tests/golden --timeout=300 --timeout-method=thread -v
+      - name: Verify Docker build
+        run: docker build -t forge .

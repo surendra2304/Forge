@@ -17,6 +17,8 @@ logger = get_logger("memory.db")
 
 SCHEMA_SQL = """
 PRAGMA journal_mode = WAL;
+PRAGMA synchronous = NORMAL;
+PRAGMA busy_timeout = 5000;
 PRAGMA foreign_keys = ON;
 
 CREATE TABLE IF NOT EXISTS projects (
@@ -143,9 +145,11 @@ class DatabaseManager:
         """Async context manager yielding a configured connection."""
         await self._ensure_schema()
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
-        async with aiosqlite.connect(str(self.db_path)) as conn:
+        async with aiosqlite.connect(str(self.db_path), timeout=10.0) as conn:
             conn.row_factory = aiosqlite.Row
             await conn.execute("PRAGMA journal_mode = WAL;")
+            await conn.execute("PRAGMA synchronous = NORMAL;")
+            await conn.execute("PRAGMA busy_timeout = 5000;")
             await conn.execute("PRAGMA foreign_keys = ON;")
             yield conn
 

@@ -27,9 +27,10 @@ class PerformanceOptimizer:
             async with db.connection() as conn:
                 await conn.execute("PRAGMA journal_mode = WAL;")
                 await conn.execute("PRAGMA synchronous = NORMAL;")
+                await conn.execute("PRAGMA busy_timeout = 5000;")
                 await conn.execute("PRAGMA cache_size = -64000;")  # 64MB cache
                 await conn.execute("PRAGMA temp_store = MEMORY;")
-            logger.info("SQLite production PRAGMAs applied (WAL mode, NORMAL sync, 64MB cache).")
+            logger.info("SQLite production PRAGMAs applied (WAL mode, NORMAL sync, busy_timeout 5s, 64MB cache).")
         except Exception as e:
             logger.warning(f"Could not apply SQLite optimizations: {e}")
 

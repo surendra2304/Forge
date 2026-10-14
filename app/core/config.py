@@ -26,7 +26,11 @@ class Settings(BaseSettings):
 
     # Network & Server
     host: str = Field(default="0.0.0.0", description="Server bind host")
-    port: int = Field(default=8000, description="Server port")
+    port: int = Field(
+        default=8000,
+        validation_alias=AliasChoices("PORT", "FORGE_PORT", "port"),
+        description="Server port",
+    )
 
     # Filesystem Paths
     base_dir: Path = Field(default_factory=lambda: Path(__file__).resolve().parent.parent.parent)
@@ -93,7 +97,7 @@ class Settings(BaseSettings):
         description="Default GitHub repository (e.g. owner/repo)",
     )
     ai_universe_url: str = Field(
-        default="https://inference-h7bn.onrender.com",
+        default="http://inference:8000",
         validation_alias=AliasChoices("INFERENCE_URL", "AI_UNIVERSE_URL", "ai_universe_url"),
         description="Base URL for external Inference / AI Universe reasoning engine",
     )
@@ -105,7 +109,7 @@ class Settings(BaseSettings):
         description="API Key for Inference REST API authentication",
     )
     intelx_url: str = Field(
-        default="https://intelx-mygl.onrender.com",
+        default="http://intelx:8000",
         validation_alias=AliasChoices("INTELX_URL", "FORGE_INTELX_URL", "intelx_url"),
         description="Base URL for IntelX technical research intelligence service",
     )
@@ -115,7 +119,7 @@ class Settings(BaseSettings):
         description="API Key for IntelX Technical Research API authentication",
     )
     futuris_url: str = Field(
-        default="https://futuris-th6f.onrender.com",
+        default="http://futuris:8000",
         validation_alias=AliasChoices("FUTURIS_URL", "FORGE_FUTURIS_URL", "futuris_url"),
         description="Base URL for Futuris predictive capacity & success intelligence service",
     )
@@ -127,7 +131,7 @@ class Settings(BaseSettings):
         description="API Key for Futuris API authentication",
     )
     cortex_url: str = Field(
-        default="https://cortex-0m7c.onrender.com",
+        default="http://cortex:8000",
         validation_alias=AliasChoices("CORTEX_URL", "NEXUS_URL", "cortex_url"),
         description="Base URL for Cortex Web Operations engine",
     )
@@ -137,7 +141,7 @@ class Settings(BaseSettings):
         description="API Key for Cortex API authentication",
     )
     memora_url: str = Field(
-        default="https://memora-cavc.onrender.com",
+        default="http://memora:8000",
         validation_alias=AliasChoices("MEMORA_URL", "FORGE_MEMORA_URL", "memora_url"),
         description="Base URL for Memora persistent memory fabric",
     )

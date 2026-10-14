@@ -9,6 +9,7 @@ import sys
 import time
 from abc import ABC, abstractmethod
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 
 from app.core.logging import get_logger
@@ -328,7 +329,7 @@ class LintChecker(BaseChecker):
         # as FORGE itself, independent of PATH.
         cmd_res = await engine.terminal.run_command(
             task_id,
-            f"{sys.executable} -m ruff check . --no-cache --select=E,F --ignore=E501,F841",
+            f'"{sys.executable}" -m ruff check . --no-cache --select=E,F --ignore=E501,F841',
             role="tester",
         )
         duration_ms = (time.perf_counter() - start_time) * 1000.0
@@ -475,7 +476,7 @@ class TestChecker(BaseChecker):
         # the project it is verifying.
         cmd_res = await engine.terminal.run_command(
             task_id,
-            f"{sys.executable} -B -m pytest -v -p no:cacheprovider",
+            f'"{sys.executable}" -B -m pytest -v -p no:cacheprovider',
             env_vars={"PYTHONPATH": ".", "PYTHONDONTWRITEBYTECODE": "1"},
             role="tester",
         )
@@ -549,15 +550,15 @@ class RuntimeChecker(BaseChecker):
                 # sys.executable.
                 if "main.py" in py_files or "src/main.py" in py_files:
                     cmd = (
-                        f"{sys.executable} main.py --help"
+                        f'"{sys.executable}" main.py --help'
                         if "main.py" in py_files
-                        else f"{sys.executable} src/main.py --help"
+                        else f'"{sys.executable}" src/main.py --help'
                     )
                 elif "cli.py" in py_files or "src/cli.py" in py_files:
                     cmd = (
-                        f"{sys.executable} cli.py --help"
+                        f'"{sys.executable}" cli.py --help'
                         if "cli.py" in py_files
-                        else f"{sys.executable} src/cli.py --help"
+                        else f'"{sys.executable}" src/cli.py --help'
                     )
 
         if not cmd:
@@ -641,7 +642,7 @@ class BrowserChecker(BaseChecker):
         # Linux images (only "python3" is guaranteed), or may resolve to a
         # different interpreter than the one FORGE itself is running under.
         # `sys.executable` is always correct and always exists.
-        server_cmd = self.start_server_cmd or f"{sys.executable} -m http.server {port}"
+        server_cmd = self.start_server_cmd or f'"{sys.executable}" -m http.server {port}'
         process_id = f"dev_server_{port}"
 
         issues = []
@@ -690,6 +691,7 @@ class BrowserChecker(BaseChecker):
 
             # 3. Try Playwright real browser automation
             playwright_used = False
+            evidence_path: Path | None = None
             try:
                 from playwright.async_api import async_playwright
 
@@ -830,13 +832,22 @@ class BrowserChecker(BaseChecker):
             if screenshot_path.exists():
                 artifacts_inspected.append(str(screenshot_path.relative_to(paths.root)))
 
-            stdout = (
-                f"Browser verification completed on {base_url}. "
-                f"Evidence saved to {evidence_path.name} (HTTP fetch; Playwright "
-                f"unavailable, no screenshot captured)."
-                if passed
-                else ""
-            )
+            if passed:
+                if playwright_used and screenshot_path.exists():
+                    stdout = (
+                        f"Browser verification completed on {base_url}. "
+                        f"Screenshot captured at {screenshot_path.name}."
+                    )
+                elif evidence_path is not None and evidence_path.exists():
+                    stdout = (
+                        f"Browser verification completed on {base_url}. "
+                        f"Evidence saved to {evidence_path.name} (HTTP fetch; Playwright "
+                        f"unavailable, no screenshot captured)."
+                    )
+                else:
+                    stdout = f"Browser verification completed on {base_url}."
+            else:
+                stdout = ""
             stderr = f"Browser verification detected issues: {issues}" if not passed else ""
 
             return VerificationEvidence(

@@ -52,8 +52,8 @@
 
 ## Documentation-vs-reality: "standalone" claim
 - README.md: "FORGE operates as a 100% independent, standalone tool ... requiring no external ecosystem dependencies." docs/ARCHITECTURE.md: "External platform integrations (FRIDAY/Jarvis...) are explicitly deferred until FORGE achieves mature standalone product readiness."
-- SYSTEM_MANIFEST.md (committed in repo root) describes Forge as one of 9 named agents in "FRIDAY Universe" with a live delegation contract, lists sibling service URLs (Inference, Memora, Stratex, IntelX, Futuris, Cortex, Sentinel, FRIDAY, all *.onrender.com), and says "Communicates directly with peer agents via authenticated REST and WebSocket protocols."
-- Code backs the ecosystem version: app/api/delegate.py ("FRIDAY Universe Forge Delegation" router, mounted in app/main.py), app/config/production.py's `friday_api_key`, app/core/config.py's ai_universe_url/intelx_url/futuris_url/cortex_url/memora_url settings (all default to live onrender.com URLs), render.yaml provisioning FRIDAY_URL/STRATEX_URL/SENTINEL_URL secrets.
+- SYSTEM_MANIFEST.md (committed in repo root) describes Forge as one of 9 named agents in "FRIDAY Universe" with a live delegation contract, lists sibling service URLs (Inference, Memora, Stratex, IntelX, Futuris, Cortex, Sentinel, FRIDAY), and says "Communicates directly with peer agents via authenticated REST and WebSocket protocols."
+- Code backs the ecosystem version: app/api/delegate.py ("FRIDAY Universe Forge Delegation" router, mounted in app/main.py), app/config/production.py's `friday_api_key`, app/core/config.py's ai_universe_url/intelx_url/futuris_url/cortex_url/memora_url settings (all default to live friday_mesh URLs), provisioning FRIDAY_URL/STRATEX_URL/SENTINEL_URL secrets.
 - Verdict: both documents are accurate about different things -- FORGE *can* run standalone (DirectProvider, template fallback, local SQLite) but ships pre-wired, by default, with a whole constellation of external services it will try to reach (and gracefully fall back from) unless explicitly air-gapped.
 
 ## Live run: autonomous build actually works end to end

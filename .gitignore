@@ -1,10 +1,16 @@
 # Environment & Secrets
 .env
+.env.production
 .env.*
 !.env.example
 *.pem
 *.key
 *.secret
+
+# Logs & Temporary Runs
+*.log
+sandbox_runs/
+temp/
 
 # Runtime Directories & Data
 data/
