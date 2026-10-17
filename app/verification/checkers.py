@@ -41,12 +41,17 @@ class BuildChecker(BaseChecker):
         start_time = time.perf_counter()
         paths = engine.wm.get_workspace_paths(task_id)
         if not paths:
+            # A missing workspace is an absence of evidence, not a successful build.
+            # Keep the result explicitly failed so an orchestrator cannot promote a
+            # task to "verified" when no project files were inspected.
             return VerificationEvidence(
                 check_name=self.name,
                 category=self.category,
-                exit_code=0,
-                passed=True,
-                stdout="No workspace paths found.",
+                exit_code=2,
+                passed=False,
+                duration_ms=round((time.perf_counter() - start_time) * 1000.0, 2),
+                stdout="",
+                stderr="Cannot verify build integrity: no workspace paths were produced.",
             )
 
         # 1. Go Stack Check
