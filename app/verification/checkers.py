@@ -618,6 +618,7 @@ class BrowserChecker(BaseChecker):
 
     async def run_check(self, task_id: str, engine: ExecutionEngine) -> VerificationEvidence:
         import asyncio
+        import os
         import time
 
         import httpx
@@ -697,62 +698,63 @@ class BrowserChecker(BaseChecker):
             # 3. Try Playwright real browser automation
             playwright_used = False
             evidence_path: Path | None = None
-            try:
-                from playwright.async_api import async_playwright
+            if os.getenv("FORGE_USE_PLAYWRIGHT", "").lower() in ("1", "true"):
+                try:
+                    from playwright.async_api import async_playwright
 
-                async with async_playwright() as p:
-                    browser = await p.chromium.launch(headless=True)
-                    page = await browser.new_page()
+                    async with async_playwright() as p:
+                        browser = await p.chromium.launch(headless=True)
+                        page = await browser.new_page()
 
-                    # Listen for console errors
-                    page.on(
-                        "console",
-                        lambda msg: (
-                            console_errors.append(msg.text)
-                            if msg.type in ["error", "warning"]
-                            else None
-                        ),
+                        # Listen for console errors
+                        page.on(
+                            "console",
+                            lambda msg: (
+                                console_errors.append(msg.text)
+                                if msg.type in ["error", "warning"]
+                                else None
+                            ),
+                        )
+
+                        # Listen for network failures
+                        page.on(
+                            "requestfailed",
+                            lambda req: network_failures.append(f"{req.url} - {req.failure}"),
+                        )
+                        page.on(
+                            "response",
+                            lambda resp: (
+                                network_failures.append(f"{resp.url} returned status {resp.status}")
+                                if resp.status >= 400
+                                else None
+                            ),
+                        )
+
+                        # Navigate to dev server
+                        await page.goto(base_url, wait_until="networkidle", timeout=5000)
+
+                        # Check for missing images
+                        broken_images = await page.evaluate("""
+                            () => Array.from(document.querySelectorAll('img'))
+                                .filter(img => !img.complete || img.naturalWidth === 0)
+                                .map(img => img.src)
+                        """)
+                        missing_assets.extend(broken_images)
+
+                        # Basic layout / interaction check
+                        buttons = await page.query_selector_all("button")
+                        if buttons:
+                            await buttons[0].click()
+                            await asyncio.sleep(0.1)
+
+                        # Capture screenshot evidence
+                        await page.screenshot(path=str(screenshot_path))
+                        await browser.close()
+                        playwright_used = True
+                except Exception as pe:
+                    logger.info(
+                        f"Playwright browser engine fallback to headless HTTP/DOM verifier: {pe}"
                     )
-
-                    # Listen for network failures
-                    page.on(
-                        "requestfailed",
-                        lambda req: network_failures.append(f"{req.url} - {req.failure}"),
-                    )
-                    page.on(
-                        "response",
-                        lambda resp: (
-                            network_failures.append(f"{resp.url} returned status {resp.status}")
-                            if resp.status >= 400
-                            else None
-                        ),
-                    )
-
-                    # Navigate to dev server
-                    await page.goto(base_url, wait_until="networkidle", timeout=5000)
-
-                    # Check for missing images
-                    broken_images = await page.evaluate("""
-                        () => Array.from(document.querySelectorAll('img'))
-                            .filter(img => !img.complete || img.naturalWidth === 0)
-                            .map(img => img.src)
-                    """)
-                    missing_assets.extend(broken_images)
-
-                    # Basic layout / interaction check
-                    buttons = await page.query_selector_all("button")
-                    if buttons:
-                        await buttons[0].click()
-                        await asyncio.sleep(0.1)
-
-                    # Capture screenshot evidence
-                    await page.screenshot(path=str(screenshot_path))
-                    await browser.close()
-                    playwright_used = True
-            except Exception as pe:
-                logger.info(
-                    f"Playwright browser engine fallback to headless HTTP/DOM verifier: {pe}"
-                )
 
             # 4. Fallback headless HTTP/DOM verifier if Playwright not installed or headless failed
             if not playwright_used:
