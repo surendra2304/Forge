@@ -77,6 +77,70 @@ SAFE_HOST_ENV_ALLOWLIST: frozenset[str] = frozenset(
 logger = get_logger("execution.terminal")
 
 
+def kill_process_tree(pid: int, timeout_sec: float = 3.0) -> bool:
+    """
+    Recursively terminate a process tree on Windows or POSIX.
+    Combines OS process-group signaling with psutil descendant traversal
+    to guarantee zero orphaned child processes or dev servers.
+    """
+    import subprocess
+
+    import psutil
+
+    killed = False
+    # 1. Platform-native process group kill
+    try:
+        if os.name == "nt":
+            subprocess.run(
+                ["taskkill", "/F", "/T", "/PID", str(pid)],
+                capture_output=True,
+                timeout=timeout_sec,
+            )
+            killed = True
+        else:
+            import signal
+
+            killpg_fn = getattr(os, "killpg", None)
+            getpgid_fn = getattr(os, "getpgid", None)
+            sigkill_val = getattr(signal, "SIGKILL", None)
+            if killpg_fn and getpgid_fn and sigkill_val:
+                try:
+                    killpg_fn(getpgid_fn(pid), sigkill_val)
+                    killed = True
+                except Exception:
+                    pass
+    except Exception:
+        pass
+
+    # 2. psutil recursive cleanup for all descendant processes
+    try:
+        parent = psutil.Process(pid)
+        children = parent.children(recursive=True)
+        for child in children:
+            try:
+                child.terminate()
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                pass
+        gone, alive = psutil.wait_procs(children, timeout=1.0)
+        for child in alive:
+            try:
+                child.kill()
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                pass
+        try:
+            parent.kill()
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            pass
+        killed = True
+    except (psutil.NoSuchProcess, psutil.AccessDenied):
+        pass
+    except Exception:
+        pass
+
+    return killed
+
+
+
 class CommandResult(BaseModel):
     command: str
     exit_code: int
@@ -249,27 +313,7 @@ class TerminalTool:
                 # Clean up the *child's* process tree only. The child leads its
                 # own group (see spawn_kwargs above), so this can never reach
                 # the FORGE process that issued the command.
-                killed = False
-                try:
-                    if os.name == "nt":
-                        subprocess.run(
-                            ["taskkill", "/F", "/T", "/PID", str(process.pid)],
-                            capture_output=True,
-                            timeout=5,
-                        )
-                        killed = True
-                    else:
-                        import signal
-
-                        killpg_fn = getattr(os, "killpg", None)
-                        getpgid_fn = getattr(os, "getpgid", None)
-                        sigkill_val = getattr(signal, "SIGKILL", None)
-                        if killpg_fn and getpgid_fn and sigkill_val:
-                            killpg_fn(getpgid_fn(process.pid), sigkill_val)
-                            killed = True
-                except Exception:
-                    killed = False
-
+                killed = kill_process_tree(process.pid, timeout_sec=5.0)
                 if not killed:
                     try:
                         process.kill()
@@ -387,22 +431,7 @@ class TerminalTool:
         for proc in list(self._active_processes):
             if proc.returncode is None:
                 try:
-                    if os.name == "nt":
-                        import subprocess
-
-                        subprocess.run(
-                            ["taskkill", "/F", "/T", "/PID", str(proc.pid)],
-                            capture_output=True,
-                            timeout=2,
-                        )
-                    else:
-                        import signal
-
-                        try:
-                            pgid = os.getpgid(proc.pid)
-                            os.killpg(pgid, signal.SIGTERM)
-                        except Exception:
-                            proc.terminate()
+                    kill_process_tree(proc.pid, timeout_sec=2.0)
                     stopped += 1
                 except Exception as e:
                     logger.warning(f"Error terminating terminal process {proc.pid}: {e}")

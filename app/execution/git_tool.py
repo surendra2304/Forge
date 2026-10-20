@@ -5,6 +5,7 @@ Manages version control, commits, diffs, branches, checkpoints, and rollbacks in
 
 import asyncio
 from pathlib import Path
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -117,6 +118,9 @@ class GitTool:
         code, out, err = await self._run_git(task_id, args)
         return out
 
+    # Alias for API parity
+    get_diff = diff
+
     async def branch(self, task_id: str, branch_name: str, role: str = "developer") -> bool:
         """Create and checkout a new branch."""
         self.pm.check_permission(role, ToolPermission.GIT_WRITE)
@@ -188,7 +192,7 @@ class GitTool:
         role: str = "developer",
         authorized: bool = False,
         pr_token: str | None = None,
-    ) -> dict[str, str]:
+    ) -> dict[str, Any]:
         """
         Create a pull request for changes.
         Requires separate authorization.
@@ -270,6 +274,7 @@ class GitTool:
             return True
         logger.error(f"Rollback failed: {err}")
         return False
+
 
 
 git_tool = GitTool()
