@@ -278,7 +278,7 @@ async def list_tasks(
     needs_superset = since_timestamp is not None or not include_archived
     fetch_limit = min(max(limit * 5, limit + 50), 2000) if needs_superset else limit
     tasks = await store.list_tasks(state=status, limit=fetch_limit, since_timestamp=since_timestamp)
-    summaries = []
+    summaries: list[TaskSummaryResponse] = []
 
     for t in tasks:
         is_archived = t.metadata.get("archived", False)
@@ -473,7 +473,7 @@ async def get_task_logs(
 
                 entries.append(
                     LogEntry(
-                        timestamp=entry_ts,
+                        timestamp=entry_ts.isoformat() if entry_ts is not None else None,
                         level=entry_level,
                         message=line,
                     )
@@ -725,7 +725,7 @@ async def cancel_task(
     store: StateStore = Depends(get_state_store),
 ) -> TaskActionResponse:
     """Gracefully cancel a running task and cleanup background resources."""
-    reason = request.reason if request else "Cancelled via FRIDAY management API"
+    reason = (request.reason if request and request.reason else "Cancelled via FRIDAY management API")
     return await execute_task_cancellation(task_id, reason, lifecycle, store)
 
 

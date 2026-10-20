@@ -20,6 +20,7 @@ from app.templates.web_studio.three_d_engine import (
 
 
 class ForgeWebStudio:
+    _last_blueprint: Any = None
     """Master procedural synthesis engine for modern 3D web applications and attractive websites."""
 
     @classmethod

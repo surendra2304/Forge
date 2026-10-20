@@ -94,13 +94,15 @@ def verify_ws_auth(websocket: WebSocket, api_key: str | None) -> bool:
 
         return not production_settings.api_key_required
 
+    active_keys = [k for k in valid_keys if isinstance(k, str) and k]
+
     # Check query param
-    if api_key and any(hmac.compare_digest(api_key.encode(), key.encode()) for key in valid_keys):
+    if api_key and any(hmac.compare_digest(api_key.encode(), key.encode()) for key in active_keys):
         return True
 
     # Check headers
     header_key = websocket.headers.get("x-friday-api-key") or websocket.headers.get("x-api-key")
-    if header_key and any(hmac.compare_digest(header_key.encode(), key.encode()) for key in valid_keys):
+    if header_key and any(hmac.compare_digest(header_key.encode(), key.encode()) for key in active_keys):
         return True
 
     return False

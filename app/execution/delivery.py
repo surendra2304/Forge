@@ -67,10 +67,12 @@ class DeliveryPackager:
         paths = self.wm.get_workspace_paths(task_id) or self.wm.create_workspace(task_id)
         req_list = requirements or []
 
-        # Optional Sentinel pre-delivery security gate
+        # Optional Sentinel pre-delivery security gate (local scanner + remote Sentinel service)
         if require_sentinel_gate:
+            from app.security.sentinel_client import sentinel_client
             from app.verification.security_scanner import OutputSecurityScanner
 
+            # 1. Local deterministic security scan
             scanner = OutputSecurityScanner(paths.project)
             scan_report = scanner.scan_all()
             if scan_report.blocks_delivery or scan_report.critical_count > 0:
@@ -78,6 +80,34 @@ class DeliveryPackager:
                 msg = f"Sentinel security gate failed with {scan_report.critical_count} critical findings: {'; '.join(issues[:3])}"
                 logger.error(msg)
                 raise SecurityGateFailure(msg)
+
+            # 2. Remote Sentinel gate (http://sentinel:8000/v1/security/audit)
+            diff_text = ""
+            try:
+                diff_text = await self.engine.git.diff(task_id, role="release_engineer")
+            except Exception:
+                diff_text = f"Delivery audit for {task_id}"
+
+            files_map = {}
+            for pf in paths.project.glob("**/*"):
+                if pf.is_file() and pf.stat().st_size < 100_000:
+                    try:
+                        rel = str(pf.relative_to(paths.project))
+                        files_map[rel] = pf.read_text(encoding="utf-8", errors="replace")
+                    except Exception:
+                        pass
+
+            try:
+                await sentinel_client.audit_diff(
+                    task_id=task_id,
+                    diff_text=diff_text,
+                    files=files_map,
+                    fail_closed=require_sentinel_gate,
+                )
+            except SecurityGateFailure:
+                raise
+            except Exception as e:
+                logger.warning(f"Sentinel remote gate evaluation notice: {e}")
 
         # 1. Implementation Summary
         all_project_files = [

@@ -31,6 +31,7 @@ import asyncio
 import os
 import re
 import sqlite3
+import sys
 import time
 import uuid
 from pathlib import Path
@@ -40,8 +41,8 @@ from typing import Any
 # it wins; the local fallback below only runs when it is not.
 try:
     MEMORA_ROOT = Path("d:/FRIDAY Universe/Memora")
-    if str(MEMORA_ROOT) not in os.sys.path:
-        os.sys.path.insert(0, str(MEMORA_ROOT))
+    if str(MEMORA_ROOT) not in sys.path:
+        sys.path.insert(0, str(MEMORA_ROOT))
     from sdk.memora_client import memora_client  # type: ignore  # noqa: F401
 
     _USING_SDK = True

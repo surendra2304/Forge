@@ -150,6 +150,46 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("FORGE_API_KEY", "FORGE_MEMORA_API_KEY", "MEMORA_API_KEY", "memora_api_key"),
         description="Forge's named agent credential for Memora Cloud",
     )
+    sentinel_url: str = Field(
+        default="http://sentinel:8000",
+        validation_alias=AliasChoices("SENTINEL_URL", "FORGE_SENTINEL_URL", "sentinel_url"),
+        description="Base URL for Sentinel security audit and vulnerability analysis gate",
+    )
+    sentinel_api_key: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("SENTINEL_API_KEY", "FORGE_SENTINEL_API_KEY", "sentinel_api_key"),
+        description="API Key for Sentinel API authentication",
+    )
+    database_url: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("DATABASE_URL", "FORGE_DATABASE_URL", "database_url"),
+        description="Explicit database connection URL (e.g. postgresql+asyncpg://... or sqlite+aiosqlite://...)",
+    )
+    postgres_host: str = Field(
+        default="dokploy-postgres",
+        validation_alias=AliasChoices("POSTGRES_HOST", "FORGE_POSTGRES_HOST", "postgres_host"),
+        description="PostgreSQL hostname within the mesh",
+    )
+    postgres_port: int = Field(
+        default=5432,
+        validation_alias=AliasChoices("POSTGRES_PORT", "FORGE_POSTGRES_PORT", "postgres_port"),
+        description="PostgreSQL port",
+    )
+    postgres_user: str = Field(
+        default="forge_user",
+        validation_alias=AliasChoices("POSTGRES_USER", "FORGE_POSTGRES_USER", "postgres_user"),
+        description="PostgreSQL username",
+    )
+    postgres_password: str = Field(
+        default="Rk5fcxK4A-V2i11aBnbvHOMT",
+        validation_alias=AliasChoices("POSTGRES_PASSWORD", "FORGE_POSTGRES_PASSWORD", "postgres_password"),
+        description="PostgreSQL password",
+    )
+    postgres_db: str = Field(
+        default="forge_db",
+        validation_alias=AliasChoices("POSTGRES_DB", "FORGE_POSTGRES_DB", "postgres_db"),
+        description="PostgreSQL database name",
+    )
     git_push_token: str | None = Field(
         default=None,
         validation_alias=AliasChoices("FORGE_GIT_PUSH_TOKEN", "git_push_token"),
@@ -165,6 +205,19 @@ class Settings(BaseSettings):
         extra="ignore",
         populate_by_name=True,
     )
+
+    def get_database_url(self) -> str:
+        """Return the effective database URL (PostgreSQL asyncpg or SQLite aiosqlite)."""
+        if self.database_url:
+            return self.database_url
+        if os.getenv("FORGE_USE_POSTGRES", "0").lower() in ("1", "true", "yes"):
+            return (
+                f"postgresql+asyncpg://{self.postgres_user}:{self.postgres_password}@"
+                f"{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
+            )
+        abs_sqlite = self.base_dir / self.database_path if not self.database_path.is_absolute() else self.database_path
+        path_str = str(abs_sqlite).replace("\\", "/")
+        return f"sqlite+aiosqlite:///{path_str}"
 
     def ensure_directories(self) -> None:
         """Create runtime directories if they do not exist."""

@@ -139,6 +139,9 @@ class ContextManager:
         raw_joined = "\n---\n".join(parts)
         return self.summarize_text(raw_joined, max_tokens=max_tokens)
 
+    # Alias for recovery engine
+    get_terminal_context = get_recent_terminal_logs
+
     def get_recent_diffs(self, task_id: str, max_tokens: int = 1500) -> str:
         """Retrieve recent diff history condensed to fit token budget."""
         diffs = self._diff_history.get(task_id, [])
