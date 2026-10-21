@@ -33,6 +33,7 @@ from app.dashboard.routes import dashboard_router
 from app.memory.db import db_manager
 from app.monitoring.production_monitor import production_monitor
 from app.optimization.performance import performance_optimizer
+from app.streaming.routes import streaming_router
 
 logger = get_logger("main")
 
@@ -361,6 +362,7 @@ def create_app() -> FastAPI:
     app.include_router(synthesis_router, tags=["Synthesis & Refactoring"])
     app.include_router(pipeline_router, tags=["Pipeline Events"])
     app.include_router(ws_router, tags=["WebSockets"])
+    app.include_router(streaming_router, tags=["WebSocket Streaming Gateway"])
     app.include_router(dashboard_router, tags=["Web Dashboard"])
 
     return app
