@@ -8,7 +8,6 @@ import time
 from dataclasses import dataclass
 from typing import Literal
 
-
 RecordStatus = Literal["in_flight", "completed"]
 
 
