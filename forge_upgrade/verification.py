@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import ast
 import os
-from time import perf_counter
 from dataclasses import dataclass, replace
 from pathlib import Path
+from time import perf_counter
 
 from .exec_runner import ExecResult, SandboxedCommandRunner
 from .models import VerificationCheck, VerificationReport
