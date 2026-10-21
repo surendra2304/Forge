@@ -1,4 +1,28 @@
-# FORGE Live-Usage Hardening Campaign — Progress
+# FORGE Engineering Progress
+
+> Roadmap: [FORGE_MASTER_PLAN.md](FORGE_MASTER_PLAN.md). The checklist below preserves the live-usage campaign history; the master plan is the active cross-workstream source of truth.
+
+## Active engineering campaign — 2026-10-22
+
+**Baseline:** `main` at `00ce5fe1e377a81c6e510c90b10c94397ea3e66d`; the latest recorded main workflow passed Ruff, pytest, and Docker build.
+
+**Feature branch:** `feat/forge-master-plan-execution-hardening`
+
+- [x] Add a phased master plan with safety rules, priorities, and exit criteria.
+- [x] Replace whole-output subprocess buffering with bounded per-stream capture while continuously draining both pipes.
+- [x] Add positive finite timeout validation and explicit output-truncation metadata.
+- [x] Add process-group termination and child reaping on timeout/cancellation paths.
+- [x] Add regression tests for exit codes, stream capture, output bounds, timeouts, cancellation, and invalid configuration.
+- [ ] Wait for the candidate branch's full CI and Docker build; fix every observed failure before merge.
+- [ ] Continue P2/P3: DAG state invariants, blocked descendants, idempotency lifecycle/concurrency, and end-to-end generated-project checks.
+
+**Acceptance rule:** do not mark the implementation complete until CI passes on the exact final head SHA and the PR contains the observed results. Cancellation and output truncation tests must pass; no CI bypasses or test skips to conceal regressions.
+
+## Next exact action
+
+Inspect the newest GitHub Actions run for this branch. If CI fails, fetch the failing job log and fix the underlying defect on this branch, add a focused regression test, and re-run all checks. If it passes, review execution call sites for policy enforcement and then begin the P2 DAG-state audit described in the master plan.
+
+---
 
 Task: operate the FORGE agent like a real user across its full capability
 surface, push it to adversarial/extreme conditions, fix every real bug found
