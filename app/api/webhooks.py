@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import asyncio
+import ipaddress
 import math
 import random
+import socket
 from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
 from typing import Any
@@ -35,12 +37,12 @@ class GenericWebhookPayload(BaseModel):
     source: str = "forge"
 
 
-def _validated_webhook_host(webhook_url: str) -> str | None:
-    """Return the hostname for an HTTP(S) URL without embedded credentials."""
+def _validated_webhook_target(webhook_url: str) -> tuple[str, int] | None:
+    """Return an HTTP(S) host/port, rejecting URL credentials and malformed authorities."""
     try:
         parsed = urlsplit(webhook_url)
         # Accessing .port validates malformed port strings and bracketed IPv6 forms.
-        _ = parsed.port
+        explicit_port = parsed.port
     except ValueError:
         return None
     if (
@@ -50,7 +52,56 @@ def _validated_webhook_host(webhook_url: str) -> str | None:
         or parsed.password is not None
     ):
         return None
-    return parsed.hostname
+    default_port = 443 if parsed.scheme.lower() == "https" else 80
+    port = explicit_port if explicit_port is not None else default_port
+    if not 1 <= port <= 65535:
+        return None
+    return parsed.hostname, port
+
+
+def _is_public_address(address: str) -> bool:
+    """Allow globally routable IPs only; exclude private, shared, loopback and special-use ranges."""
+    try:
+        parsed = ipaddress.ip_address(address.split("%", 1)[0])
+    except ValueError:
+        return False
+    return parsed.is_global and not (
+        parsed.is_private
+        or parsed.is_loopback
+        or parsed.is_link_local
+        or parsed.is_multicast
+        or parsed.is_reserved
+        or parsed.is_unspecified
+    )
+
+
+async def _resolve_public_webhook_target(host: str, port: int) -> bool:
+    """Reject callback targets whose literal or DNS-resolved addresses are not public.
+
+    All DNS answers must be public; a mixed public/private answer is rejected rather than
+    trusting the resolver's first result. This is a defense-in-depth check. It is not a
+    complete DNS-rebinding defense because HTTPX performs its own connection-time lookup.
+    """
+    if host.lower().rstrip(".") == "localhost" or host.lower().endswith(".localhost"):
+        return False
+    if host.lower().endswith(".local"):
+        return False
+
+    try:
+        ipaddress.ip_address(host.split("%", 1)[0])
+    except ValueError:
+        try:
+            records = await asyncio.get_running_loop().getaddrinfo(
+                host, port, type=socket.SOCK_STREAM
+            )
+        except (OSError, UnicodeError, ValueError):
+            return False
+        addresses = {record[4][0] for record in records if record and record[4]}
+        if not addresses:
+            return False
+        return all(_is_public_address(address) for address in addresses)
+    else:
+        return _is_public_address(host)
 
 
 def _retry_after_seconds(value: str | None) -> float | None:
@@ -112,8 +163,23 @@ class WebhookDispatcher:
 
         if not webhook_url:
             return False
-        host = _validated_webhook_host(webhook_url)
-        if host is None:
+        target = _validated_webhook_target(webhook_url)
+        if target is None:
+            return False
+        host, port = target
+        try:
+            target_is_public = await _resolve_public_webhook_target(host, port)
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            logger.warning(
+                "Webhook target validation failed host=%s error_type=%s",
+                host,
+                type(exc).__name__,
+            )
+            return False
+        if not target_is_public:
+            logger.warning("Webhook target rejected host=%s: target is not globally routable", host)
             return False
 
         payload = GenericWebhookPayload(
@@ -128,7 +194,11 @@ class WebhookDispatcher:
         }
 
         try:
-            async with httpx.AsyncClient(timeout=_DEFAULT_TIMEOUT_SECONDS) as client:
+            async with httpx.AsyncClient(
+                timeout=_DEFAULT_TIMEOUT_SECONDS,
+                follow_redirects=False,
+                trust_env=False,
+            ) as client:
                 for attempt in range(1, max_retries + 1):
                     retry_after: float | None = None
                     try:
