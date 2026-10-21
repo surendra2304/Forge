@@ -59,11 +59,15 @@ class SandboxedCommandRunner:
             raise TypeError("command must be a string")
         if not command.strip():
             raise ValueError("command must not be empty")
+        try:
+            timeout_value = float(timeout_seconds)
+        except (OverflowError, TypeError, ValueError) as exc:
+            raise ValueError("timeout_seconds must be a finite positive number") from exc
         if (
             isinstance(timeout_seconds, bool)
             or not isinstance(timeout_seconds, (int, float))
-            or not math.isfinite(timeout_seconds)
-            or timeout_seconds <= 0
+            or not math.isfinite(timeout_value)
+            or timeout_value <= 0
         ):
             raise ValueError("timeout_seconds must be a finite positive number")
 
@@ -96,7 +100,7 @@ class SandboxedCommandRunner:
         try:
             _, pending = await asyncio.wait(
                 tasks,
-                timeout=float(timeout_seconds),
+                timeout=timeout_value,
                 return_when=asyncio.ALL_COMPLETED,
             )
             if pending:
