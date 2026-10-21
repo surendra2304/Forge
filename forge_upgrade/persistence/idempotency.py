@@ -34,11 +34,15 @@ class IdempotencyStore:
     """
 
     def __init__(self, ttl_seconds: float = 3600, max_items: int = 50000):
+        try:
+            ttl_value = float(ttl_seconds)
+        except (OverflowError, TypeError, ValueError) as exc:
+            raise ValueError("ttl_seconds must be a finite positive number") from exc
         if (
             isinstance(ttl_seconds, bool)
             or not isinstance(ttl_seconds, (int, float))
-            or not math.isfinite(ttl_seconds)
-            or ttl_seconds <= 0
+            or not math.isfinite(ttl_value)
+            or ttl_value <= 0
         ):
             raise ValueError("ttl_seconds must be a finite positive number")
         if isinstance(max_items, bool) or not isinstance(max_items, int):
@@ -46,7 +50,7 @@ class IdempotencyStore:
         if max_items <= 0:
             raise ValueError("max_items must be positive")
 
-        self.ttl = float(ttl_seconds)
+        self.ttl = ttl_value
         self.max_items = max_items
         self._items: dict[str, IdempotencyRecord] = {}
         self._lock = threading.RLock()
