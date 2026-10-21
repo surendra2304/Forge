@@ -49,6 +49,16 @@ CREATE TABLE IF NOT EXISTS tasks (
     updated_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS idempotency_records (
+    idempotency_key TEXT PRIMARY KEY,
+    request_fingerprint TEXT NOT NULL,
+    task_id TEXT NOT NULL,
+    owner_token TEXT NOT NULL,
+    status TEXT NOT NULL CHECK(status IN ('IN_PROGRESS', 'COMPLETED', 'FAILED')),
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS audit_events (
     id TEXT PRIMARY KEY,
     task_id TEXT NOT NULL,
@@ -93,6 +103,8 @@ CREATE TABLE IF NOT EXISTS checkpoints (
     description TEXT
 );
 
+CREATE INDEX IF NOT EXISTS idx_idempotency_status_updated_at
+    ON idempotency_records(status, updated_at);
 CREATE INDEX IF NOT EXISTS idx_tasks_state ON tasks(state);
 CREATE INDEX IF NOT EXISTS idx_tasks_created_at ON tasks(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_tasks_updated_at ON tasks(updated_at DESC);
