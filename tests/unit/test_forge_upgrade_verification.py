@@ -230,7 +230,8 @@ async def test_timed_out_command_includes_timeout_diagnostic_and_preserves_trunc
     assert not check.passed
     assert check.exit_code == -9
     assert check.stderr == "partial diagnostic\ncommand timed out after 300 seconds"
-    assert check.stdout_truncated if hasattr(check, "stdout_truncated") else True
+    assert check.stdout_truncated
+    assert check.stderr_truncated
     assert report.mandatory_failures == ("slow-check",)
 
 
