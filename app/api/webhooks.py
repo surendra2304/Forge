@@ -75,6 +75,13 @@ def _is_public_address(address: str) -> bool:
     )
 
 
+async def _lookup_webhook_addresses(host: str, port: int) -> list[tuple]:
+    """Resolve a webhook host through the current event loop's resolver."""
+    return await asyncio.get_running_loop().getaddrinfo(
+        host, port, type=socket.SOCK_STREAM
+    )
+
+
 async def _resolve_public_webhook_target(host: str, port: int) -> bool:
     """Reject callback targets whose literal or DNS-resolved addresses are not public.
 
@@ -91,9 +98,7 @@ async def _resolve_public_webhook_target(host: str, port: int) -> bool:
         ipaddress.ip_address(host.split("%", 1)[0])
     except ValueError:
         try:
-            records = await asyncio.get_running_loop().getaddrinfo(
-                host, port, type=socket.SOCK_STREAM
-            )
+            records = await _lookup_webhook_addresses(host, port)
         except (OSError, UnicodeError, ValueError):
             return False
         addresses = {record[4][0] for record in records if record and record[4]}
