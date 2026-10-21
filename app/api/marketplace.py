@@ -2,7 +2,7 @@
 API Marketplace Endpoints, Template Instantiation, and Quality Gate Validation for Project FORGE.
 """
 
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import BaseModel, Field
@@ -47,7 +47,7 @@ async def list_marketplace_templates(
     language: str | None = None,
     framework: str | None = None,
     query: str | None = None,
-    sort_by: str = Query("rating", enum=["rating", "downloads", "name"]),
+    sort_by: Literal["rating", "downloads", "name"] = Query("rating"),
 ):
     """Browse and filter curated marketplace templates."""
     return template_registry.list_templates(
