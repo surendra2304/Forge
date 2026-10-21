@@ -4,13 +4,15 @@ Provides full task lifecycle, inspection, logging, artifact download, cancellati
 """
 
 import asyncio
+import hashlib
 import json
 import mimetypes
 import os
+import secrets
 from datetime import UTC, datetime
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Response, status
 from fastapi.responses import FileResponse
 
 from app.agents.project_types import detect_project_type
@@ -173,6 +175,42 @@ def get_orchestrator(store: StateStore = Depends(get_state_store)) -> Orchestrat
     return OrchestratorCore(store=store)
 
 
+def _task_response_from_entity(task) -> TaskResponse:
+    """Build the public task response from a persisted task entity."""
+    return TaskResponse(
+        id=task.id,
+        goal=task.goal,
+        requirements=task.requirements,
+        mode=task.mode,
+        workspace_path=task.workspace_path,
+        max_budget=task.max_budget,
+        budget_consumed=task.budget_consumed,
+        state=task.state,
+        progress_percentage=task.progress_percentage,
+        error_message=task.error_message,
+        metadata=task.metadata,
+        created_at=task.created_at,
+        updated_at=task.updated_at,
+    )
+
+
+def _request_fingerprint(request: TaskCreateRequest) -> str:
+    """Canonical digest of every task-creation input; never persist raw request secrets."""
+    canonical = json.dumps(
+        request.model_dump(mode="json"),
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+        allow_nan=False,
+    )
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def _idempotency_key_digest(value: str) -> str:
+    """Store only a digest of the caller-supplied idempotency key."""
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+
 @tasks_router.post(
     "",
     response_model=TaskResponse,
@@ -181,10 +219,63 @@ def get_orchestrator(store: StateStore = Depends(get_state_store)) -> Orchestrat
 )
 async def create_task(
     request: TaskCreateRequest,
+    response: Response,
+    idempotency_key: str | None = Header(
+        default=None, alias="Idempotency-Key", max_length=255
+    ),
     orchestrator: OrchestratorCore = Depends(get_orchestrator),
     store: StateStore = Depends(get_state_store),
 ) -> TaskResponse:
-    """Intake, analyze, and provision a new autonomous engineering task."""
+    """Intake a task, deduplicating retries when an Idempotency-Key is provided."""
+    normalized_key = idempotency_key.strip() if idempotency_key is not None else None
+    if idempotency_key is not None and not normalized_key:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Idempotency-Key must not be blank.",
+        )
+    if normalized_key is not None and any(
+        ord(char) < 32 or ord(char) == 127 for char in normalized_key
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Idempotency-Key contains unsupported control characters.",
+        )
+
+    key_digest: str | None = None
+    owner_token: str | None = None
+    reserved_task_id: str | None = None
+    if normalized_key is not None:
+        key_digest = _idempotency_key_digest(normalized_key)
+        owner_token = secrets.token_hex(24)
+        reserved_task_id = f"task_idem_{secrets.token_hex(16)}"
+        fingerprint = _request_fingerprint(request)
+        claim = await store.claim_idempotency_key(
+            key_digest,
+            fingerprint,
+            reserved_task_id,
+            owner_token,
+        )
+        if not claim["owned"]:
+            if claim["request_fingerprint"] != fingerprint:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=(
+                        "This Idempotency-Key was already used with a different task request."
+                    ),
+                )
+            existing_task = await store.get_task(claim["task_id"])
+            if existing_task is None:
+                response.headers["Retry-After"] = "1"
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=(
+                        "An identical task request is already being accepted. Retry shortly "
+                        "with the same Idempotency-Key."
+                    ),
+                )
+            response.status_code = status.HTTP_200_OK
+            return _task_response_from_entity(existing_task)
+
     metadata = {}
     if request.task_metadata:
         metadata = request.task_metadata.model_dump(mode="json")
@@ -194,18 +285,59 @@ async def create_task(
     if request.webhook_url and "webhook_url" not in metadata:
         metadata["webhook_url"] = request.webhook_url
 
-    task, _ = await orchestrator.intake_and_plan(
-        goal=request.goal,
-        requirements=request.requirements,
-        mode=request.mode,
-        repo_url=request.repo_url,
-        local_path=request.local_path,
-        max_budget=request.max_budget,
-    )
+    intake_kwargs = {
+        "goal": request.goal,
+        "requirements": request.requirements,
+        "mode": request.mode,
+        "repo_url": request.repo_url,
+        "local_path": request.local_path,
+        "max_budget": request.max_budget,
+    }
+    if reserved_task_id is not None:
+        intake_kwargs["task_id_override"] = reserved_task_id
 
-    # Attach task metadata
-    task.metadata.update(metadata)
-    await store.save_task(task)
+    try:
+        task, _ = await orchestrator.intake_and_plan(**intake_kwargs)
+        if reserved_task_id is not None and task.id != reserved_task_id:
+            raise RuntimeError("orchestrator did not preserve the reserved task ID")
+        task.metadata.update(metadata)
+        await store.save_task(task)
+    except Exception:
+        if key_digest is not None and owner_token is not None and reserved_task_id is not None:
+            try:
+                persisted_task = await store.get_task(reserved_task_id)
+                if persisted_task is None:
+                    await store.release_idempotency_key(key_digest, owner_token)
+                else:
+                    # Keep the key attached to the failed task so retries cannot create
+                    # a second task after intake has already persisted side effects.
+                    try:
+                        await store.update_task_state(
+                            reserved_task_id,
+                            TaskState.FAILED,
+                            error_message="Task intake failed before acceptance completed.",
+                        )
+                        await store.finish_idempotency_key(key_digest, owner_token, "FAILED")
+                    except Exception as finalization_error:
+                        logger.error(
+                            "Could not finalize failed idempotent request (error_type=%s)",
+                            type(finalization_error).__name__,
+                        )
+            except Exception as cleanup_error:
+                logger.error(
+                    "Could not release failed idempotency reservation (error_type=%s)",
+                    type(cleanup_error).__name__,
+                )
+        raise
+
+    if key_digest is not None and owner_token is not None:
+        try:
+            await store.finish_idempotency_key(key_digest, owner_token, "COMPLETED")
+        except Exception as finalize_error:
+            logger.error(
+                "Could not mark idempotent request complete (error_type=%s)",
+                type(finalize_error).__name__,
+            )
 
     # Initialize progress tracker for task
     ptype = detect_project_type(task.goal, task.requirements).category.value
@@ -238,21 +370,7 @@ async def create_task(
         }
     )
 
-    return TaskResponse(
-        id=task.id,
-        goal=task.goal,
-        requirements=task.requirements,
-        mode=task.mode,
-        workspace_path=task.workspace_path,
-        max_budget=task.max_budget,
-        budget_consumed=task.budget_consumed,
-        state=task.state,
-        progress_percentage=task.progress_percentage,
-        error_message=task.error_message,
-        metadata=task.metadata,
-        created_at=task.created_at,
-        updated_at=task.updated_at,
-    )
+    return _task_response_from_entity(task)
 
 
 @tasks_router.get("", response_model=list[TaskSummaryResponse], summary="List Tasks")
