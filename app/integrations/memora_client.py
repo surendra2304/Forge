@@ -428,12 +428,31 @@ class MemoraClient:
                 now_iso = time.strftime("%Y-%m-%d %H:%M:%S")
                 rec_id = str(uuid.uuid4())
                 content = f"Forge Task: {user_input} | Result: {agent_output}"
+                cols = {col[1] for col in c.execute("PRAGMA table_info(memory_records)").fetchall()}
+                record_data = {
+                    "id": rec_id,
+                    "namespace_id": nid,
+                    "owner_id": aid,
+                    "agent_id": aid,
+                    "user_id": "default",
+                    "workspace_id": "default",
+                    "device_id": "default",
+                    "memory_type": "episodic",
+                    "content_text": content,
+                    "source": f"agent:{agent_name.lower()}",
+                    "confidence": 1.0,
+                    "importance": 0.9,
+                    "lifecycle_state": "active",
+                    "tenant_id": "default",
+                    "observed_at": now_iso,
+                    "created_at": now_iso,
+                }
+                valid_fields = [k for k in record_data if k in cols]
+                placeholders = ", ".join(["?"] * len(valid_fields))
+                col_names = ", ".join(valid_fields)
                 c.execute(
-                    """
-                    INSERT INTO memory_records (id, namespace_id, owner_id, memory_type, content_text, source, confidence, importance, lifecycle_state, tenant_id, created_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """,
-                    (rec_id, nid, aid, "episodic", content, f"agent:{agent_name.lower()}", 1.0, 0.9, "active", "default", now_iso),
+                    f"INSERT INTO memory_records ({col_names}) VALUES ({placeholders})",
+                    [record_data[k] for k in valid_fields],
                 )
                 conn.commit()
                 return {"id": rec_id, "status": "persisted_locally"}
@@ -462,12 +481,31 @@ class MemoraClient:
                 nid = row_ns[0] if row_ns else str(uuid.uuid4())
                 now_iso = time.strftime("%Y-%m-%d %H:%M:%S")
                 rec_id = str(uuid.uuid4())
+                cols = {col[1] for col in c.execute("PRAGMA table_info(memory_records)").fetchall()}
+                record_data = {
+                    "id": rec_id,
+                    "namespace_id": nid,
+                    "owner_id": aid,
+                    "agent_id": aid,
+                    "user_id": "default",
+                    "workspace_id": "default",
+                    "device_id": "default",
+                    "memory_type": "semantic",
+                    "content_text": fact_text,
+                    "source": f"agent:{agent_name.lower()}",
+                    "confidence": 1.0,
+                    "importance": importance,
+                    "lifecycle_state": "active",
+                    "tenant_id": "default",
+                    "observed_at": now_iso,
+                    "created_at": now_iso,
+                }
+                valid_fields = [k for k in record_data if k in cols]
+                placeholders = ", ".join(["?"] * len(valid_fields))
+                col_names = ", ".join(valid_fields)
                 c.execute(
-                    """
-                    INSERT INTO memory_records (id, namespace_id, owner_id, memory_type, content_text, source, confidence, importance, lifecycle_state, tenant_id, created_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """,
-                    (rec_id, nid, aid, "semantic", fact_text, f"agent:{agent_name.lower()}", 1.0, importance, "active", "default", now_iso),
+                    f"INSERT INTO memory_records ({col_names}) VALUES ({placeholders})",
+                    [record_data[k] for k in valid_fields],
                 )
                 conn.commit()
                 return {"id": rec_id, "status": "fact_persisted_locally"}

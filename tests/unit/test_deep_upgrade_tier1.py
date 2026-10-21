@@ -31,6 +31,7 @@ from app.security.sentinel_client import (
 def test_config_postgres_url_resolution():
     """Verify Settings resolves PostgreSQL dokploy-postgres database URL correctly."""
     settings = Settings()
+    settings.database_url = None
     settings.postgres_host = "dokploy-postgres"
     settings.postgres_port = 5432
     settings.postgres_user = "forge_user"

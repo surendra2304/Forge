@@ -8,12 +8,17 @@ ENV PYTHONUNBUFFERED=1 \
     PORT=8000 \
     FORGE_ENV=production
 
-# Install runtime dependencies (git, curl for healthchecks, build-essential)
+# Install runtime dependencies (git, curl for healthchecks, build-essential, nodejs, npm, golang)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     curl \
     build-essential \
-    && rm -rf /var/lib/apt/lists/*
+    nodejs \
+    npm \
+    golang-go \
+    && npm install -g typescript --no-audit --no-fund \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/* /root/.npm
 
 # Implement container security: Create non-root appuser
 RUN useradd -m -u 1000 appuser
