@@ -122,6 +122,8 @@ class VerificationEngine:
                     stdout=result.stdout,
                     stderr=result.stderr,
                     mandatory=command in mandatory_commands,
+                    stdout_truncated=result.stdout_truncated,
+                    stderr_truncated=result.stderr_truncated,
                 )
             )
 
@@ -138,6 +140,8 @@ class VerificationEngine:
                     stdout=result.stdout,
                     stderr=result.stderr,
                     mandatory=True,
+                    stdout_truncated=result.stdout_truncated,
+                    stderr_truncated=result.stderr_truncated,
                 )
             )
 
