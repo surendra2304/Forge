@@ -9,7 +9,6 @@ from time import perf_counter
 from .exec_runner import ExecResult, SandboxedCommandRunner
 from .models import VerificationCheck, VerificationReport
 
-
 _EXCLUDED_PARSE_DIRECTORIES = {
     ".git",
     ".mypy_cache",
@@ -99,7 +98,7 @@ class VerificationEngine:
                 stdout="",
                 stderr=f"failed to start command ({type(exc).__name__}): {exc}",
                 timed_out=False,
-                duration_ms=(time.perf_counter() - started) * 1000,
+                duration_ms=(perf_counter() - started) * 1000,
             )
 
         if result.timed_out:
