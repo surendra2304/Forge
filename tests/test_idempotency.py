@@ -20,13 +20,18 @@ def test_idempotency_basic_compatibility() -> None:
     assert store.get(key).response_hash == "response"  # type: ignore[union-attr]
 
 
-@pytest.mark.parametrize("ttl", [0, -1, float("inf"), float("-inf"), float("nan"), True, 10**10000])
+@pytest.mark.parametrize("ttl", [0, -1, float("inf"), float("-inf"), float("nan"), True])
 def test_store_rejects_invalid_ttl(ttl: float) -> None:
     with pytest.raises(ValueError, match="finite positive"):
         IdempotencyStore(ttl_seconds=ttl)
 
 
 @pytest.mark.parametrize("capacity", [0, -1, True, 1.5])
+def test_store_rejects_unrepresentable_expiry_value() -> None:
+    with pytest.raises(ValueError, match="finite positive"):
+        IdempotencyStore(ttl_seconds=10**10000)
+
+
 def test_store_rejects_invalid_capacity(capacity: int) -> None:
     error = TypeError if isinstance(capacity, float) or isinstance(capacity, bool) else ValueError
     with pytest.raises(error):
