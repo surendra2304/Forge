@@ -4,9 +4,7 @@ import hashlib
 import json
 from pathlib import Path
 
-import pytest
-
-from forge_upgrade.repo_intelligence import RepoIntelligence, RepoMap, RepoFile
+from forge_upgrade.repo_intelligence import RepoFile, RepoIntelligence, RepoMap
 
 
 def test_repo_map(tmp_path: Path) -> None:
