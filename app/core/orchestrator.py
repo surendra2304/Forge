@@ -117,6 +117,7 @@ class OrchestratorCore:
         repo_url: str | None = None,
         local_path: str | Path | None = None,
         context: dict[str, Any] | None = None,
+        task_id_override: str | None = None,
     ) -> tuple[TaskEntity, TaskGraph]:
         """
         Intake a user request, create isolated workspace (with optional git clone or local copy),
@@ -160,22 +161,34 @@ class OrchestratorCore:
         # one SQLite file, and now correctly resyncs `task_id` and the
         # workspace to whatever id actually got persisted.
         async with _TASK_ID_ALLOC_LOCK:
-            if hasattr(self.store, "count_tasks"):
-                total_count = await self.store.count_tasks()
+            if task_id_override is not None:
+                if (
+                    not isinstance(task_id_override, str)
+                    or not task_id_override.strip()
+                    or task_id_override != task_id_override.strip()
+                ):
+                    raise ValueError("task_id_override must be a non-empty, trimmed string")
+                task_id = task_id_override
+                task_seq = 0
+                if await self.store.get_task(task_id):
+                    raise ValueError(f"reserved task id '{task_id}' already exists")
             else:
-                tasks = await self.store.list_tasks(limit=1000)
-                total_count = len(tasks)
-            task_seq = total_count + 1
-            task_id = generate_task_id(task_seq)
-            attempts = 0
-            while await self.store.get_task(task_id):
-                task_seq += 1
+                if hasattr(self.store, "count_tasks"):
+                    total_count = await self.store.count_tasks()
+                else:
+                    tasks = await self.store.list_tasks(limit=1000)
+                    total_count = len(tasks)
+                task_seq = total_count + 1
                 task_id = generate_task_id(task_seq)
-                attempts += 1
-                if attempts > 50:
-                    # Fall back to a collision-proof id rather than looping forever.
-                    task_id = generate_task_id(task_seq) + f"x{token_hex(3)}"
-                    break
+                attempts = 0
+                while await self.store.get_task(task_id):
+                    task_seq += 1
+                    task_id = generate_task_id(task_seq)
+                    attempts += 1
+                    if attempts > 50:
+                        # Fall back to a collision-proof id rather than looping forever.
+                        task_id = generate_task_id(task_seq) + f"x{token_hex(3)}"
+                        break
             logger.info(f"Orchestrator intaking task '{task_id}': {goal[:80]}...")
 
             # 1. Provision isolated workspace under workspaces/<task_id>/
@@ -201,6 +214,12 @@ class OrchestratorCore:
             try:
                 await self.store.create_task(task)
             except Exception as exc:
+                # A caller-supplied reservation ID is part of an idempotency
+                # contract. Never silently change it on a uniqueness collision.
+                if task_id_override is not None:
+                    raise RuntimeError(
+                        f"reserved task id '{task_id}' could not be persisted"
+                    ) from exc
                 # Last-resort guard against a lost race (e.g. another process
                 # sharing this SQLite file): retry once with a guaranteed-unique
                 # id before surfacing the error to the caller.
