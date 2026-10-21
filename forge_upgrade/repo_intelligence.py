@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 IGNORED = {".git", ".venv", "node_modules", "__pycache__", ".pytest_cache", "dist", "build"}
@@ -92,6 +92,6 @@ class RepoIntelligence:
 
     def to_json(self, repo_map: RepoMap) -> str:
         return json.dumps(
-            {"root": repo_map.root, "files": [f.__dict__ for f in repo_map.files]},
+            {"root": repo_map.root, "files": [asdict(file) for file in repo_map.files]},
             indent=2,
         )
