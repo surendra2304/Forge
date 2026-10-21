@@ -30,6 +30,135 @@ class StateStore:
     def __init__(self, db: DatabaseManager | None = None):
         self.db = db or db_manager
 
+    # --- Durable idempotency ---
+
+    async def claim_idempotency_key(
+        self,
+        key_digest: str,
+        request_fingerprint: str,
+        task_id: str,
+        owner_token: str,
+        *,
+        retention_seconds: int = 86_400,
+    ) -> dict[str, Any]:
+        """Atomically claim a client key or return the record owned by its first caller.
+
+        Completed/failed records are retained for a bounded window. In-flight reservations
+        are never reaped by TTL: evicting an active reservation can admit duplicate work.
+        A unique key constraint plus INSERT .. ON CONFLICT makes the claim safe across
+        concurrent requests and across processes sharing the database.
+        """
+        for value, name in (
+            (key_digest, "key_digest"),
+            (request_fingerprint, "request_fingerprint"),
+            (task_id, "task_id"),
+            (owner_token, "owner_token"),
+        ):
+            if not isinstance(value, str) or not value.strip():
+                raise ValueError(f"{name} must be a non-empty string")
+        if isinstance(retention_seconds, bool) or not isinstance(retention_seconds, int):
+            raise TypeError("retention_seconds must be an integer")
+        if retention_seconds <= 0:
+            raise ValueError("retention_seconds must be positive")
+
+        now = datetime.now(UTC)
+        now_iso = now.isoformat()
+        cutoff = datetime.fromtimestamp(
+            now.timestamp() - retention_seconds, tz=UTC
+        ).isoformat()
+        async with self.db.connection() as conn:
+            await conn.execute(
+                "DELETE FROM idempotency_records "
+                "WHERE status IN ('COMPLETED', 'FAILED') AND updated_at < ?",
+                (cutoff,),
+            )
+            await conn.execute(
+                """
+                INSERT INTO idempotency_records
+                    (idempotency_key, request_fingerprint, task_id, owner_token,
+                     status, created_at, updated_at)
+                VALUES (?, ?, ?, ?, 'IN_PROGRESS', ?, ?)
+                ON CONFLICT(idempotency_key) DO NOTHING
+                """,
+                (
+                    key_digest,
+                    request_fingerprint,
+                    task_id,
+                    owner_token,
+                    now_iso,
+                    now_iso,
+                ),
+            )
+            async with conn.execute(
+                """
+                SELECT idempotency_key, request_fingerprint, task_id, owner_token,
+                       status, created_at, updated_at
+                FROM idempotency_records
+                WHERE idempotency_key = ?
+                """,
+                (key_digest,),
+            ) as cursor:
+                row = await cursor.fetchone()
+            await conn.commit()
+
+        if row is None:
+            raise RuntimeError("idempotency claim was not visible after insertion")
+        return {
+            "key_digest": row["idempotency_key"],
+            "request_fingerprint": row["request_fingerprint"],
+            "task_id": row["task_id"],
+            "status": row["status"],
+            "created_at": row["created_at"],
+            "updated_at": row["updated_at"],
+            "owned": row["owner_token"] == owner_token,
+        }
+
+    async def finish_idempotency_key(
+        self,
+        key_digest: str,
+        owner_token: str,
+        status: str,
+    ) -> bool:
+        """Mark the current owner's reservation terminal without changing its task ID."""
+        if status not in {"COMPLETED", "FAILED"}:
+            raise ValueError("status must be COMPLETED or FAILED")
+        now_iso = datetime.now(UTC).isoformat()
+        async with self.db.connection() as conn:
+            async with conn.execute(
+                "SELECT owner_token, status FROM idempotency_records WHERE idempotency_key = ?",
+                (key_digest,),
+            ) as cursor:
+                row = await cursor.fetchone()
+            if row is None or row["owner_token"] != owner_token:
+                await conn.commit()
+                return False
+            await conn.execute(
+                "UPDATE idempotency_records SET status = ?, updated_at = ? "
+                "WHERE idempotency_key = ? AND owner_token = ?",
+                (status, now_iso, key_digest, owner_token),
+            )
+            await conn.commit()
+        return True
+
+    async def release_idempotency_key(self, key_digest: str, owner_token: str) -> bool:
+        """Release an unfulfilled claim after a failure before its task row was created."""
+        async with self.db.connection() as conn:
+            async with conn.execute(
+                "SELECT owner_token, status FROM idempotency_records WHERE idempotency_key = ?",
+                (key_digest,),
+            ) as cursor:
+                row = await cursor.fetchone()
+            if row is None or row["owner_token"] != owner_token or row["status"] != "IN_PROGRESS":
+                await conn.commit()
+                return False
+            await conn.execute(
+                "DELETE FROM idempotency_records "
+                "WHERE idempotency_key = ? AND owner_token = ? AND status = 'IN_PROGRESS'",
+                (key_digest, owner_token),
+            )
+            await conn.commit()
+        return True
+
     # --- Project Management ---
 
     async def create_project(self, project: ProjectWorkspace) -> ProjectWorkspace:
