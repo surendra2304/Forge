@@ -50,6 +50,44 @@ def _as_utc(value: datetime) -> datetime:
 logger = get_logger("api.tasks")
 tasks_router = APIRouter(prefix="/tasks", tags=["Tasks"])
 
+def _parse_concurrency_limit(
+    raw_value: str | None, *, default: int = 3, maximum: int = 32
+) -> int:
+    """Parse an operator-configured worker limit without breaking application startup."""
+    if (
+        isinstance(default, bool)
+        or not isinstance(default, int)
+        or isinstance(maximum, bool)
+        or not isinstance(maximum, int)
+        or default < 1
+        or maximum < default
+    ):
+        raise ValueError("default and maximum must be positive ordered integers")
+    if raw_value is None or not raw_value.strip():
+        return default
+    try:
+        value = int(raw_value.strip())
+    except ValueError:
+        logger.warning(
+            "FORGE_MAX_CONCURRENT_TASKS must be an integer; using default %d",
+            default,
+        )
+        return default
+    if value < 1:
+        logger.warning(
+            "FORGE_MAX_CONCURRENT_TASKS must be positive; using default %d",
+            default,
+        )
+        return default
+    if value > maximum:
+        logger.warning(
+            "FORGE_MAX_CONCURRENT_TASKS exceeds safe maximum; clamping to %d",
+            maximum,
+        )
+        return maximum
+    return value
+
+
 
 def get_state_store() -> StateStore:
     return StateStore(db_manager)
@@ -66,13 +104,12 @@ _PROJECT_TYPE_CACHE_MAX = 2048
 _running_tasks: dict[str, asyncio.Task] = {}
 _running_tasks_guard = asyncio.Lock()
 
-# Bound on concurrent autonomous pipelines. Unbounded, 25 submitted tasks meant
-# 25 simultaneous pipelines each spawning subprocesses and LLM calls, which
-# drove GET /api/tasks?limit=10 from a 255ms p50 to 695ms p50 / 6.3s p99 under
-# sustained load. Excess submissions queue instead of piling onto the worker.
-MAX_CONCURRENT_TASKS = int(os.environ.get("FORGE_MAX_CONCURRENT_TASKS", "3"))
+# Bound concurrent autonomous pipelines: each can spawn subprocesses and LLM calls.
+# Excess submissions wait on this semaphore instead of an unbounded worker pool.
+MAX_CONCURRENT_TASKS = _parse_concurrency_limit(
+    os.environ.get("FORGE_MAX_CONCURRENT_TASKS")
+)
 _execution_slots = asyncio.Semaphore(MAX_CONCURRENT_TASKS)
-_queued_tasks: asyncio.Queue[str] = asyncio.Queue()
 
 
 async def _run_task_supervised(task_id: str, webhook_url: str | None) -> None:
