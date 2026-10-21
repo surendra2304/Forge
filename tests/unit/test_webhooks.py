@@ -1,18 +1,37 @@
-"""Unit tests for the consumer-agnostic webhook dispatcher."""
+"""Unit tests for bounded and SSRF-aware webhook delivery."""
 
 import asyncio
+import socket
 from unittest.mock import AsyncMock, call, patch
 
 import pytest
 from httpx import ASGITransport, AsyncClient, Response
 
-from app.api.webhooks import _retry_after_seconds, webhook_dispatcher
+from app.api import webhooks as webhooks_module
+from app.api.webhooks import (
+    _is_public_address,
+    _resolve_public_webhook_target,
+    _retry_after_seconds,
+    webhook_dispatcher,
+)
 from app.main import app
 from app.memory.db import DatabaseManager
 
 
+@pytest.fixture
+def public_webhook_resolution(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep delivery tests deterministic without depending on a public DNS resolver."""
+    monkeypatch.setattr(
+        webhooks_module,
+        "_resolve_public_webhook_target",
+        AsyncMock(return_value=True),
+    )
+
+
 @pytest.mark.asyncio
-async def test_webhook_dispatch_success_for_any_2xx_response() -> None:
+async def test_webhook_dispatch_success_for_any_2xx_response(
+    public_webhook_resolution: None,
+) -> None:
     with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
         mock_post.return_value = Response(206, json={"status": "accepted"})
         delivered = await webhook_dispatcher.dispatch_event(
@@ -49,9 +68,11 @@ async def test_webhook_dispatch_no_url() -> None:
         "https:///missing-host",
         "https://user:secret@example.com/webhook",
         "https://example.com:not-a-port/webhook",
+        "http://127.0.0.1/private",
+        "http://169.254.169.254/latest/meta-data/",
     ],
 )
-async def test_webhook_rejects_invalid_urls_without_network_calls(url: str) -> None:
+async def test_webhook_rejects_invalid_or_private_urls_without_network_calls(url: str) -> None:
     with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
         delivered = await webhook_dispatcher.dispatch_event(
             webhook_url=url,
@@ -64,7 +85,9 @@ async def test_webhook_rejects_invalid_urls_without_network_calls(url: str) -> N
 
 
 @pytest.mark.asyncio
-async def test_webhook_retries_transport_errors_and_fails_gracefully() -> None:
+async def test_webhook_retries_transport_errors_and_fails_gracefully(
+    public_webhook_resolution: None,
+) -> None:
     with (
         patch(
             "httpx.AsyncClient.post",
@@ -87,7 +110,9 @@ async def test_webhook_retries_transport_errors_and_fails_gracefully() -> None:
 
 
 @pytest.mark.asyncio
-async def test_webhook_retries_transient_statuses_and_honors_retry_after() -> None:
+async def test_webhook_retries_transient_statuses_and_honors_retry_after(
+    public_webhook_resolution: None,
+) -> None:
     with (
         patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post,
         patch("app.api.webhooks.asyncio.sleep", new_callable=AsyncMock) as sleep,
@@ -111,7 +136,9 @@ async def test_webhook_retries_transient_statuses_and_honors_retry_after() -> No
 
 
 @pytest.mark.asyncio
-async def test_permanent_client_error_fails_fast_without_retry() -> None:
+async def test_permanent_client_error_fails_fast_without_retry(
+    public_webhook_resolution: None,
+) -> None:
     with (
         patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post,
         patch("app.api.webhooks.asyncio.sleep", new_callable=AsyncMock) as sleep,
@@ -130,7 +157,9 @@ async def test_permanent_client_error_fails_fast_without_retry() -> None:
 
 
 @pytest.mark.asyncio
-async def test_cancellation_propagates_without_retrying() -> None:
+async def test_cancellation_propagates_without_retrying(
+    public_webhook_resolution: None,
+) -> None:
     with (
         patch(
             "httpx.AsyncClient.post",
@@ -163,7 +192,96 @@ async def test_webhook_rejects_invalid_attempt_limits(attempts) -> None:
         )
 
 
-def test_retry_after_parses_seconds_and_caps_wait() -> None:
+def test_public_address_classifier_rejects_local_and_special_ranges() -> None:
+    for address in (
+        "127.0.0.1",
+        "10.1.2.3",
+        "172.16.0.1",
+        "192.168.1.2",
+        "169.254.169.254",
+        "100.64.0.1",
+        "::1",
+        "fc00::1",
+        "fe80::1",
+        "ff02::1",
+        "0.0.0.0",
+        "not-an-ip",
+    ):
+        assert not _is_public_address(address), address
+    assert _is_public_address("8.8.8.8")
+    assert _is_public_address("2606:4700:4700::1111")
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("host", "port"),
+    [
+        ("localhost", 80),
+        ("service.local", 8080),
+        ("127.0.0.1", 443),
+        ("169.254.169.254", 80),
+        ("::1", 443),
+        ("fc00::1", 443),
+    ],
+)
+async def test_resolver_rejects_private_literal_and_local_hosts(host: str, port: int) -> None:
+    assert not await _resolve_public_webhook_target(host, port)
+
+
+@pytest.mark.asyncio
+async def test_resolver_rejects_mixed_public_and_private_dns_answers(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    public_record = (socket.AF_INET, socket.SOCK_STREAM, 6, "", ("93.184.216.34", 443))
+    private_record = (socket.AF_INET, socket.SOCK_STREAM, 6, "", ("10.0.0.8", 443))
+    monkeypatch.setattr(
+        webhooks_module,
+        "_lookup_webhook_addresses",
+        AsyncMock(return_value=[public_record, private_record]),
+    )
+
+    assert not await _resolve_public_webhook_target("mixed.example", 443)
+
+
+@pytest.mark.asyncio
+async def test_resolver_accepts_only_public_dns_answers(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    records = [
+        (socket.AF_INET, socket.SOCK_STREAM, 6, "", ("93.184.216.34", 443)),
+        (socket.AF_INET, socket.SOCK_STREAM, 6, "", ("8.8.8.8", 443)),
+    ]
+    monkeypatch.setattr(
+        webhooks_module,
+        "_lookup_webhook_addresses",
+        AsyncMock(return_value=records),
+    )
+
+    assert await _resolve_public_webhook_target("public.example", 443)
+
+
+@pytest.mark.asyncio
+async def test_dns_failure_rejects_webhook_without_posting(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        webhooks_module,
+        "_lookup_webhook_addresses",
+        AsyncMock(side_effect=OSError("resolver unavailable")),
+    )
+    with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
+        delivered = await webhook_dispatcher.dispatch_event(
+            webhook_url="https://does-not-resolve.example/events",
+            task_id="task_dns_failure",
+            event="task_started",
+        )
+
+    assert not delivered
+    mock_post.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_retry_after_parser_handles_seconds_and_bounds_waits() -> None:
     assert _retry_after_seconds("1.5") == 1.5
     assert _retry_after_seconds("100000") == 10.0
     assert _retry_after_seconds("-1") is None
