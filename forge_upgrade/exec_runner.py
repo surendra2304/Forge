@@ -23,12 +23,14 @@ def _terminate_process_tree(proc: asyncio.subprocess.Process) -> None:
     """Best-effort termination of the sandbox command and its child processes."""
     try:
         if os.name == "nt":
-            subprocess.run(
+            result = subprocess.run(
                 ["taskkill", "/F", "/T", "/PID", str(proc.pid)],
                 capture_output=True,
                 timeout=5,
                 check=False,
             )
+            if result.returncode != 0:
+                proc.kill()
         elif hasattr(os, "killpg") and hasattr(signal, "SIGKILL"):
             # start_new_session=True gives this command its own process group.
             os.killpg(proc.pid, signal.SIGKILL)
