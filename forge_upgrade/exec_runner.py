@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import os
 import signal
+import subprocess
 import time
 from dataclasses import dataclass
 from typing import Mapping
@@ -16,6 +17,35 @@ class ExecResult:
     stderr: str
     timed_out: bool
     duration_ms: float
+
+
+def _terminate_process_tree(proc: asyncio.subprocess.Process) -> None:
+    """Best-effort termination of the sandbox command and its child processes."""
+    try:
+        if os.name == "nt":
+            subprocess.run(
+                ["taskkill", "/F", "/T", "/PID", str(proc.pid)],
+                capture_output=True,
+                timeout=5,
+                check=False,
+            )
+        elif hasattr(os, "killpg") and hasattr(signal, "SIGKILL"):
+            # start_new_session=True gives this command its own process group.
+            os.killpg(proc.pid, signal.SIGKILL)
+        else:
+            proc.kill()
+    except ProcessLookupError:
+        # The process exited between the timeout/cancellation and the signal.
+        return
+    except Exception:
+        # Fall back to killing the direct child if process-group termination is
+        # unavailable. Never let cleanup errors hide the original cancellation.
+        try:
+            proc.kill()
+        except ProcessLookupError:
+            pass
+        except Exception:
+            pass
 
 
 class SandboxedCommandRunner:
@@ -44,21 +74,20 @@ class SandboxedCommandRunner:
             stdout_b, stderr_b = await asyncio.wait_for(proc.communicate(), timeout=timeout_seconds)
         except asyncio.TimeoutError:
             timed_out = True
-            try:
-                if os.name == "nt":
-                    import subprocess
-
-                    subprocess.run(
-                        ["taskkill", "/F", "/T", "/PID", str(proc.pid)],
-                        capture_output=True,
-                        timeout=5,
-                    )
-                else:
-                    if hasattr(os, "killpg") and hasattr(signal, "SIGKILL"):
-                        os.killpg(proc.pid, signal.SIGKILL)
-            except Exception:
-                pass
+            _terminate_process_tree(proc)
             stdout_b, stderr_b = await proc.communicate()
+        except asyncio.CancelledError:
+            # Cancellation must not orphan the command tree. Kill it, drain the
+            # pipes/reap the child, then preserve cancellation semantics.
+            _terminate_process_tree(proc)
+            try:
+                await proc.communicate()
+            except Exception:
+                try:
+                    await proc.wait()
+                except Exception:
+                    pass
+            raise
         stdout = stdout_b[: self.max_output_bytes].decode("utf-8", "replace")
         stderr = stderr_b[: self.max_output_bytes].decode("utf-8", "replace")
         return ExecResult(
