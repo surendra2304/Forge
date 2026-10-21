@@ -8,6 +8,7 @@ from app.core.logging import get_logger
 from app.providers.anthropic import AnthropicProvider
 from app.providers.base import BaseModelProvider
 from app.providers.direct import DirectProvider
+from app.providers.inference import InferenceProvider
 from app.providers.openai import OpenAIProvider
 
 logger = get_logger("providers.factory")
@@ -31,8 +32,12 @@ def get_provider(
             prov = "openai"
         elif model_name.startswith("claude-"):
             prov = "anthropic"
+        elif model_name.startswith(("llama-", "deepseek-", "qwen-", "gemini-")):
+            prov = "inference"
 
-    if prov == "openai":
+    if prov in ["inference", "ai_universe"]:
+        return InferenceProvider(model_name=model_name, **kwargs)
+    elif prov == "openai":
         return OpenAIProvider(model_name=model_name, **kwargs)
     elif prov == "anthropic":
         return AnthropicProvider(model_name=model_name, **kwargs)
