@@ -198,6 +198,8 @@ class VerificationCheck:
     stdout: str
     stderr: str
     mandatory: bool = True
+    stdout_truncated: bool = False
+    stderr_truncated: bool = False
 
 
 @dataclass(frozen=True, slots=True)

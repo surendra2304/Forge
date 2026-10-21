@@ -3,7 +3,7 @@
 **Owner:** FORGE engineering workstream  
 **Repository:** `surendra2304/Forge`  
 **Plan status:** Active; execute in small, reviewable, CI-gated batches  
-**Baseline:** `main` at `00ce5fe1e377a81c6e510c90b10c94397ea3e66d` (2026-10-21 CI run passed lint, pytest, and Docker build)
+**Current main:** `f6db25b5304d7107869411e3a5f827554631f90b` (P1 subprocess hardening and P2 plan/DAG safety are merged; verify latest `main` workflow before release claims)
 
 ## Mission
 
@@ -76,13 +76,25 @@ Make FORGE a dependable software-engineering agent that can understand a reposit
 - Publish documented setup, configuration, diagnostics, backups/restore, and rollback guidance.
 - Exit: reproducible clean install, green full CI, working health checks, and a release checklist with no unexplained failures.
 
+## Live execution log — 2026-10-22
+
+- [x] **P0 baseline:** inspected repository tree, Actions history, current branch/PR state, and a green full CI run.
+- [x] **P1 subprocess runner core:** merged PR #12 at `859746130e1fe6be807eb19d9687d1746f1e06dc`. Its exact-head CI passed Ruff, full pytest (**560 passed, 1 skipped**), and Docker build: [run 39671108411](https://github.com/surendra2304/Forge/actions/runs/39671108411).
+- [x] **P2 plan/DAG invariants:** merged PR #13 at `f6db25b5304d7107869411e3a5f827554631f90b`. Its exact-head CI passed Ruff, full pytest (**557 passed, 1 skipped**), and Docker build: [run 39671452792](https://github.com/surendra2304/Forge/actions/runs/39671452792).
+- [ ] **P1 verification evidence hardening:** active branch `feat/forge-verification-hardening`. Scans are deterministic and prune dependency/build directories; parse/read errors and root/walk failures are reported; project-escaping file symlinks fail; command start failures and timeouts become diagnostic checks; output-truncation metadata is carried through VerificationCheck. Regression suite added; candidate CI pending.
+- [ ] **P3 idempotency/persistence:** next after the verification PR; prioritize configuration validation, key collision resistance, safe bounded eviction, and concurrency tests.
+- [ ] **Repository intelligence correctness:** fix the confirmed slotted-dataclass serialization defect in `RepoIntelligence.to_json` with a regression test.
+- [ ] **P4–P8:** continue in separate, evidence-gated batches: orchestration lifecycle, generated output live-use testing, webhook retry behavior, API/filesystem security, and release operations.
+
+The current website generator skip is visible and must not be treated as a passing test: `tests/unit/test_deterministic_synthesis.py:163` skips because the website project has no test suite. P5 must establish real smoke/behavior tests or accurately document the missing test contract. Never delete or weaken that skip just to inflate pass counts.
+
 ## Execution order for the current campaign
 
-1. P0: re-check current main CI and repository state. (Baseline currently has a green run.)
-2. P1: harden `forge_upgrade/exec_runner.py` and introduce focused tests. This is the first implementation batch.
-3. Add this plan to the repo and keep `AGENT_PROGRESS.md` in sync with evidence and the next exact action.
-4. Run PR CI. Diagnose and repair every newly exposed issue; do not merge on a partial pass.
-5. Continue P2/P3 in subsequent small batches, using the same tests-first, evidence-gated process.
+1. Finish P1 verification evidence hardening and require exact-head Ruff, full pytest, and Docker success.
+2. Verify merged main CI after P1/P2 integration.
+3. Implement P3 idempotency correctness in a separate feature branch with deterministic expiry/capacity/concurrency tests.
+4. Fix RepoIntelligence serialization and bound filesystem traversal in a separate focused PR.
+5. Continue P4–P8 one defect-driven PR at a time; maintain this log with exact tested SHAs and run URLs.
 
 ## Definition of done
 

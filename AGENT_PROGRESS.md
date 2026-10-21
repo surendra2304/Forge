@@ -4,24 +4,22 @@
 
 ## Active engineering campaign — 2026-10-22
 
-**Baseline:** `main` at `00ce5fe1e377a81c6e510c90b10c94397ea3e66d`; the latest recorded main workflow passed Ruff, pytest, and Docker build.
+**Roadmap:** [FORGE_MASTER_PLAN.md](FORGE_MASTER_PLAN.md)  
+**Current base:** `main` at `f6db25b5304d7107869411e3a5f827554631f90b` after PR #12 and #13.
 
-**Feature branch:** `feat/forge-master-plan-execution-hardening`
+- [x] P0 — Inspect repository and CI baseline; confirm last candidate run evidence.
+- [x] P1 — Harden command execution: bounded pipe capture, truncation flags, timeout handling, process-tree cleanup on cancellation. Merged PR #12; [CI passed](https://github.com/surendra2304/Forge/actions/runs/39671108411): Ruff, 560 passed/1 skipped, Docker.
+- [x] P2 — Enforce delivery TEST/REVIEW ancestors, reject verification bypass edges, enforce legal DAG state transitions and transitively block failed descendants. Merged PR #13; [CI passed](https://github.com/surendra2304/Forge/actions/runs/39671452792): Ruff, 557 passed/1 skipped, Docker.
+- [~] P1 — Verification hardening on branch `feat/forge-verification-hardening`: deterministic bounded scope of Python source scanning, actionable syntax/read/walk errors, root containment, runner-start and timeout diagnostics, preserve stdout/stderr truncation flags. Regression tests have been added; candidate CI pending.
+- [ ] P3 — Idempotency store validation, collision-safe key construction, capacity/TTL edge cases and concurrent tests.
+- [ ] P3 — Fix RepoIntelligence serialization of slotted `RepoFile` dataclasses and add regression coverage.
+- [ ] P4–P8 — Continue orchestrator lifecycle, generator live-use battery, webhook resilience, API/filesystem security, and release-readiness audits.
 
-- [x] Add a phased master plan with safety rules, priorities, and exit criteria.
-- [x] Replace whole-output subprocess buffering with bounded per-stream capture while continuously draining both pipes.
-- [x] Add positive finite timeout validation and explicit output-truncation metadata.
-- [x] Add process-group termination and child reaping on timeout/cancellation paths.
-- [x] Add regression tests for exit codes, stream capture, output bounds, timeouts, cancellation, and invalid configuration.
-- [ ] Wait for the candidate branch's full CI and Docker build; fix every observed failure before merge.
-- [ ] Continue P2/P3: DAG state invariants, blocked descendants, idempotency lifecycle/concurrency, and end-to-end generated-project checks.
-
-**Acceptance rule:** do not mark the implementation complete until CI passes on the exact final head SHA and the PR contains the observed results. Cancellation and output truncation tests must pass; no CI bypasses or test skips to conceal regressions.
+**Acceptance:** exact candidate head must pass Ruff, full pytest and Docker. The existing website-project skip is not counted as a passing test; P5 must establish a meaningful generated-site test contract or record why it cannot be tested.
 
 ## Next exact action
 
-Inspect the newest GitHub Actions run for this branch. If CI fails, fetch the failing job log and fix the underlying defect on this branch, add a focused regression test, and re-run all checks. If it passes, review execution call sites for policy enforcement and then begin the P2 DAG-state audit described in the master plan.
-
+Create/update the verification-hardening PR and inspect its candidate CI logs. Fix any real failures before merge. After this batch, prioritize P3 IdempotencyStore defects (invalid zero capacity, invalid TTL, eviction when updating an existing key, and delimiter-collision-resistant fingerprints), then the confirmed `RepoIntelligence.to_json` slotted-dataclass serialization bug.
 ---
 
 Task: operate the FORGE agent like a real user across its full capability
