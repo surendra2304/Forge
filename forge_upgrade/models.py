@@ -94,7 +94,9 @@ class PlanGraph:
 
     def validate(self) -> list[str]:
         errors: list[str] = []
-        for node in self.nodes.values():
+        for key, node in self.nodes.items():
+            if key != node.node_id:
+                errors.append(f"node key mismatch: {key!r} != {node.node_id!r}")
             for dep in node.dependencies:
                 if dep == node.node_id:
                     errors.append(f"self dependency: {node.node_id}")
