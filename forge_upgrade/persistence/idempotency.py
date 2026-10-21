@@ -73,10 +73,15 @@ class IdempotencyStore:
         return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
 
     def _purge_expired_locked(self, now: float) -> None:
+        # The TTL is a completed-result retention policy, not a lease on active work.
+        # Expiring a still-running claim can admit duplicate side effects while its first
+        # execution is still in progress. A crashed in-memory process loses the whole
+        # registry on restart, so active entries are deliberately retained until release
+        # or completion instead of being guessed stale based on elapsed wall time.
         expired = [
             key
             for key, record in self._items.items()
-            if now - record.created_at >= self.ttl
+            if record.status == "completed" and now - record.created_at >= self.ttl
         ]
         for key in expired:
             self._items.pop(key, None)
