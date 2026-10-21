@@ -72,7 +72,7 @@ def test_search_symbols_is_case_insensitive_and_skips_binary_text(tmp_path: Path
     assert hits == ["module.py"]
 
 
-def test_build_map_prunes_ignored_directories(tmp_path: Path) -> None:
+def test_build_map_ignores_files_in_dependency_directories(tmp_path: Path) -> None:
     visible = tmp_path / "src" / "visible.py"
     visible.parent.mkdir()
     visible.write_text("print('visible')\n", encoding="utf-8")
