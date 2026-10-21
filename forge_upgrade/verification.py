@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import ast
 import os
-import time
+from time import perf_counter
 from dataclasses import dataclass, replace
 from pathlib import Path
 
@@ -89,7 +89,7 @@ class VerificationEngine:
         )
 
     async def _run_command(self, command: str, timeout_seconds: float) -> ExecResult:
-        started = time.perf_counter()
+        started = perf_counter()
         try:
             result = await self.runner.run(command, timeout_seconds=timeout_seconds)
         except OSError as exc:
