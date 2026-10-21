@@ -20,7 +20,7 @@ def test_idempotency_basic_compatibility() -> None:
     assert store.get(key).response_hash == "response"  # type: ignore[union-attr]
 
 
-@pytest.mark.parametrize("ttl", [0, -1, float("inf"), float("-inf"), float("nan"), True])
+@pytest.mark.parametrize("ttl", [0, -1, float("inf"), float("-inf"), float("nan"), True, 10**10000])
 def test_store_rejects_invalid_ttl(ttl: float) -> None:
     with pytest.raises(ValueError, match="finite positive"):
         IdempotencyStore(ttl_seconds=ttl)
