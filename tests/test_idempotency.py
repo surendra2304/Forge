@@ -69,6 +69,21 @@ def test_ttl_expiration_is_enforced_and_expired_entries_are_pruned(monkeypatch) 
     assert store._items == {}
 
 
+def test_inflight_claim_does_not_expire_with_completed_result_ttl(monkeypatch) -> None:
+    import forge_upgrade.persistence.idempotency as module
+
+    clock = [100.0]
+    monkeypatch.setattr(module.time, "monotonic", lambda: clock[0])
+    store = IdempotencyStore(ttl_seconds=5, max_items=1)
+    assert store.try_claim("long-operation")
+
+    clock[0] = 10_000.0
+    assert store.seen("long-operation")
+    assert store.get("long-operation").status == "in_flight"  # type: ignore[union-attr]
+    with pytest.raises(IdempotencyCapacityError, match="in-flight"):
+        store.try_claim("duplicate-operation")
+
+
 def test_update_existing_full_store_does_not_evict_an_unrelated_record() -> None:
     store = IdempotencyStore(max_items=2)
     store.remember("first", "old-response")
